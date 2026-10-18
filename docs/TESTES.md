@@ -3,8 +3,8 @@
 | Camada | Comando | O que cobre |
 |---|---|---|
 | Servidor de login | `npx vitest run server` | só existem tabelas de usuários; nenhuma rota de dados; primeiro acesso; sal não revela contas; CSRF; bloqueio de conta; inatividade; `Clear-Site-Data`; escalada de privilégio; ativação por link; MFA (vetor RFC 6238); troca de senha; limite de corpo |
-| Motor no navegador | `cd frontend && npx vitest run` | normalização (números, datas, fusos, durações, tipos, CGI, coordenadas), resolução de ERB (R1–R4, ambiguidade, MCC/MNC, versões), assistente |
-| Ponta a ponta (no mesmo ambiente da Cloudflare, via wrangler) | `npx playwright test` | primeiro acesso → login → demonstração → todas as telas sem erro → exportação Excel e PDF → **nada no armazenamento do navegador** → sair → novo login sem dados; carga de arquivo pelo assistente; cadastro e ativação de usuário; ocultar números; bloqueio e desbloqueio de tela |
+| Motor no navegador | `cd frontend && npx vitest run` | normalização (números, datas, fusos, durações, tipos, CGI, coordenadas), resolução de ERB (R1–R4, ambiguidade, MCC/MNC, versões), leitor de WhatsApp Records (HTML da Meta e texto, datas/IPs inválidos), mapeamento automático com cabeçalhos de TIM/Vivo/Claro/Oi, ocultação de números, assistente |
+| Ponta a ponta (no mesmo ambiente da Cloudflare, via wrangler) | `npx playwright test` | primeiro acesso → login → demonstração → todas as telas sem erro → exportação Excel e PDF → **nada no armazenamento do navegador** → sair → novo login sem dados; carga de arquivo pelo assistente; cadastro e ativação de usuário; ocultar números; bloqueio e desbloqueio de tela; WhatsApp Records (importação automática pela tela, IPs em comum, grupos, exportação) |
 | Tipos, lint, build | `npm run typecheck && npx eslint . && npm run build` | inclui a checagem de que nenhum arquivo passa de 25 MiB (CI) |
 
 Todos os comandos rodam na pasta `frontend`. O teste ponta a ponta compila o site e sobe sozinho o ambiente local da

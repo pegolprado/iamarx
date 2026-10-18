@@ -14,7 +14,7 @@ const CDR_GROUPS: [string, string[]][] = [
   ['Números', ['target_number', 'a_number', 'b_number', 'other_number', 'direction']],
   ['Evento', ['event_type', 'datetime', 'date', 'time', 'timezone', 'duration', 'status']],
   ['Rede / célula', ['tech', 'mcc', 'mnc', 'lac', 'tac', 'cell_id', 'eci', 'nci', 'cgi', 'erb_raw', 'lat', 'lon', 'azimuth']],
-  ['Aparelho e dados', ['imei', 'imsi', 'ip', 'bytes_up', 'bytes_down']],
+  ['Aparelho e dados', ['imei', 'imsi', 'ip', 'port', 'bytes_up', 'bytes_down']],
 ]
 const ERB_GROUPS: [string, string[]][] = [
   ['Identificação', ['operator', 'tech', 'mcc', 'mnc', 'lac', 'tac', 'cell_id', 'eci', 'nci', 'cgi']],

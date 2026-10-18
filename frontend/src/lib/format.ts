@@ -8,8 +8,15 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   dados: 'Sessão de dados',
   desvio: 'Chamada desviada',
   evento_rede: 'Evento de rede',
+  wa_msg_enviada: 'WhatsApp: msg enviada',
+  wa_msg_recebida: 'WhatsApp: msg recebida',
+  wa_chamada_originada: 'WhatsApp: chamada originada',
+  wa_chamada_recebida: 'WhatsApp: chamada recebida',
+  wa_conexao: 'WhatsApp: conexão (IP)',
   outro: 'Outro registro',
 }
+
+export const WHATSAPP = ['wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida', 'wa_conexao']
 
 export const VOICE = ['voz_originada', 'voz_recebida', 'voz', 'desvio']
 export const SMS = ['sms_enviado', 'sms_recebido', 'sms']

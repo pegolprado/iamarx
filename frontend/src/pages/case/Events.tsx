@@ -9,7 +9,7 @@ import { EVENT_EXPORT_COLS } from '../../engine/report'
 import { useCase } from '../../app/layout'
 import { type EventFilter, FilterBar } from '../../components/FilterBar'
 import { Badge, Criteria, ErrorBox, Loading, PageHeader, Pagination, Tabs } from '../../components/ui'
-import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtInt, fmtNumber, RESOLUTION_LABEL, SMS, VOICE } from '../../lib/format'
+import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtInt, fmtNumber, RESOLUTION_LABEL, SMS, VOICE, WHATSAPP } from '../../lib/format'
 import { useUrlFilter } from '../../lib/useUrlFilter'
 
 type Col = { key: string; label: string; sort?: string; render: (e: any) => React.ReactNode; default?: boolean }
@@ -80,7 +80,7 @@ const COLS: Col[] = [
   },
 ]
 
-const TAB_TYPES: Record<string, string[]> = { voz: VOICE, sms: SMS, dados: ['dados'] }
+const TAB_TYPES: Record<string, string[]> = { voz: VOICE, sms: SMS, dados: ['dados'], whatsapp: WHATSAPP }
 
 export default function Events() {
   const { c } = useCase()
@@ -130,6 +130,7 @@ export default function Events() {
           { value: 'voz', label: 'Chamadas' },
           { value: 'sms', label: 'SMS' },
           { value: 'dados', label: 'Dados' },
+          { value: 'whatsapp', label: 'WhatsApp' },
         ]}
       />
       <FilterBar value={filter} onChange={setFilter} />

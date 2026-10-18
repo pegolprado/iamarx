@@ -16,7 +16,7 @@ export default function Dashboard() {
   const s = useSession((x) => x)
   const [demo, setDemo] = useState<{ label: string; p: number } | null>(null)
   const done = s.imports.filter((i) => i.status === 'done')
-  const events = done.filter((i) => i.kind === 'cdr').reduce((n, i) => n + i.rows_ok - i.rows_duplicate, 0)
+  const events = done.filter((i) => i.kind === 'cdr' || i.kind === 'whatsapp').reduce((n, i) => n + i.rows_ok - i.rows_duplicate, 0)
   const cells = done.filter((i) => i.kind === 'erb_registry').reduce((n, i) => n + i.rows_ok, 0)
   const pendingAlerts = s.alerts.filter((a) => a.review_status === 'pendente').length
   const meta: Record<string, string> = {
@@ -25,6 +25,7 @@ export default function Dashboard() {
     cdr: `${fmtInt(events)} registros normalizados`,
     erb: `${fmtInt(cells)} células em cadastros técnicos`,
     links: `${fmtInt(s.targets.length)} alvos informados`,
+    whatsapp: `${fmtInt(done.filter((i) => i.kind === 'whatsapp').length)} relatórios do WhatsApp carregados`,
     timeline: `${fmtInt(events)} eventos em linha do tempo`,
     geo: `${fmtInt(cells)} células com cadastro`,
     stats: 'cálculos executados no seu navegador',

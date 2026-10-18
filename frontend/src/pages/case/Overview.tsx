@@ -74,8 +74,8 @@ export default function Overview() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Registros considerados" value={fmtInt(t?.events)} hint={t ? `${fmtInt(s.data!.excluded.duplicates)} duplicados e ${fmtInt(s.data!.excluded.out_of_scope)} fora do período excluídos` : undefined} />
-        <Stat label="Chamadas / SMS / dados" value={t ? `${fmtInt(t.calls)} / ${fmtInt(t.sms)} / ${fmtInt(t.data_sessions)}` : '—'} hint={t ? `duração total ${fmtDuration(t.call_seconds)}` : undefined} />
-        <Stat label="Contatos distintos" value={fmtInt(t?.distinct_contacts)} hint={t ? `${fmtInt(t.distinct_cells)} células · ${fmtInt(t.distinct_imeis)} IMEIs` : undefined} />
+        <Stat label="Chamadas / SMS / dados" value={t ? `${fmtInt(t.calls)} / ${fmtInt(t.sms)} / ${fmtInt(t.data_sessions)}` : '—'} hint={t ? `duração total ${fmtDuration(t.call_seconds)}${t.whatsapp ? ` · ${fmtInt(t.whatsapp)} registros de WhatsApp` : ''}` : undefined} />
+        <Stat label="Contatos distintos" value={fmtInt(t?.distinct_contacts)} hint={t ? `${fmtInt(t.distinct_cells)} células · ${fmtInt(t.distinct_imeis)} IMEIs · ${fmtInt(t.distinct_ips)} IPs` : undefined} />
         <Stat label="Primeiro / último registro" value={<span className="text-base">{t?.first_event ? `${fmtDate(t.first_event)} → ${fmtDate(t.last_event)}` : '—'}</span>} hint={t ? `${fmtInt(t.active_days)} dias com atividade` : undefined} />
       </div>
       {s.data && s.data.by_day.length > 0 && (

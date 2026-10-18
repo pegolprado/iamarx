@@ -18,6 +18,12 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "a_number": {
   "label": "Número de origem (A)",
   "syn": [
+   "telefone a",
+   "tel a",
+   "linha a",
+   "numero a chamador",
+   "nr a",
+   "origem chamada",
    "a party",
    "aparty",
    "numero a",
@@ -39,6 +45,11 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "b_number": {
   "label": "Número de destino (B)",
   "syn": [
+   "telefone b",
+   "tel b",
+   "linha b",
+   "nr b",
+   "destino chamada",
    "b party",
    "bparty",
    "numero b",
@@ -82,6 +93,10 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "event_type": {
   "label": "Tipo de evento",
   "syn": [
+   "tp chamada",
+   "tp evento",
+   "tp servico",
+   "tipo da chamada",
    "tipo",
    "tipo evento",
    "tipo de evento",
@@ -118,6 +133,8 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "date": {
   "label": "Data do evento",
   "syn": [
+   "dt chamada",
+   "dt inicio",
    "data",
    "date",
    "data evento",
@@ -133,6 +150,9 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "time": {
   "label": "Horário do evento",
   "syn": [
+   "hr chamada",
+   "hr evento",
+   "hr inicio",
    "hora",
    "time",
    "hora evento",
@@ -157,6 +177,8 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "duration": {
   "label": "Duração",
   "syn": [
+   "tempo chamada",
+   "tempo de conversacao",
    "duracao",
    "duration",
    "segundos",
@@ -225,6 +247,10 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
  "cell_id": {
   "label": "Cell ID / CI",
   "syn": [
+   "celula origem",
+   "celula inicial",
+   "cell origem",
+   "celula a",
    "cell id",
    "cellid",
    "ci",
@@ -344,6 +370,19 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
    "ip publico",
    "ipv4",
    "ipv6"
+  ]
+ },
+ "port": {
+  "label": "Porta (IP)",
+  "syn": [
+   "porta",
+   "porta origem",
+   "porta de origem",
+   "source port",
+   "src port",
+   "port",
+   "porta ip",
+   "porta publica"
   ]
  },
  "bytes_up": {

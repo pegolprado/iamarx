@@ -162,6 +162,8 @@ export async function summary(f: EventFilter) {
       (count(*) FILTER (WHERE event_type IN ${VOICE_IN}))::INTEGER AS calls,
       (count(*) FILTER (WHERE event_type LIKE 'sms%'))::INTEGER AS sms,
       (count(*) FILTER (WHERE event_type = 'dados'))::INTEGER AS data_sessions,
+      (count(*) FILTER (WHERE event_type LIKE 'wa_%'))::INTEGER AS whatsapp,
+      count(DISTINCT ip)::INTEGER AS distinct_ips,
       (count(*) FILTER (WHERE direction = 'out'))::INTEGER AS outgoing,
       (count(*) FILTER (WHERE direction = 'in'))::INTEGER AS incoming,
       (count(*) FILTER (WHERE event_type IN ${VOICE_IN} AND coalesce(duration_s, 0) = 0))::INTEGER AS zero_duration_calls,

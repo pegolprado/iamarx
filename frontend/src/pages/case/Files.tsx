@@ -7,11 +7,27 @@ import { useCase } from '../../app/layout'
 import { Badge, Empty, Field, Notice, PageHeader } from '../../components/ui'
 import { q as sql } from '../../engine/db'
 import { addFiles, removeFile } from '../../engine/importer'
+import { detectWhatsApp, importWhatsApp } from '../../engine/whatsapp'
 import { sha256 } from '../../engine/readers'
 import { type SessionFile, setState, useSession } from '../../engine/session'
 import { fmtBytes, fmtDateTime, fmtInt, shortHash } from '../../lib/format'
 
 const STATUS_TONE: Record<string, any> = { processado: 'green', recebido: 'blue', em_processamento: 'amber', expandido: 'gray', rejeitado: 'red', nao_suportado: 'red' }
+
+async function runWhatsApp(id: number) {
+  setState({ busy: { label: 'Importando WhatsApp Records', progress: 0 } })
+  try {
+    const r = await importWhatsApp(id)
+    toast.success(`WhatsApp Records de ${r.account}: ${r.messages} mensagens, ${r.calls} chamadas, ${r.ips} registros de IP`, {
+      description: r.discarded ? `${r.discarded} trechos sem data/IP válidos foram ignorados.` : 'Veja a aba WhatsApp.',
+      duration: 10000,
+    })
+  } catch (e: any) {
+    toast.error(`WhatsApp Records: ${e?.message ?? e}`)
+  } finally {
+    setState({ busy: null })
+  }
+}
 
 export default function Files() {
   const { c, canWrite } = useCase()
@@ -34,7 +50,11 @@ export default function Files() {
       const r = await addFiles(files, kind as SessionFile['kind'], operator || null, (label) => setState({ busy: { label, progress: 0 } }))
       r.forEach((f) => f.meta?.duplicate_of && toast.warning(`${f.original_name}: conteúdo idêntico ao arquivo #${f.meta.duplicate_of} (mesmo SHA-256)`))
       toast.success(`${r.length} arquivo(s) carregado(s) na memória desta aba`)
-      const tab = r.filter((f) => !['zip'].includes(f.detected_format) && f.status === 'recebido')
+      // WhatsApp Records (Meta) é reconhecido e importado automaticamente, sem mapeamento
+      const wa: number[] = []
+      for (const f of r) if (f.status === 'recebido' && (await detectWhatsApp(f.blob, f.original_name))) wa.push(f.id)
+      for (const id of wa) await runWhatsApp(id)
+      const tab = r.filter((f) => !['zip'].includes(f.detected_format) && f.status === 'recebido' && !wa.includes(f.id))
       if (tab.length === 1) navigate(`../importar/${tab[0].id}?tipo=${kind}`, { relative: 'path' })
     } catch (e: any) {
       toast.error(e.message)
@@ -88,7 +108,7 @@ export default function Files() {
               </button>
             </div>
           </div>
-          <p className="mt-3 text-center text-xs text-faint">ou arraste os arquivos para cá · CSV, TXT (delimitado ou largura fixa), XLS, XLSX, XML, JSON, HTML, PDF (texto ou digitalizado, com OCR) e ZIP</p>
+          <p className="mt-3 text-center text-xs text-faint">ou arraste os arquivos para cá · CSV, TXT (delimitado ou largura fixa), XLS, XLSX, XML, JSON, HTML, PDF (texto ou digitalizado, com OCR), ZIP e WhatsApp Records da Meta (records.html ou o ZIP recebido), reconhecido automaticamente</p>
         </div>
       )}
       {files.length === 0 ? (
@@ -123,7 +143,7 @@ export default function Files() {
                       {f.meta?.duplicate_of && <div className="text-xs text-amber">idêntico ao #{f.meta.duplicate_of}</div>}
                       {f.meta?.error && <div className="text-xs text-danger">{f.meta.error}</div>}
                     </td>
-                    <td className="text-xs">{f.kind === 'erb_registry' ? 'cadastro ERB' : f.kind === 'cdr' ? 'bilhetagem' : 'complementar'}</td>
+                    <td className="text-xs">{f.kind === 'erb_registry' ? 'cadastro ERB' : f.kind === 'cdr' ? 'bilhetagem' : f.kind === 'whatsapp' ? 'WhatsApp Records' : 'complementar'}</td>
                     <td className="font-mono text-xs uppercase">{f.detected_format}</td>
                     <td className="text-xs">
                       {f.operator_declared ?? '—'}
@@ -144,7 +164,12 @@ export default function Files() {
                     <td className="text-right tabular-nums">{fmtInt(counts.data?.[f.id] ?? 0)}</td>
                     <td>
                       <div className="flex gap-1">
-                        {canWrite && !['zip'].includes(f.detected_format) && f.status !== 'nao_suportado' && f.status !== 'rejeitado' && (
+                        {canWrite && f.kind === 'whatsapp' && (
+                          <button className="btn-ghost !px-2 !py-1 text-xs" title="Reimportar WhatsApp Records" onClick={() => runWhatsApp(f.id)}>
+                            <Wand2 className="h-3.5 w-3.5" /> Reimportar
+                          </button>
+                        )}
+                        {canWrite && f.kind !== 'whatsapp' && !['zip'].includes(f.detected_format) && f.status !== 'nao_suportado' && f.status !== 'rejeitado' && (
                           <Link to={`../importar/${f.id}?tipo=${f.kind}`} relative="path" className="btn-ghost !px-2 !py-1 text-xs" title="Configurar importação">
                             <Wand2 className="h-3.5 w-3.5" /> {imports.some((i) => i.file_id === f.id && i.status === 'done') ? 'Reimportar' : 'Importar'}
                           </Link>

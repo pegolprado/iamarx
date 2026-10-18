@@ -11,6 +11,11 @@ describe('assistente local', () => {
     expect(r.intent).toBe('common')
     expect(r.filter.targets).toEqual(['+5561999990001', '+5561999990002'])
   })
+  it('entende WhatsApp', () => {
+    const r = parse('mensagens de whatsapp do alvo a em 02/03/2026', ['+5561999990001'])
+    expect(r.filter.event_types).toEqual(['wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida'])
+    expect(parse('chamadas no zap', []).filter.event_types).toEqual(['wa_chamada_originada', 'wa_chamada_recebida'])
+  })
   it('sem critério', () => {
     expect(parse('olá', []).notes[0]).toContain('nenhum critério')
   })

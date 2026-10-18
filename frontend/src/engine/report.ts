@@ -7,6 +7,7 @@
  */
 import { fmtDate, fmtDateTime, fmtDuration, fmtNumberPlain } from '../lib/format'
 import * as A from './analytics'
+import * as W from './whatsapp'
 import { q } from './db'
 import { addSheet, BRAND, COLORS, download, type ExportFormat, newPdf, pageDecor, pdfText, reportCode, safeName, TABLE_STYLE, type Who } from './exporter'
 import { APP_VERSION, EVENT_TYPES, RULES_VERSION } from './normalize'
@@ -19,18 +20,20 @@ export const LIMITATIONS = [
   'Horários são exibidos conforme o documento de origem. Eventos com fuso horário não confirmado estão sinalizados e devem ser interpretados com cautela em comparações entre fontes.',
   'Registros duplicados e fora do período autorizado foram excluídos das estatísticas, salvo indicação em contrário nos critérios.',
   'Hashes SHA-256 verificam a integridade dos arquivos carregados, mas não comprovam, por si sós, a autenticidade da origem.',
+  'Relatórios do WhatsApp (Meta) trazem metadados, não o conteúdo das mensagens. Um mesmo IPv4 de operadora móvel é compartilhado por muitos clientes (CGNAT): a identificação do usuário exige IP, porta e data/hora exatos junto ao provedor.',
 ]
 
-export type ReportType = 'cdr' | 'erb' | 'links' | 'full'
-export const REPORT_TYPES: Record<ReportType, string> = { cdr: 'Bilhetagem', erb: 'ERB', links: 'Vínculos', full: 'Completo' }
+export type ReportType = 'cdr' | 'erb' | 'links' | 'whatsapp' | 'full'
+export const REPORT_TYPES: Record<ReportType, string> = { cdr: 'Bilhetagem', erb: 'ERB', links: 'Vínculos', whatsapp: 'WhatsApp e IPs', full: 'Completo' }
 
 export const SECTIONS: Record<ReportType, string[]> = {
   cdr: ['escopo', 'fontes', 'metodologia', 'estatisticas', 'graficos', 'contatos', 'eventos', 'limitacoes', 'rastreabilidade'],
   erb: ['escopo', 'fontes', 'cadastro', 'resolucao', 'celulas', 'mapa', 'sequencia', 'inconsistencias', 'limitacoes', 'rastreabilidade'],
   links: ['escopo', 'fontes', 'vinculos', 'grafo', 'contatos_comuns', 'limitacoes', 'rastreabilidade'],
+  whatsapp: ['escopo', 'fontes', 'whatsapp', 'wa_contatos', 'ips', 'ips_comuns', 'wa_grupos', 'limitacoes', 'rastreabilidade'],
   full: [],
 }
-SECTIONS.full = [...new Set([...SECTIONS.cdr, ...SECTIONS.erb, ...SECTIONS.links].filter((x) => x !== 'limitacoes' && x !== 'rastreabilidade')), 'limitacoes', 'rastreabilidade']
+SECTIONS.full = [...new Set([...SECTIONS.cdr, ...SECTIONS.erb, ...SECTIONS.links, ...SECTIONS.whatsapp].filter((x) => x !== 'limitacoes' && x !== 'rastreabilidade')), 'limitacoes', 'rastreabilidade']
 
 export const SECTION_NAMES: Record<string, string> = {
   escopo: 'Identificação e escopo', fontes: 'Arquivos utilizados', metodologia: 'Metodologia de importação',
@@ -39,6 +42,7 @@ export const SECTION_NAMES: Record<string, string> = {
   celulas: 'Eventos por célula', mapa: 'Representação esquemática das estações', sequencia: 'Sequência temporal de células',
   inconsistencias: 'Inconsistências', vinculos: 'Relacionamentos documentados', grafo: 'Grafo de contatos',
   contatos_comuns: 'Contatos em comum', limitacoes: 'Limitações dos dados', rastreabilidade: 'Rastreabilidade',
+  whatsapp: 'WhatsApp Records — resumo', wa_contatos: 'WhatsApp — contatos', ips: 'Endereços IP dos alvos', ips_comuns: 'IPs em comum entre alvos', wa_grupos: 'WhatsApp — grupos',
 }
 
 const ERB_RULES = [
@@ -88,6 +92,14 @@ export async function collect(f: A.EventFilter, o: ReportOptions, who: Who) {
     data.graph = await A.linkGraph(f, o.center ?? null, o.depth ?? 2, o.minEvents ?? 1, false, 400)
     const nums = A.normList(f.targets?.length ? f.targets : f.numbers)
     data.common = await A.commonContacts(nums.length ? nums : data.targets.map((t: any) => t.number), f)
+  }
+  if (sections.some((s) => ['whatsapp', 'wa_contatos', 'ips', 'ips_comuns', 'wa_grupos'].includes(s))) {
+    data.wa = await W.waSummary(f)
+    data.wa_accounts = await W.waAccounts()
+    data.wa_contacts = await A.contacts(W.waEventFilter({ ...f, event_types: ['wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida'] }), 100)
+    data.ips = await W.ipList(f, 300)
+    data.shared_ips = await W.sharedIps(f)
+    data.wa_groups = await W.waGroups(f)
   }
   data.criteria = A.criteria(f)
   data.limitations = LIMITATIONS
@@ -215,7 +227,7 @@ export async function renderPdf(data: Record<string, any>): Promise<ArrayBuffer>
     } else if (s === 'fontes') {
       Hd(s)
       table(['#', 'Arquivo', 'Tipo', 'Operadora', 'Formato', 'SHA-256'],
-        data.files.map((x: any) => [x.id, x.name, x.kind === 'erb_registry' ? 'cadastro ERB' : 'bilhetagem', x.operator || '—', x.format, x.sha256]),
+        data.files.map((x: any) => [x.id, x.name, x.kind === 'erb_registry' ? 'cadastro ERB' : x.kind === 'whatsapp' ? 'WhatsApp Records' : 'bilhetagem', x.operator || '—', x.format, x.sha256]),
         { columnStyles: { 5: { font: 'courier', fontSize: 6, cellWidth: 62 } } })
     } else if (s === 'metodologia') {
       Hd(s)
@@ -225,6 +237,10 @@ export async function renderPdf(data: Record<string, any>): Promise<ArrayBuffer>
         small('Mapeamento: ' + Object.entries(i.mapping).filter(([, v]) => v).map(([k, v]) => `${k} <- “${v}”`).join(', '))
         const op = i.options
         small(`Fuso: ${op.tz_mode ?? 'unknown'} (${op.tz_name || 'não informado'}) · formato de data: ${op.date_format || op.datetime_format || 'automático'} · linhas: ${i.rows_total} lidas, ${i.rows_ok} aceitas, ${i.rows_error} rejeitadas, ${i.rows_duplicate} duplicadas, ${i.rows_out_of_scope} fora do período · regras ${i.rules_version}`)
+      }
+      for (const i of data.imports.filter((i: any) => i.kind === 'whatsapp')) {
+        H2(`Importação #${i.id} (arquivo #${i.file_id}) — WhatsApp Records`)
+        small(`Leitura automática do relatório da Meta (sem mapeamento manual). Horários em UTC no documento, convertidos para ${i.options.tz_name}. Registros: ${i.rows_ok} aceitos, ${i.rows_error} trechos ignorados por data/IP inválidos, ${i.rows_duplicate} duplicados, ${i.rows_out_of_scope} fora do período · regras ${i.rules_version}`)
       }
     } else if (s === 'estatisticas') {
       Hd(s)
@@ -307,6 +323,46 @@ export async function renderPdf(data: Record<string, any>): Promise<ArrayBuffer>
         schematicGraph(doc, data.graph, L + (CW - 160) / 2, ensureBlock(165), 160)
         small('Azul: números alvo; âmbar: contatos em comum a dois ou mais alvos; linhas verde-água: comunicação nos dois sentidos; espessura proporcional à quantidade de eventos.')
       }
+    } else if (s === 'whatsapp' && data.wa) {
+      Hd(s)
+      const t = data.wa.totals
+      if (!t.events) P('Nenhum registro de WhatsApp nos critérios selecionados.')
+      else {
+        kv([
+          ['Mensagens enviadas / recebidas', `${t.sent} / ${t.received}`], ['Chamadas (atendidas / vídeo)', `${t.calls} (${t.calls_answered} / ${t.video_calls})`],
+          ['Interlocutores / grupos', `${t.contacts} / ${t.groups}`], ['IPs distintos do alvo', t.ips], ['Registros de conexão', t.connections],
+          ['Período', `${fmtDateTime(t.first_event)} a ${fmtDateTime(t.last_event)}`],
+        ])
+        table(['Conta', 'Chamado', 'Período do relatório', 'Gerado em', 'Mensagens', 'Chamadas', 'IPs'],
+          data.wa_accounts.map((a: any) => [fmtNumberPlain(a.account), a.header?.['internal ticket number'] ?? '—', a.header?.['date range'] ?? '—', a.header?.generated ?? '—', a.messages, a.calls, a.ips]))
+        small('Horários convertidos de UTC (fonte) para o fuso da análise. Os relatórios contêm metadados, não o conteúdo das mensagens.')
+      }
+    } else if (s === 'wa_contatos' && data.wa_contacts?.items.length) {
+      Hd(s)
+      table(['Alvo', 'Interlocutor', 'Registros', 'Dias', 'Env./orig.', 'Receb.', 'Primeiro', 'Último'],
+        data.wa_contacts.items.slice(0, 80).map((r: any) => [fmtNumberPlain(r.target_number), fmtNumberPlain(r.other_number), r.events, r.days, r.outgoing, r.incoming, fmtDateTime(r.first_event), fmtDateTime(r.last_event)]),
+        { styles: { ...TABLE_STYLE.styles, fontSize: 6.5 } })
+    } else if (s === 'ips' && data.ips) {
+      Hd(s)
+      if (!data.ips.items.length) P('Nenhum endereço IP nos registros selecionados.')
+      else
+        table(['IP', 'Registros', 'Dias', 'Primeiro uso', 'Último uso', 'Portas', 'Alvos'],
+          data.ips.items.slice(0, 150).map((r: any) => [r.ip, r.events, r.days, fmtDateTime(r.first_event), fmtDateTime(r.last_event), (r.ports ?? []).slice(0, 5).join(', '), (r.targets ?? []).map(fmtNumberPlain).join(', ')]),
+          { styles: { ...TABLE_STYLE.styles, fontSize: 6.3 }, columnStyles: { 0: { font: 'courier', fontSize: 6 } } })
+      small(data.ips.criteria.note)
+    } else if (s === 'ips_comuns' && data.shared_ips) {
+      Hd(s)
+      if (!data.shared_ips.items.length) P('Nenhum IP compartilhado entre os alvos no período e filtros selecionados.')
+      else
+        table(['IP', 'Alvo', 'Registros', 'Primeiro uso', 'Último uso', 'Portas'],
+          data.shared_ips.items.flatMap((it: any) => it.per_target.map((p: any) => [it.ip, fmtNumberPlain(p.target_number), p.n, fmtDateTime(p.first_event), fmtDateTime(p.last_event), (p.ports ?? []).slice(0, 5).join(', ')])),
+          { styles: { ...TABLE_STYLE.styles, fontSize: 6.5 }, columnStyles: { 0: { font: 'courier', fontSize: 6 } } })
+      small(data.shared_ips.criteria.note)
+    } else if (s === 'wa_grupos' && data.wa_groups?.items.length) {
+      Hd(s)
+      table(['Grupo', 'Alvo', 'Mensagens', 'Env.', 'Receb.', 'Primeira', 'Última', 'Participantes'],
+        data.wa_groups.items.slice(0, 80).map((g: any) => [g.group_id, fmtNumberPlain(g.target_number), g.messages, g.sent, g.received, fmtDateTime(g.first_event), fmtDateTime(g.last_event), String(g.members.length)]),
+        { styles: { ...TABLE_STYLE.styles, fontSize: 6.3 } })
     } else if (s === 'contatos_comuns' && data.common) {
       Hd(s)
       const nums: string[] = data.common.numbers
@@ -501,6 +557,15 @@ export async function renderXlsx(data: Record<string, any>): Promise<ArrayBuffer
   if (data.cells)
     sheet('ERB', ['Célula', 'Eventos', 'Números', 'Resolução', 'Regra', 'Estação', 'Código', 'Lat', 'Lon', 'Azimute', 'Primeiro', 'Último', 'Observação'],
       data.cells.items.map((c: any) => [c.cell_key, c.events, c.numbers, c.resolution_status, c.resolution_rule, c.site_name, c.site_code, c.lat, c.lon, c.azimuth, c.first_event, c.last_event, c.resolution_note]))
+  if (data.ips)
+    sheet('IPs', ['IP', 'Versão', 'Registros', 'Dias', 'Primeiro uso', 'Último uso', 'Portas', 'Alvos', 'Fonte'],
+      data.ips.items.map((r: any) => [r.ip, r.version, r.events, r.days, r.first_event, r.last_event, (r.ports ?? []).join(', '), (r.targets ?? []).join(', '), (r.sources ?? []).join(', ')]))
+  if (data.shared_ips?.items.length)
+    sheet('IPs em comum', ['IP', 'Alvo', 'Registros', 'Primeiro uso', 'Último uso', 'Portas'],
+      data.shared_ips.items.flatMap((it: any) => it.per_target.map((p: any) => [it.ip, p.target_number, p.n, p.first_event, p.last_event, (p.ports ?? []).join(', ')])))
+  if (data.wa_groups?.items.length)
+    sheet('Grupos WhatsApp', ['Grupo', 'Alvo', 'Mensagens', 'Enviadas', 'Recebidas', 'Primeira', 'Última', 'Participantes vistos'],
+      data.wa_groups.items.map((g: any) => [g.group_id, g.target_number, g.messages, g.sent, g.received, g.first_event, g.last_event, g.members.join(', ')]))
   sheet('Critérios e limites', ['Item', 'Descrição'], [['Filtros', JSON.stringify(data.criteria.filters)], ['Regras', data.criteria.rules_version], ...data.limitations.map((x: string) => ['Limitação', x])])
   return wb.xlsx.writeBuffer() as Promise<ArrayBuffer>
 }

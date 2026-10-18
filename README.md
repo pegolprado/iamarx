@@ -27,6 +27,11 @@ coordenadas) · mapa com setores esquemáticos e reprodução cronológica · li
 e padrões · cruzamento multifonte de registros recíprocos · alertas configuráveis · assistente analítico local ·
 relatório técnico rastreável (SHA-256 dos arquivos de entrada e do arquivo gerado).
 
+**WhatsApp Records (Meta)**: o `records.html` (ou o ZIP) entregue pela Meta é reconhecido e importado
+automaticamente — mensagens, chamadas, grupos e conexões, com horários convertidos de UTC. Análises de
+contatos, **IPs do alvo** (com portas, para CGNAT), **IPs em comum entre alvos** (inclusive cruzando com as
+sessões de dados das operadoras), sequência de IPs e grupos, tudo exportável em Excel/PDF/CSV.
+
 ## Documentação
 
 | Documento | Conteúdo |

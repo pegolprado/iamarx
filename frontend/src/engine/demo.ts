@@ -11,6 +11,8 @@ import { resetDb } from './db'
 import { resolveErb } from './erb'
 import { addFiles, analyze, createImport, runImport, syncTargetsTable } from './importer'
 import { clearSession, nextId, setState } from './session'
+import { waRecordsHtml } from './waSample'
+import { importWhatsApp } from './whatsapp'
 
 const T_A = '+5561900000001'
 const T_B = '+5561900000002'
@@ -18,6 +20,7 @@ const T_C = '+5561900000003'
 const CENTER: [number, number] = [-15.79, -47.88]
 const OPS: [string, string][] = [['TIM', '02'], ['VIVO', '11'], ['CLARO', '05']]
 const N_SITES = 10
+const SHARED_IP = '10.20.30.40'
 
 type Cell = { idx: number; site_idx: number; op: string; tech: string; mcc: string; mnc: string; lac: string; tac: string; ci: string; eci: string; site: string; name: string; lat: number; lon: number; az: number; bw: number }
 type Ev = { ts: Date; kind: 'voz' | 'sms' | 'dados'; out: boolean; other: string | null; dur: number; cell: Cell; imei: string; ip: string }
@@ -138,6 +141,44 @@ function cp1252(s: string) {
   return out
 }
 
+/** WhatsApp Records sintético do alvo A: conversas com B e contatos, um grupo com B e C, chamadas e IPs. */
+function waDemo(rng: Rng, contacts: string[]): string {
+  const acc = T_A.slice(1)
+  const peers = [T_B, ...contacts.slice(0, 5)].map((n) => n.slice(1))
+  const ipFor = (day: number) => (day <= 10 ? '177.10.20.30' : day <= 20 ? SHARED_IP : '2804:14c:abcd::1')
+  const ts = (d: number, h: number, m: number, s: number) => `2026-03-${p2(d)} ${p2(h)}:${p2(m)}:${p2(s)} UTC`
+  const messages: [string, string, string[], string | null, string | null][] = []
+  for (let i = 0; i < 140; i++) {
+    const d = rng.randint(1, 31)
+    const peer = rng.weighted(peers, [5, 3, 2, 2, 1, 1])
+    const out = rng.random() < 0.55
+    messages.push([ts(d, rng.randint(10, 23), rng.randint(0, 59), rng.randint(0, 59)), out ? acc : peer, [out ? peer : acc], null, out ? ipFor(d) : '200.150.1.' + rng.randint(1, 254)])
+  }
+  const group = '120363012345678901@g.us'
+  const members = [T_B, T_C, contacts[1]].map((n) => n.slice(1))
+  for (let i = 0; i < 18; i++) {
+    const d = rng.randint(1, 31)
+    const out = rng.random() < 0.4
+    const sender = out ? acc : rng.choice(members)
+    messages.push([ts(d, rng.randint(8, 22), rng.randint(0, 59), rng.randint(0, 59)), sender, [acc, ...members].filter((x) => x !== sender), group, out ? ipFor(d) : null])
+  }
+  messages.sort((x, y) => x[0].localeCompare(y[0]))
+  const calls: [string, string, string, [string, string][]][] = []
+  for (let i = 0; i < 12; i++) {
+    const d = rng.randint(1, 31)
+    const h = rng.randint(9, 22)
+    const answered = rng.random() < 0.75
+    const dur = rng.randint(20, 900)
+    const start = Date.UTC(2026, 2, d, h, rng.randint(0, 59), 0)
+    const iso = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ') + ' UTC'
+    const evs: [string, string][] = answered ? [['offer', iso(start)], ['accept', iso(start + 4000)], ['terminate', iso(start + 4000 + dur * 1000)]] : [['offer', iso(start)], ['terminate', iso(start + 30000)]]
+    calls.push([`DEMO${p2(i)}CALL`, rng.random() < 0.5 ? acc : peers[0], rng.random() < 0.2 ? 'video' : 'audio', evs])
+  }
+  const ips: [string, string][] = []
+  for (let d = 1; d <= 31; d += 2) ips.push([ts(d, 7, rng.randint(0, 59), 0), ipFor(d)])
+  return waRecordsHtml({ account: acc, messages, calls, ips })
+}
+
 export async function buildFiles(seed = 20260301): Promise<File[]> {
   const rng = rngOf(seed)
   const cells = makeCells(rng)
@@ -152,6 +193,8 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
   c = [...c, ...mirror(b, T_B, T_C, rng).map((e) => ({ ...e, cell: pick(cells, 'CLARO', e.cell.site_idx, ['4G'], rng) }))]
   b.sort((x, y) => +x.ts - +y.ts)
   c.sort((x, y) => +x.ts - +y.ts)
+  // um IP de dados do alvo B que também aparece no WhatsApp do alvo A (análise de IPs em comum)
+  for (const e of b.filter((x) => x.kind === 'dados' && x.ts.getUTCDate() >= 11 && x.ts.getUTCDate() <= 20).slice(0, 6)) e.ip = SHARED_IP
 
   // ---- Arquivo 1: CSV ';' cp1252 com preâmbulo (layout fictício "estilo TIM")
   const rows: (string | number)[][] = []
@@ -231,7 +274,11 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
   const f4 = csv([header, ...current])
   const f5 = csv([header, ...regRows(cells.filter((x) => x.site_idx <= 1), 0.004)]) // versão antiga com coordenadas deslocadas
 
+  // ---- Arquivo 6: WhatsApp Records (formato da Meta) da conta do alvo A
+  const f6 = waDemo(rng, contacts)
+
   return [
+    new File([f6], 'DEMO_WhatsApp_records_alvoA.html', { type: 'text/html' }),
     new File([f5], 'DEMO_cadastro_ERB_2025-12.csv', { type: 'text/csv' }),
     new File([f4], 'DEMO_cadastro_ERB_2026-03.csv', { type: 'text/csv' }),
     new File([cp1252(f1)], 'DEMO_TIM_extrato_alvoA.csv', { type: 'text/csv' }),
@@ -258,7 +305,7 @@ export async function loadDemo(onStatus: (s: string, p: number) => void = () => 
   await syncTargetsTable()
   onStatus('gerando arquivos sintéticos', 0.05)
   const files = await buildFiles()
-  const plan: [string, 'cdr' | 'erb_registry', string | null, Record<string, any>][] = [
+  const plan: [string, 'cdr' | 'erb_registry' | 'whatsapp', string | null, Record<string, any>][] = [
     ['DEMO_cadastro_ERB_2025-12.csv', 'erb_registry', null, { reference_date: '2025-12-01', version_name: 'Cadastro DEMO dez/2025' }],
     ['DEMO_cadastro_ERB_2026-03.csv', 'erb_registry', null, { reference_date: '2026-03-01', version_name: 'Cadastro DEMO mar/2026' }],
     ['DEMO_TIM_extrato_alvoA.csv', 'cdr', 'TIM', { target_number: T_A, tz_mode: 'assumed', tz_name: 'America/Sao_Paulo' }],
@@ -267,10 +314,16 @@ export async function loadDemo(onStatus: (s: string, p: number) => void = () => 
       target_number: T_C, tz_mode: 'unknown', default_event_type: 'voz',
       value_map: { MO: 'voz_originada', MT: 'voz_recebida', 'MO-SMS': 'sms_enviado', 'MT-SMS': 'sms_recebido' },
     }],
+    ['DEMO_WhatsApp_records_alvoA.html', 'whatsapp', null, {}],
   ]
   for (const [i, [name, kind, op, opts]] of plan.entries()) {
     onStatus(`importando ${name}`, 0.1 + (0.75 * i) / plan.length)
     const file = files.find((f) => f.name === name)!
+    if (kind === 'whatsapp') {
+      const [wf] = await addFiles([file], 'whatsapp', null)
+      await importWhatsApp(wf.id)
+      continue
+    }
     const [sf] = await addFiles([file], kind, op)
     const an = await analyze(sf.id, kind, {})
     const mapping = { ...an.suggested_mapping }

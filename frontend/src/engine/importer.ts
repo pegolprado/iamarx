@@ -298,7 +298,8 @@ export class RowNormalizer {
       ts_original: [dtRaw, dRaw, tmRaw, tzRaw].filter(Boolean).join(' ').slice(0, 80), ts_utc: tsUtc, ts_local: tsLocal, tz_name: tzName, tz_status: tzStatus,
       duration_s: dur, status: this.g(rec, 'status'), ...sig, cell_key: cellKey, lat, lon, azimuth: az,
       imei: (this.g(rec, 'imei') ?? '').replace(/\D/g, '').slice(0, 20) || null, imsi: (this.g(rec, 'imsi') ?? '').replace(/\D/g, '').slice(0, 20) || null,
-      ip, bytes_up: N.parseIntLoose(this.g(rec, 'bytes_up')), bytes_down: N.parseIntLoose(this.g(rec, 'bytes_down')),
+      ip, port: ((p) => (p !== null && p >= 0 && p <= 65535 ? p : null))(N.parseIntLoose(this.g(rec, 'port'))),
+      bytes_up: N.parseIntLoose(this.g(rec, 'bytes_up')), bytes_down: N.parseIntLoose(this.g(rec, 'bytes_down')),
       raw: JSON.stringify(rec), warnings: JSON.stringify(warns), n_warnings: warns.length, confidence: conf, out_of_scope: outOfScope,
       dedup_hash: N.quickHash([target, a, b, tsUtc, dur, et, cellKey, ip]),
       sig_key: N.quickHash(Object.values(sig)),
@@ -315,7 +316,7 @@ export const EVENT_COLS: { name: string; type: string }[] = [
   ['mnc', 'VARCHAR'], ['lac', 'VARCHAR'], ['tac', 'VARCHAR'], ['cell_id', 'VARCHAR'], ['eci', 'VARCHAR'], ['nci', 'VARCHAR'], ['cgi', 'VARCHAR'],
   ['erb_raw', 'VARCHAR'], ['cell_key', 'VARCHAR'], ['lat', 'DOUBLE'], ['lon', 'DOUBLE'], ['azimuth', 'DOUBLE'], ['imei', 'VARCHAR'], ['imsi', 'VARCHAR'],
   ['ip', 'VARCHAR'], ['bytes_up', 'BIGINT'], ['bytes_down', 'BIGINT'], ['raw', 'VARCHAR'], ['warnings', 'VARCHAR'], ['n_warnings', 'INTEGER'],
-  ['confidence', 'DOUBLE'], ['out_of_scope', 'BOOLEAN'], ['dedup_hash', 'VARCHAR'], ['sig_key', 'VARCHAR'],
+  ['confidence', 'DOUBLE'], ['out_of_scope', 'BOOLEAN'], ['dedup_hash', 'VARCHAR'], ['sig_key', 'VARCHAR'], ['port', 'INTEGER'],
 ].map(([name, type]) => ({ name, type }))
 
 export function createImport(fileId: number, kind: ImportRec['kind'], mapping: Record<string, string>, options: Record<string, any>): ImportRec {

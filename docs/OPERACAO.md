@@ -5,6 +5,12 @@
 - **Link de senha**: para quem esqueceu a senha (24 h, uso único).
 - Por usuário: perfil (Administrador/Usuário), **pode exportar**, desativar, desbloquear, encerrar sessões, excluir.
 
+## WhatsApp Records
+Em **Arquivos**, selecione o `records.html` ou o ZIP recebido da Meta. O MARX reconhece o documento sozinho,
+cria o número da conta como alvo (se ainda não existir) e mostra o resultado na aba **WhatsApp**. Os horários
+do documento estão em UTC e são convertidos para o horário de Brasília. Para reimportar, use **Reimportar** na
+linha do arquivo.
+
 ## Privacidade no dia a dia
 - **Bloquear tela** (menu lateral, ou automático após 5 min parado): esconde tudo e pede a senha para voltar,
   sem apagar a análise. Se ninguém desbloquear, a análise é apagada ao atingir `IDLE_MINUTES` (padrão 30).

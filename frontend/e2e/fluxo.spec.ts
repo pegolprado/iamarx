@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { waRecordsHtml } from '../src/engine/waSample'
 
 const EMAIL = process.env.MARX_E2E_EMAIL ?? 'admin@marx.local'
 const PASSWORD = process.env.MARX_E2E_PASSWORD ?? 'Teste!Marx2026'
@@ -22,7 +23,7 @@ test('fluxo completo: demonstração, telas, exportação e apagamento ao sair',
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
-  for (const t of ['Alvos', 'Arquivos', 'Importações', 'Qualidade', 'Eventos', 'Contatos', 'Comparar', 'Vínculos', 'ERB', 'Mapa', 'Linha do tempo', 'Estatística', 'Cruzamento', 'Alertas', 'Exportar', 'Assistente']) {
+  for (const t of ['Alvos', 'Arquivos', 'Importações', 'Qualidade', 'Eventos', 'Contatos', 'WhatsApp', 'Comparar', 'Vínculos', 'ERB', 'Mapa', 'Linha do tempo', 'Estatística', 'Cruzamento', 'Alertas', 'Exportar', 'Assistente']) {
     await tab(page, t)
     await page.waitForTimeout(1200)
     await expect(page.locator('[role=alert]'), `erro na tela ${t}`).toHaveCount(0)
@@ -120,4 +121,30 @@ test('ocultar números na tela e bloquear a tela sem perder a análise', async (
   await page.click('button:has-text("Desbloquear")')
   await expect(page.getByText('Análise de contatos')).toBeVisible()
   await expect(page.locator('table tbody tr').first()).toBeVisible()
+})
+
+test('WhatsApp Records: importação automática, IPs em comum, grupos e exportação', async ({ page }) => {
+  page.on('dialog', (d) => d.accept())
+  await login(page)
+  // demonstração já traz o WhatsApp do alvo A e IP de dados do alvo B em comum
+  await page.click('text=Gerar análise de demonstração')
+  await expect(page.getByText('Registros considerados')).toBeVisible()
+  await tab(page, 'WhatsApp')
+  await expect(page.getByText('Relatórios carregados')).toBeVisible()
+  await page.click('[role=tablist] >> text=IPs em comum')
+  await expect(page.getByText('10.20.30.40').first()).toBeVisible()
+  await page.click('[role=tablist] >> text=Grupos')
+  await expect(page.getByText('120363012345678901@g.us')).toBeVisible()
+  const [x] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Excel")')])
+  expect(x.suggestedFilename()).toMatch(/grupos.*\.xlsx$/i)
+
+  // carregar outro records.html pela tela de Arquivos: reconhecido e importado sem mapeamento
+  await tab(page, 'Arquivos')
+  const html = waRecordsHtml({ account: '5561977776666' })
+  await page.setInputFiles('input[type=file]', { name: 'records.html', mimeType: 'text/html', buffer: Buffer.from(html, 'utf-8') })
+  await expect(page.getByText(/WhatsApp Records de \+5561977776666/)).toBeVisible()
+  await expect(page.getByText('WhatsApp Records', { exact: true }).first()).toBeVisible()
+  await tab(page, 'Eventos')
+  await page.click('[role=tablist] >> text=WhatsApp')
+  await expect(page.getByText(/WhatsApp: msg (enviada|recebida)/).first()).toBeVisible()
 })

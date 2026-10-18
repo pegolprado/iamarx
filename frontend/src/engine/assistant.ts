@@ -66,13 +66,17 @@ export function parse(question: string, targets: string[]): { filter: A.EventFil
     }
   }
   const types: string[] = []
-  if (/\b(sms|mensage)/.test(q)) types.push('sms_enviado', 'sms_recebido', 'sms')
-  if (/\b(chamad|ligac|ligou|ligaram|voz)/.test(q)) {
+  if (!/\b(whats|zap|wpp)/.test(q) && /\b(sms|mensage)/.test(q)) types.push('sms_enviado', 'sms_recebido', 'sms')
+  if (!/\b(whats|zap|wpp)/.test(q) && /\b(chamad|ligac|ligou|ligaram|voz)/.test(q)) {
     if (q.includes('originad') || q.includes('efetuad') || /\bfez\b/.test(q)) types.push('voz_originada')
     else if (q.includes('recebid')) types.push('voz_recebida')
     else types.push('voz_originada', 'voz_recebida', 'voz')
   }
-  if (/\b(dados|internet|conex)/.test(q)) types.push('dados')
+  const wa = /\b(whats|zap|wpp|whatsapp)/.test(q)
+  if (wa) {
+    if (/\b(chamad|ligac|ligou|voz)/.test(q)) types.push('wa_chamada_originada', 'wa_chamada_recebida')
+    else types.push('wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida')
+  } else if (/\b(dados|internet|conex)/.test(q)) types.push('dados')
   if (types.length) {
     f.event_types = types
     notes.push('tipos: ' + types.map((t) => EVENT_TYPES[t] ?? t).join(', '))

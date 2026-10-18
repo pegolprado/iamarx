@@ -29,6 +29,7 @@ const CrossMatch = lazy(() => import('./pages/case/CrossMatch'))
 const Alerts = lazy(() => import('./pages/case/Alerts'))
 const Reports = lazy(() => import('./pages/case/Reports'))
 const Assistant = lazy(() => import('./pages/case/Assistant'))
+const WhatsApp = lazy(() => import('./pages/case/WhatsApp'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="alertas" element={<Alerts />} />
               <Route path="relatorios" element={<Reports />} />
               <Route path="assistente" element={<Assistant />} />
+              <Route path="whatsapp" element={<WhatsApp />} />
             </Route>
             <Route path="casos/*" element={<Navigate to="/analise" replace />} />
             <Route path="*" element={<div className="py-20 text-center text-muted">Página não encontrada.</div>} />

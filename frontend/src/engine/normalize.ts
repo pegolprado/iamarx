@@ -198,7 +198,7 @@ function wallMs(l: LocalDT) {
 }
 
 const dtfCache = new Map<string, Intl.DateTimeFormat>()
-function tzOffsetMs(utcMs: number, tz: string): number {
+export function tzOffsetMs(utcMs: number, tz: string): number {
   let f = dtfCache.get(tz)
   if (!f) {
     f = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -263,6 +263,11 @@ export const EVENT_TYPES: Record<string, string> = {
   dados: 'Sessão de dados',
   desvio: 'Chamada desviada/encaminhada',
   evento_rede: 'Evento de rede',
+  wa_msg_enviada: 'WhatsApp: mensagem enviada',
+  wa_msg_recebida: 'WhatsApp: mensagem recebida',
+  wa_chamada_originada: 'WhatsApp: chamada originada',
+  wa_chamada_recebida: 'WhatsApp: chamada recebida',
+  wa_conexao: 'WhatsApp: conexão (IP)',
   outro: 'Outro registro',
 }
 
