@@ -500,10 +500,15 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   try {
     const c = cfg(env)
     const ctx: Ctx = { req, env, c, res, path: url.pathname.replace(/\/+$/, '') || '/', method: req.method.toUpperCase(), ip: req.headers.get('cf-connecting-ip') ?? '0.0.0.0' }
+    // Proteção CSRF por origem (recomendação OWASP): o navegador informa de onde veio a requisição
+    // (Origin / Sec-Fetch-Site) e o cabeçalho próprio exige pré-verificação CORS, que este servidor
+    // nunca autoriza para outros sites. Somado ao cookie de sessão SameSite=Strict.
     if (ctx.method !== 'GET' && ctx.method !== 'HEAD' && ctx.path !== '/api/health') {
-      const ck = cookies(req)[CSRF_COOKIE]
-      const hd = req.headers.get('x-csrf-token')
-      if (!ck || !hd || !safeEqual(ck, hd)) throw new HttpError(403, 'Token CSRF ausente ou inválido. Recarregue a página.')
+      const origin = req.headers.get('origin')
+      const site = req.headers.get('sec-fetch-site')
+      const sameOrigin = !origin || origin === url.origin
+      const sameSite = !site || site === 'same-origin'
+      if (!req.headers.get('x-csrf-token') || !sameOrigin || !sameSite) throw new HttpError(403, 'Requisição de outra origem bloqueada. Recarregue a página.')
     }
     await ensureSchema(env.DB)
     const allowed: string[] = []

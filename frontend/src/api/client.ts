@@ -15,19 +15,13 @@ function readCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null
 }
 
-let csrfP: Promise<string> | null = null
-
-/** Garante o token CSRF; chamadas simultâneas compartilham a mesma busca (evita tokens divergentes). */
+/**
+ * Valor do cabeçalho anti-CSRF. O servidor valida a origem da requisição (Origin/Sec-Fetch-Site) e a
+ * presença deste cabeçalho próprio, sem depender de cookie legível pelo navegador.
+ */
 export async function ensureCsrf(): Promise<string> {
-  csrf = readCookie('marx_csrf') ?? csrf
-  if (csrf) return csrf
-  csrfP ??= fetch('/api/auth/csrf', { credentials: 'same-origin' })
-    .then(async (r) => readCookie('marx_csrf') ?? (await r.json()).csrf)
-    .finally(() => {
-      csrfP = null
-    })
-  csrf = await csrfP
-  return csrf!
+  csrf = readCookie('marx_csrf') ?? csrf ?? 'marx'
+  return csrf
 }
 
 type Listener = (status: number, path: string) => void

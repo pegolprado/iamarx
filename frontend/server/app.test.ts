@@ -89,6 +89,12 @@ describe('servidor de login', () => {
     expect(db.raw.prepare('SELECT pw FROM users').get()).not.toHaveProperty('pw', expect.stringMatching(/SenhaForte/))
   })
 
+  it('funciona sem o cookie anti-CSRF (celular que não o guardou)', async () => {
+    const c = new Client(env) // sem buscar /api/auth/csrf
+    const r = await c.req('POST', '/api/auth/salt', { email: 'a@b.c' }, { 'x-csrf-token': 'marx', origin: 'https://iamarx.com.br', 'sec-fetch-site': 'same-origin' })
+    expect(r.status).toBe(200)
+  })
+
   it('primeiro acesso exige o código e só funciona uma vez', async () => {
     const c = await client()
     expect((await c.req('GET', '/api/setup')).body).toEqual({ needed: true, token_configured: true })
@@ -110,7 +116,13 @@ describe('servidor de login', () => {
     const me = await c.req('GET', '/api/auth/me')
     expect(me.body).toMatchObject({ email: 'admin@marx.local', role: 'admin', idle_minutes: 30 })
     expect(me.headers.get('cache-control')).toBe('no-store')
-    expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'falso' })).status).toBe(403)
+    // requisições forjadas por outro site são bloqueadas
+    expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'x', origin: 'https://site-malicioso.com' })).status).toBe(403)
+    expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'x', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    const semCabecalho = await handle(new Request('https://iamarx.com.br/api/auth/logout', { method: 'POST', headers: { cookie: [...c.jar].map(([k, v]) => `${k}=${v}`).join('; ') } }), env)
+    expect(semCabecalho.status).toBe(403)
+    // mesmo site, sem depender do cookie anti-CSRF
+    expect((await c.req('GET', '/api/auth/me')).status).toBe(200)
     const out = await c.req('POST', '/api/auth/logout', {})
     expect(out.headers.get('clear-site-data')).toContain('storage')
     expect((await c.req('GET', '/api/auth/me')).status).toBe(401)
