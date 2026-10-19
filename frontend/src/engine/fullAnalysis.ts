@@ -11,7 +11,8 @@ import { cells, commonContacts, compareNumbers, contacts, criteria, type EventFi
 import { reciprocalMatch } from './crossmatch'
 import { q } from './db'
 import { getState } from './session'
-import { sharedGroupMembers, sharedIps, waGroups, waSummary } from './whatsapp'
+import { ipCorrelation } from './accessLog'
+import { bookCommon, groupsInfo, sharedGroupMembers, sharedIps, waGroups, waSummary } from './whatsapp'
 
 /** Limite de alvos comparados entre si (cada par gera consultas próprias). */
 export const MAX_COMPARED = 12
@@ -20,12 +21,12 @@ export const MAX_COMPARED = 12
 export async function activeTargets(f: EventFilter, limit = 50): Promise<string[]> {
   if (f.targets?.length) return normList(f.targets)
   const rows = await q(
-    `SELECT target_number, count(*)::INTEGER AS n FROM events e WHERE ${where(f)} AND target_number IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT ${Number(limit)}`,
+    `SELECT target_number, count(*)::INTEGER AS n FROM events e WHERE ${where(f)} AND target_number IS NOT NULL AND event_type <> 'acesso' GROUP BY 1 ORDER BY 2 DESC LIMIT ${Number(limit)}`,
   )
   return rows.map((r) => r.target_number as string)
 }
 
-export type LinkOptions = { windowS?: number; minEvents?: number }
+export type LinkOptions = { windowS?: number; minEvents?: number; ipWindowS?: number }
 
 /** Vínculos completos: grafo, reciprocidade, contatos em comum, contatos diretos, células compartilhadas, coincidências, cruzamento e WhatsApp. */
 export async function linkAnalysis(f: EventFilter, o: LinkOptions = {}) {
@@ -39,6 +40,9 @@ export async function linkAnalysis(f: EventFilter, o: LinkOptions = {}) {
   const coin = cmp?.coincidences ?? { items: [], truncated: false, criteria: {} }
   const cross = await reciprocalMatch(f, 60, 5, 500)
   const ips = await sharedIps(f)
+  const ipCorr = await ipCorrelation(f, o.ipWindowS ?? 1800, 2000)
+  const book = await bookCommon()
+  const ginfo = await groupsInfo()
   const groups = await sharedGroupMembers(f)
   const crossTotal = Object.values(cross.totals).reduce((a, b) => a + b, 0)
   return {
@@ -55,6 +59,9 @@ export async function linkAnalysis(f: EventFilter, o: LinkOptions = {}) {
     cross: { ...cross, total: crossTotal },
     shared_ips: ips.items,
     shared_group_members: groups,
+    ip_correlation: ipCorr,
+    book,
+    groups_info: ginfo,
     criteria: criteria(f, {
       window_s: windowS,
       compared_targets: compared.length < nums.length ? `${compared.length} alvos mais ativos de ${nums.length}` : `${compared.length} alvos`,
@@ -155,6 +162,53 @@ export function linkFindings(l: LinkResult, fmt: Fmt): Finding[] {
       detail: `${l.shared_ips[0].ip} aparece para ${l.shared_ips[0].targets} alvos. Compare datas e portas (CGNAT).`,
       path: 'vinculos',
       tab: 'ips',
+    })
+  const strong = l.ip_correlation.pairs.filter((p: any) => p.forte > 0)
+  if (strong.length) {
+    const p = strong[0]
+    out.push({
+      tone: 'red',
+      area: 'Logs de acesso e IPs',
+      title: `${plural(strong.length, 'par de fontes', 'pares de fontes')} com mesmo IP e porta no mesmo horário`,
+      detail: `${fmt(p.acc1)} (${p.src1}) e ${fmt(p.acc2)} (${p.src2}): ${plural(p.forte, 'coincidência forte', 'coincidências fortes')}. Indica a mesma conexão — possível mesmo usuário.`,
+      path: 'ips',
+    })
+  } else if (l.ip_correlation.pairs.length)
+    out.push({
+      tone: 'amber',
+      area: 'Logs de acesso e IPs',
+      title: `${plural(l.ip_correlation.pairs.length, 'par de fontes', 'pares de fontes')} com o mesmo IP no mesmo período`,
+      detail: 'Sem porta coincidente: indica a mesma rede (ou CGNAT da operadora). Peça a porta lógica ao provedor para confirmar.',
+      path: 'ips',
+    })
+  if (l.book.targets_in_books.length) {
+    const b = l.book.targets_in_books[0]
+    out.push({
+      tone: 'red',
+      area: 'Agenda',
+      title: `${plural(l.book.targets_in_books.length, 'alvo salvo', 'alvos salvos')} na agenda de outro alvo`,
+      detail: `${fmt(b.contact)} está na agenda de ${fmt(b.account)} (${b.kind}).`,
+      path: 'whatsapp',
+      tab: 'agenda',
+    })
+  }
+  if (l.book.shared.length)
+    out.push({
+      tone: 'amber',
+      area: 'Agenda',
+      title: `${plural(l.book.shared.length, 'contato')} na agenda de mais de um alvo`,
+      detail: `Por exemplo ${fmt(l.book.shared[0].contact)}, salvo por ${l.book.shared[0].accounts} contas.`,
+      path: 'whatsapp',
+      tab: 'agenda',
+    })
+  if (l.groups_info.common.length)
+    out.push({
+      tone: 'violet',
+      area: 'WhatsApp e IPs',
+      title: `${plural(l.groups_info.common.length, 'grupo')} de WhatsApp em comum entre alvos`,
+      detail: `Por exemplo “${l.groups_info.common[0].subject ?? l.groups_info.common[0].group_id}”, com ${l.groups_info.common[0].accounts} alvos.`,
+      path: 'whatsapp',
+      tab: 'grupos',
     })
   if (l.shared_group_members.length)
     out.push({

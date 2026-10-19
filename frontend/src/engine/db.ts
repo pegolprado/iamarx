@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS erb_cells (
   cell_id VARCHAR, eci VARCHAR, nci VARCHAR, cgi VARCHAR, cell_key VARCHAR, site_code VARCHAR, site_name VARCHAR, address VARCHAR,
   lat DOUBLE, lon DOUBLE, azimuth DOUBLE, beamwidth DOUBLE, sector VARCHAR, height_m DOUBLE, validation_status VARCHAR, validation_notes VARCHAR, raw VARCHAR
 );
+CREATE TABLE IF NOT EXISTS wa_book (import_id INTEGER, file_id INTEGER, account VARCHAR, contact VARCHAR, kind VARCHAR);
+CREATE TABLE IF NOT EXISTS wa_groupinfo (import_id INTEGER, file_id INTEGER, account VARCHAR, group_id VARCHAR, kind VARCHAR, creation VARCHAR, size INTEGER, subject VARCHAR, description VARCHAR);
 CREATE TABLE IF NOT EXISTS annotations (id INTEGER, ts_utc TIMESTAMP, number VARCHAR, text VARCHAR, author VARCHAR, created_at TIMESTAMP);
 `
 

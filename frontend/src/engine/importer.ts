@@ -70,6 +70,7 @@ export function removeFile(id: number) {
   const ids = new Set([id, ...getState().files.filter((f) => f.parent_id === id).map((f) => f.id)])
   return (async () => {
     await exec(`DELETE FROM events WHERE file_id IN (${[...ids].join(',')})`)
+    await exec(`DELETE FROM wa_book WHERE file_id IN (${[...ids].join(',')}); DELETE FROM wa_groupinfo WHERE file_id IN (${[...ids].join(',')})`)
     await exec(`DELETE FROM erb_cells WHERE version_id IN (SELECT id FROM erb_versions WHERE file_id IN (${[...ids].join(',')}))`)
     await exec(`DELETE FROM erb_versions WHERE file_id IN (${[...ids].join(',')})`)
     setState((s) => ({ files: s.files.filter((f) => !ids.has(f.id)), imports: s.imports.filter((i) => !ids.has(i.file_id)) }), true)
@@ -584,7 +585,7 @@ async function runErb(imp: ImportRec, f: SessionFile) {
 
 export async function discardImport(id: number) {
   const n = (await q1<{ n: number }>(`SELECT count(*)::INTEGER AS n FROM events WHERE import_id = ${id}`)).n
-  await exec(`DELETE FROM events WHERE import_id = ${id}`)
+  await exec(`DELETE FROM events WHERE import_id = ${id}; DELETE FROM wa_book WHERE import_id = ${id}; DELETE FROM wa_groupinfo WHERE import_id = ${id}`)
   await exec(`DELETE FROM erb_cells WHERE version_id IN (SELECT id FROM erb_versions WHERE import_id = ${id}); DELETE FROM erb_versions WHERE import_id = ${id}`)
   updateImport(id, { status: 'superseded' }, true)
   await recomputeDuplicates()

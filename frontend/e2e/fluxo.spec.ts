@@ -180,24 +180,58 @@ test('análise completa e vínculos: tudo calculado de uma vez a partir da impor
   await tab(page, 'Análise completa')
   const achados = page.getByRole('list', { name: 'Principais achados' })
   await expect(achados).toBeVisible({ timeout: 60_000 })
-  await expect(achados.getByText(/em comum entre alvos/)).toBeVisible()
+  await expect(achados.getByText(/contatos em comum entre alvos/)).toBeVisible()
   await expect(achados.getByText(/IPs? usados? por mais de um alvo/)).toBeVisible()
   await expect(page.getByText('Contatos mais frequentes')).toBeVisible()
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Relatório PDF")')])
   expect(pdf.suggestedFilename()).toMatch(/analise_completa.*\.pdf$/i)
 
   // achado leva direto ao resultado detalhado na análise de vínculos
-  await achados.getByText(/em comum entre alvos/).click()
+  await achados.getByText(/contatos em comum entre alvos/).click()
   await expect(page.getByRole('heading', { name: 'Análise de vínculos' })).toBeVisible()
   await expect(page.getByRole('tab', { name: /Contatos em comum/, selected: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Contatos em comum entre alvos' })).toBeVisible()
   await expect(page.locator('section table tbody tr').first()).toBeVisible()
-  for (const t of ['Recíprocas', 'Contato direto', 'Coincidências', 'Células em comum', 'Atividade dos alvos', 'Cruzamento multifonte', 'IPs e grupos', 'Todas as conexões']) {
+  for (const t of ['Recíprocas', 'Contato direto', 'Coincidências', 'Células em comum', 'Atividade dos alvos', 'Cruzamento multifonte', 'IPs, agenda e grupos', 'Todas as conexões']) {
     await page.click(`[role=tablist] >> text=${t}`)
     await expect(page.locator('[role=alert]'), `erro na aba ${t}`).toHaveCount(0)
   }
   await page.click('[role=tablist] >> text=Cruzamento multifonte')
   const [x] = await Promise.all([page.waitForEvent('download'), page.locator('section').filter({ hasText: 'Cruzamento multifonte' }).last().locator('button:has-text("Excel")').click()])
   expect(x.suggestedFilename()).toMatch(/\.xlsx$/)
+  expect(errors).toEqual([])
+})
+
+test('WhatsApp: dados cadastrais e agenda; logs de acesso com correlação de IPs', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('dialog', (d) => d.accept())
+  await login(page)
+  await page.click('text=Gerar análise de demonstração')
+  await expect(page.getByText('Registros considerados')).toBeVisible()
+
+  await tab(page, 'WhatsApp')
+  await page.click('[role=tablist] >> text=Dados cadastrais')
+  await expect(page.getByText('alvo.a.demo@example.com').first()).toBeVisible()
+  await expect(page.getByText('Fulano Teste').first()).toBeVisible()
+  await page.click('[role=tablist] >> text=Agenda')
+  const salvos = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Alvos salvos na agenda de outro alvo' }) })
+  await expect(salvos.locator('tbody tr')).toHaveCount(3) // A tem B e C; B tem A
+  await page.click('[role=tablist] >> text=Grupos')
+  await expect(page.getByText('Futebol de quinta (fictício)').first()).toBeVisible()
+
+  await page.click('nav[aria-label="Telas de WhatsApp e IPs"] >> text="Logs de acesso e IPs"')
+  const pares = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Pares de fontes com o mesmo IP' }) })
+  await expect(pares.getByText('alvo.a.demo@example.com').first()).toBeVisible({ timeout: 30_000 })
+  await expect(pares.getByText('google').first()).toBeVisible()
+
+  // carregar um log de acesso pela tela de Arquivos (colunas com nomes em português, sem fuso)
+  await tab(page, 'Arquivos')
+  await page.selectOption('select >> nth=0', 'access_log')
+  await page.fill('input[placeholder="e-mail, usuário ou telefone"]', 'outra.conta@example.com')
+  const csv = 'Data;Hora;Endereço IP;Porta\r\n21/03/2026;10:00:00;10.20.30.40;40001\r\n21/03/2026;11:00:00;189.40.50.60:51515\r\n'
+  await page.setInputFiles('input[type=file]', { name: 'log_provedor.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf-8') })
+  await expect(page.getByText(/Log de acesso: 2 registros de IP/)).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'log de acesso (IP)', exact: true })).toHaveCount(2)
   expect(errors).toEqual([])
 })

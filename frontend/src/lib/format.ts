@@ -13,6 +13,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   wa_chamada_originada: 'WhatsApp: chamada originada',
   wa_chamada_recebida: 'WhatsApp: chamada recebida',
   wa_conexao: 'WhatsApp: conexão (IP)',
+  acesso: 'Acesso (log de IP)',
   outro: 'Outro registro',
 }
 

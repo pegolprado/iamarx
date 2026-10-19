@@ -47,7 +47,7 @@ export default function Imports() {
                 <tr key={i.id} className={String(i.id) === sel ? 'bg-accent/5' : ''}>
                   <td className="font-mono text-xs">{i.id}</td>
                   <td className="max-w-56 text-xs break-all">{name(i.file_id)}</td>
-                  <td className="text-xs">{i.kind === 'cdr' ? 'eventos' : i.kind === 'whatsapp' ? 'WhatsApp' : 'cadastro ERB'}</td>
+                  <td className="text-xs">{i.kind === 'cdr' ? 'eventos' : i.kind === 'whatsapp' ? 'WhatsApp' : i.kind === 'access_log' ? 'log de acesso' : 'cadastro ERB'}</td>
                   <td className="min-w-36">
                     <Badge tone={TONE[i.status]}>{LABEL[i.status] ?? i.status}</Badge>
                     {i.status === 'running' && (

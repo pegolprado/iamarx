@@ -1,17 +1,4 @@
-import {
-  Activity,
-  AlertTriangle,
-  FileSearch,
-  FileText,
-  FolderKanban,
-  GitMerge,
-  MessageCircle,
-  Network,
-  PhoneCall,
-  RadioTower,
-  Sparkles,
-  Upload,
-} from 'lucide-react'
+import { Activity, AlertTriangle, FileSearch, FileText, FolderKanban, GitMerge, MessageCircle, Network, PhoneCall, RadioTower, Sparkles, Upload } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Tone } from '../components/ui'
 
@@ -67,7 +54,8 @@ export const MODULES: ModuleDef[] = [
   {
     key: 'whatsapp',
     title: 'WhatsApp e IPs',
-    description: 'Relatórios da Meta: mensagens, chamadas, grupos, IPs e portas do alvo, sequência de IPs e IPs em comum entre alvos.',
+    description:
+      'Relatórios da Meta (mensagens, chamadas, dados cadastrais, agenda e grupos) e logs de acesso do Google e outros provedores, com correlação de IPs entre contas e serviços.',
     icon: <MessageCircle />,
     path: 'whatsapp',
     inCase: true,
@@ -118,11 +106,12 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: 'arquivos',
         includes: [
           'CSV, TXT, XLS, XLSX, XML, JSON, HTML, PDF (com OCR) e ZIP',
+          'Extratos de voz, SMS e conexão (dados) de TIM, Vivo, Claro e Oi',
           'Layout, separador e operadora detectados',
           'Datas, fusos, durações e números padronizados',
           'Validação por linha e prévia',
           'Duplicidades e registros fora do período',
-          'WhatsApp Records reconhecido sozinho',
+          'WhatsApp Records e logs de acesso reconhecidos',
           'SHA-256 de cada original',
         ],
       },
@@ -176,15 +165,31 @@ export const TOOL_GROUPS: ToolGroup[] = [
       },
       {
         title: 'WhatsApp e IPs',
-        description: 'Leitura do relatório da Meta (records.html ou ZIP) com horários convertidos de UTC e cruzamento com as sessões de dados das operadoras.',
+        description:
+          'Relatórios da Meta (records.html, ZIP ou vários HTML diários do mesmo alvo, sem duplicar) com horários convertidos de UTC, cruzados com as sessões de dados das operadoras.',
         path: 'whatsapp',
         includes: [
+          'Dados cadastrais (aparelho, versão, e-mail, nome)',
           'Mensagens e chamadas (voz e vídeo)',
-          'Contatos no WhatsApp',
-          'IPs e portas do alvo',
-          'Sequência de IPs',
+          'Interlocutores mais frequentes',
+          'Agenda: alvos e contatos em comum',
+          'Grupos (cadastro e mensagens) em comum',
+          'IPs, portas e sequência de IPs',
           'IPs em comum entre alvos',
-          'Grupos e participantes em comum',
+        ],
+      },
+      {
+        title: 'Log de acesso e correlação de IPs',
+        description:
+          'Logs de IP de Google, Instagram, Facebook, Apple, provedores e outros (planilha ou HTML), cruzados com WhatsApp e operadoras para identificar o mesmo usuário ou uso compartilhado.',
+        path: 'ips',
+        includes: [
+          'Colunas reconhecidas automaticamente',
+          'Fuso UTC detectado',
+          'Mesmo IP e porta no mesmo horário (forte)',
+          'Mesmo IP sem porta (média)',
+          'CGNAT sinalizado (fraca)',
+          'Mesma conta em serviços diferentes',
         ],
       },
       {

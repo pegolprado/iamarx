@@ -202,7 +202,13 @@ const NAV: { label: string; sub: [string, string][]; also?: string[] }[] = [
       ['cruzamento', 'Cruzamento (ajustes)'],
     ],
   },
-  { label: 'WhatsApp e IPs', sub: [['whatsapp', 'WhatsApp e IPs']] },
+  {
+    label: 'WhatsApp e IPs',
+    sub: [
+      ['whatsapp', 'WhatsApp'],
+      ['ips', 'Logs de acesso e IPs'],
+    ],
+  },
   {
     label: 'ERB e mapa',
     sub: [

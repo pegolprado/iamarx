@@ -25,7 +25,7 @@ export type Issue = { row: number | null; page?: number | null; field: string; s
 export type ImportRec = {
   id: number
   file_id: number
-  kind: 'cdr' | 'erb_registry' | 'whatsapp'
+  kind: 'cdr' | 'erb_registry' | 'whatsapp' | 'access_log'
   mapping: Record<string, string>
   options: Record<string, any>
   status: 'draft' | 'running' | 'done' | 'failed' | 'cancelled' | 'superseded'
@@ -51,7 +51,7 @@ export type SessionFile = {
   size_bytes: number
   sha256: string
   detected_format: Fmt
-  kind: 'cdr' | 'erb_registry' | 'whatsapp' | 'other'
+  kind: 'cdr' | 'erb_registry' | 'whatsapp' | 'access_log' | 'other'
   operator_declared: string | null
   operator_detected: string | null
   operator_confidence: number | null

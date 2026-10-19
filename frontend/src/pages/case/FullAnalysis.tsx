@@ -27,7 +27,7 @@ const ERB_LABEL: Record<string, string> = { exact: 'exata', probable: 'provável
 export default function FullAnalysis() {
   const { me } = useAuth()
   const [f, setF] = useUrlFilter()
-  const hasEvents = useSession((s) => s.imports.some((i) => i.status === 'done' && (i.kind === 'cdr' || i.kind === 'whatsapp')))
+  const hasEvents = useSession((s) => s.imports.some((i) => i.status === 'done' && (i.kind === 'cdr' || i.kind === 'whatsapp' || i.kind === 'access_log')))
   const q = useQuery({ queryKey: ['full-analysis', f], queryFn: () => fullAnalysis(f), enabled: hasEvents })
   const [busy, setBusy] = useState<ExportFormat | null>(null)
   const exportAll = async (fmt: ExportFormat) => {

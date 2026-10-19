@@ -7,27 +7,13 @@ import { apath, useCase } from '../../app/layout'
 import { ExportButtons } from '../../components/Export'
 import { type EventFilter, FilterBar } from '../../components/FilterBar'
 import { Findings } from '../../components/Findings'
+import { date, int, IP_PAIR_COLS, num, nums } from '../../components/columns'
 import { type ResultColumn, ResultTable } from '../../components/ResultTable'
-import { Badge, Criteria, DrillLink, ErrorBox, Field, Loading, Notice, Num, PageHeader, Tabs } from '../../components/ui'
+import { Badge, Criteria, DrillLink, ErrorBox, Field, Loading, Notice, PageHeader, Tabs } from '../../components/ui'
 import { linkGraph } from '../../engine/analytics'
 import { type LinkResult, linkAnalysis, linkFindings, MAX_COMPARED } from '../../engine/fullAnalysis'
 import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtInt, fmtNumber, fmtNumberPlain } from '../../lib/format'
 import { useUrlFilter } from '../../lib/useUrlFilter'
-
-const num = (key: string, label: string): ResultColumn => ({ key, label, fmt: (v) => fmtNumberPlain(v), render: (r) => <Num n={r[key]} /> })
-const date = (key: string, label: string): ResultColumn => ({
-  key,
-  label,
-  fmt: (v) => fmtDateTime(v),
-  render: (r) => <span className="text-xs whitespace-nowrap">{fmtDateTime(r[key])}</span>,
-})
-const int = (key: string, label: string): ResultColumn => ({ key, label, right: true, render: (r) => fmtInt(r[key]) })
-const nums = (key: string, label: string): ResultColumn => ({
-  key,
-  label,
-  fmt: (v) => (v ?? []).map((x: string) => fmtNumberPlain(x)).join(', '),
-  render: (r) => <span className="text-xs">{(r[key] ?? []).map((x: string) => fmtNumber(x)).join(', ')}</span>,
-})
 
 type Tab = 'reciprocas' | 'comum' | 'diretos' | 'coincidencias' | 'celulas' | 'atividade' | 'cruzamento' | 'ips' | 'conexoes'
 
@@ -112,7 +98,10 @@ export default function Links() {
                 { value: 'celulas', label: `Células em comum (${d.shared_cells.length})` },
                 { value: 'atividade', label: `Atividade dos alvos (${d.per_number.length})` },
                 { value: 'cruzamento', label: `Cruzamento multifonte (${d.cross.total})` },
-                { value: 'ips', label: `IPs e grupos em comum (${d.shared_ips.length + d.shared_group_members.length})` },
+                {
+                  value: 'ips',
+                  label: `IPs, agenda e grupos (${d.ip_correlation.pairs.length + d.shared_ips.length + d.book.shared.length + d.book.targets_in_books.length + d.groups_info.common.length + d.shared_group_members.length})`,
+                },
                 { value: 'conexoes', label: `Todas as conexões (${d.graph.edges.length})` },
               ]}
             />
@@ -326,6 +315,45 @@ function Section({ tab, d, f }: { tab: Tab; d: LinkResult; f: EventFilter }) {
   if (tab === 'ips')
     return (
       <div className="space-y-4">
+        <ResultTable
+          title="Correlação de IPs entre fontes"
+          subtitle="Contas/serviços diferentes (WhatsApp, logs de acesso, sessões de dados) que usaram o mesmo IP no mesmo período. Detalhes em WhatsApp e IPs → Logs de acesso e IPs."
+          columns={IP_PAIR_COLS}
+          rows={d.ip_correlation.pairs}
+          criteria={d.ip_correlation.criteria}
+          empty="Nenhum IP usado por duas fontes no mesmo período."
+        />
+        <ResultTable
+          title="Alvos salvos na agenda de outro alvo"
+          subtitle="Agenda (Address Book) dos relatórios de WhatsApp."
+          columns={[num('account', 'Agenda de'), num('contact', 'Alvo salvo'), { key: 'kind', label: 'Tipo' }]}
+          rows={d.book.targets_in_books}
+          empty="Nenhum alvo encontrado na agenda de outro (requer WhatsApp Records com agenda)."
+        />
+        <ResultTable
+          title="Contatos na agenda de mais de um alvo"
+          columns={[
+            num('contact', 'Contato'),
+            int('accounts', 'Agendas'),
+            nums('in_books', 'Na agenda de'),
+            { key: 'is_target', label: 'É alvo', fmt: (v) => (v ? 'sim' : 'não') },
+          ]}
+          rows={d.book.shared}
+          empty="Nenhum contato em comum nas agendas carregadas."
+        />
+        <ResultTable
+          title="Grupos de WhatsApp em comum (cadastro)"
+          columns={[
+            { key: 'subject', label: 'Grupo', fmt: (v, r) => v ?? r.group_id },
+            { key: 'group_id', label: 'ID' },
+            int('size', 'Tamanho'),
+            int('accounts', 'Alvos'),
+            nums('members', 'Alvos no grupo'),
+            nums('owners', 'Administrador/criador'),
+          ]}
+          rows={d.groups_info.common}
+          empty="Nenhum grupo em comum no cadastro (Groups Info) dos relatórios carregados."
+        />
         <ResultTable
           title="IPs usados por mais de um alvo"
           subtitle="WhatsApp e sessões de dados. Um IPv4 de operadora móvel pode ser compartilhado (CGNAT): compare datas e portas."

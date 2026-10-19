@@ -7,12 +7,27 @@ import { ExportButtons } from '../../components/Export'
 import { FilterBar } from '../../components/FilterBar'
 import { Badge, Criteria, DrillLink, Empty, ErrorBox, Loading, Notice, Num, PageHeader, Stat, Tabs } from '../../components/ui'
 import { contacts } from '../../engine/analytics'
-import { ipList, ipSequence, sharedGroupMembers, sharedIps, waAccounts, waEventFilter, waGroups, waSummary } from '../../engine/whatsapp'
+import {
+  bookCommon,
+  bookContacts,
+  groupsInfo,
+  ipList,
+  ipSequence,
+  sharedGroupMembers,
+  sharedIps,
+  waAccounts,
+  waEventFilter,
+  waGroups,
+  waProfiles,
+  waSummary,
+} from '../../engine/whatsapp'
+import { date, int, num, nums } from '../../components/columns'
+import { ResultTable } from '../../components/ResultTable'
 import { useSession } from '../../engine/session'
 import { fmtDateTime, fmtDuration, fmtInt, fmtNumber, fmtNumberPlain } from '../../lib/format'
 import { useUrlFilter } from '../../lib/useUrlFilter'
 
-type Tab = 'resumo' | 'contatos' | 'ips' | 'ips_comuns' | 'sequencia' | 'grupos'
+type Tab = 'resumo' | 'cadastro' | 'contatos' | 'agenda' | 'ips' | 'ips_comuns' | 'sequencia' | 'grupos'
 
 export default function WhatsApp() {
   const [sp] = useSearchParams()
@@ -28,7 +43,11 @@ export default function WhatsApp() {
       />
       {!hasWa ? (
         <Empty title="Nenhum WhatsApp Records carregado">
-          Em <Link className="text-accent hover:underline" to="../arquivos" relative="path">Arquivos</Link>, selecione o <b>records.html</b> ou o <b>ZIP</b> recebido da Meta: ele é reconhecido e importado automaticamente.
+          Em{' '}
+          <Link className="text-accent hover:underline" to="../arquivos" relative="path">
+            Arquivos
+          </Link>
+          , selecione o <b>records.html</b> ou o <b>ZIP</b> recebido da Meta: ele é reconhecido e importado automaticamente.
         </Empty>
       ) : (
         <>
@@ -37,7 +56,9 @@ export default function WhatsApp() {
             onChange={setTab}
             items={[
               { value: 'resumo', label: 'Resumo' },
+              { value: 'cadastro', label: 'Dados cadastrais' },
               { value: 'contatos', label: 'Contatos' },
+              { value: 'agenda', label: 'Agenda' },
               { value: 'ips', label: 'IPs' },
               { value: 'ips_comuns', label: 'IPs em comum' },
               { value: 'sequencia', label: 'Sequência de IPs' },
@@ -46,11 +67,18 @@ export default function WhatsApp() {
           />
           <FilterBar value={f} onChange={setF} compact />
           {tab === 'resumo' && <Summary f={f} />}
+          {tab === 'cadastro' && <Profile />}
           {tab === 'contatos' && <Contacts f={f} />}
+          {tab === 'agenda' && <Book f={f} />}
           {tab === 'ips' && <Ips f={f} />}
           {tab === 'ips_comuns' && <SharedIps f={f} />}
           {tab === 'sequencia' && <Sequence f={f} />}
-          {tab === 'grupos' && <Groups f={f} />}
+          {tab === 'grupos' && (
+            <div className="space-y-4">
+              <Groups f={f} />
+              <GroupsCadastro />
+            </div>
+          )}
         </>
       )}
     </div>
@@ -67,7 +95,11 @@ function Summary({ f }: { f: any }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Mensagens enviadas / recebidas" value={`${fmtInt(t.sent)} / ${fmtInt(t.received)}`} hint={`${fmtInt(t.contacts)} interlocutores · ${fmtInt(t.groups)} grupos`} />
+        <Stat
+          label="Mensagens enviadas / recebidas"
+          value={`${fmtInt(t.sent)} / ${fmtInt(t.received)}`}
+          hint={`${fmtInt(t.contacts)} interlocutores · ${fmtInt(t.groups)} grupos`}
+        />
         <Stat label="Chamadas" value={fmtInt(t.calls)} hint={`${fmtInt(t.calls_answered)} atendidas · ${fmtInt(t.video_calls)} de vídeo`} />
         <Stat label="IPs distintos do alvo" value={fmtInt(t.ips)} hint={`${fmtInt(t.connections)} registros de conexão · ${fmtInt(t.devices)} tipos de aparelho`} />
         <Stat label="Período" value={<span className="text-base">{t.first_event ? `${fmtDateTime(t.first_event, false)} → ${fmtDateTime(t.last_event, false)}` : '—'}</span>} />
@@ -146,7 +178,8 @@ function Summary({ f }: { f: any }) {
         </section>
       </div>
       <Notice>
-        Os relatórios trazem metadados (quem, quando, IP, tipo), nunca o conteúdo das conversas. O IP de mensagens <b>recebidas</b> é do remetente e por isso não é atribuído ao alvo.
+        Os relatórios trazem metadados (quem, quando, IP, tipo), nunca o conteúdo das conversas. O IP de mensagens <b>recebidas</b> é do remetente e por isso não é atribuído ao
+        alvo.
       </Notice>
     </div>
   )
@@ -154,7 +187,10 @@ function Summary({ f }: { f: any }) {
 
 function Contacts({ f }: { f: any }) {
   const { c } = useCase()
-  const ff = waEventFilter({ ...f, event_types: (f.event_types ?? []).length ? f.event_types : ['wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida'] })
+  const ff = waEventFilter({
+    ...f,
+    event_types: (f.event_types ?? []).length ? f.event_types : ['wa_msg_enviada', 'wa_msg_recebida', 'wa_chamada_originada', 'wa_chamada_recebida'],
+  })
   const q = useQuery({ queryKey: ['wa-contacts', c.id, ff], queryFn: () => contacts(ff, 500) as Promise<any> })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
@@ -494,7 +530,11 @@ function Groups({ f }: { f: any }) {
                   {fmtDateTime(r.first_event, false)} → {fmtDateTime(r.last_event, false)}
                 </td>
                 <td className="text-xs">
-                  {r.members.length} · {r.members.slice(0, 6).map((m: string) => fmtNumber(m)).join(', ')}
+                  {r.members.length} ·{' '}
+                  {r.members
+                    .slice(0, 6)
+                    .map((m: string) => fmtNumber(m))
+                    .join(', ')}
                   {r.members.length > 6 ? '…' : ''}
                 </td>
               </tr>
@@ -504,5 +544,174 @@ function Groups({ f }: { f: any }) {
       )}
       <Criteria criteria={q.data.criteria} />
     </div>
+  )
+}
+
+const HEADER_LABEL: Record<string, string> = {
+  service: 'Serviço',
+  'internal ticket number': 'Chamado (ticket)',
+  'account identifier': 'Conta',
+  'account type': 'Tipo de conta',
+  generated: 'Gerado em',
+  'date range': 'Período do relatório',
+  target: 'Alvo',
+  'connection state': 'Estado da conexão',
+  'last seen': 'Visto por último',
+  'device type': 'Tipo de aparelho',
+  'app version': 'Versão do app',
+  'device os build number': 'Sistema do aparelho',
+  'device manufacturer': 'Fabricante',
+  'device model': 'Modelo',
+  'os version': 'Versão do sistema',
+  'last ip': 'Último IP',
+  'online since': 'On-line desde',
+}
+
+/** Dados cadastrais de cada conta: cabeçalho do relatório, Connection/Device/Web Info e e-mails. */
+function Profile() {
+  const list = waProfiles()
+  const rows = list.flatMap((p) => [
+    ...Object.entries(p.header)
+      .filter(([, v]) => v)
+      .map(([k, v]) => ({ account: p.account, section: 'Relatório', label: HEADER_LABEL[k] ?? k, value: v })),
+    ...p.profile.map((x) => ({ account: p.account, section: x.section, label: x.label, value: x.value })),
+    ...p.emails.map((e) => ({ account: p.account, section: 'E-mails', label: 'E-mail registrado', value: e })),
+    { account: p.account, section: 'Agenda', label: 'Contatos simétricos / assimétricos', value: `${p.book_symmetric} / ${p.book_asymmetric}` },
+    { account: p.account, section: 'Grupos', label: 'Grupos no cadastro', value: String(p.groups_info) },
+  ])
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {list.map((p) => (
+          <section key={p.import_id} className="card p-4 text-sm">
+            <div className="mb-2 font-mono text-base text-white">
+              <Num n={p.account} />
+            </div>
+            <dl className="space-y-1">
+              {[...p.profile.filter((x) => /push name|name|device|app version|os|last seen|connection state|service start|platform|version/i.test(x.label)).slice(0, 10)].map(
+                (x, i) => (
+                  <div key={i} className="flex justify-between gap-3 border-b border-line/50 pb-1">
+                    <dt className="text-muted">{x.label}</dt>
+                    <dd className="text-right text-white">{x.value}</dd>
+                  </div>
+                ),
+              )}
+              {p.emails.map((e) => (
+                <div key={e} className="flex justify-between gap-3 border-b border-line/50 pb-1">
+                  <dt className="text-muted">E-mail</dt>
+                  <dd className="text-right break-all text-white">{e}</dd>
+                </div>
+              ))}
+            </dl>
+            {!p.profile.length && !p.emails.length && <p className="text-xs text-faint">O relatório não trouxe dados cadastrais além do cabeçalho.</p>}
+          </section>
+        ))}
+      </div>
+      <ResultTable
+        title="WhatsApp — dados cadastrais"
+        subtitle="Todos os campos identificados nos relatórios, por conta."
+        columns={[num('account', 'Conta'), { key: 'section', label: 'Seção' }, { key: 'label', label: 'Campo' }, { key: 'value', label: 'Valor' }]}
+        rows={rows}
+        pageSize={100}
+      />
+    </div>
+  )
+}
+
+/** Agenda (Address Book): contatos salvos, comunicação com cada um e cruzamento entre alvos. */
+function Book({ f }: { f: any }) {
+  const { c } = useCase()
+  const b = useQuery({ queryKey: ['wa-book', c.id, f], queryFn: () => bookContacts(f) })
+  const cm = useQuery({ queryKey: ['wa-book-common', c.id], queryFn: bookCommon })
+  if (b.isLoading || cm.isLoading) return <Loading />
+  if (b.error || cm.error) return <ErrorBox error={b.error ?? cm.error} />
+  if (!b.data!.items.length) return <Empty title="Os relatórios carregados não trazem agenda (Address Book)" />
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {b.data!.totals.map((t: any) => (
+          <Stat
+            key={t.account}
+            label={`Agenda de ${fmtNumber(t.account)}`}
+            value={fmtInt(t.symmetric + t.asymmetric)}
+            hint={`${fmtInt(t.symmetric)} simétricos · ${fmtInt(t.asymmetric)} assimétricos`}
+          />
+        ))}
+      </div>
+      <ResultTable
+        title="Alvos salvos na agenda de outro alvo"
+        columns={[num('account', 'Agenda de'), num('contact', 'Alvo salvo'), { key: 'kind', label: 'Tipo' }]}
+        rows={cm.data!.targets_in_books}
+        empty="Nenhum alvo encontrado na agenda de outro alvo."
+      />
+      <ResultTable
+        title="Contatos na agenda de mais de um alvo"
+        columns={[
+          num('contact', 'Contato'),
+          int('accounts', 'Agendas'),
+          nums('in_books', 'Na agenda de'),
+          { key: 'kinds', label: 'Tipos', fmt: (v) => (v ?? []).join(', ') },
+          { key: 'is_target', label: 'É alvo', fmt: (v) => (v ? 'sim' : 'não') },
+        ]}
+        rows={cm.data!.shared}
+        criteria={cm.data!.criteria}
+        empty="Carregue o WhatsApp Records de dois ou mais alvos para cruzar as agendas."
+      />
+      <ResultTable
+        title="WhatsApp — agenda"
+        subtitle="Contatos salvos e a comunicação registrada com cada um (mensagens e chamadas no período). Contatos sem nenhum registro também são informação."
+        columns={[
+          num('account', 'Conta'),
+          num('contact', 'Contato'),
+          { key: 'kind', label: 'Tipo' },
+          { key: 'is_target', label: 'É alvo', fmt: (v) => (v ? 'sim' : 'não'), render: (r) => (r.is_target ? <Badge tone="red">alvo</Badge> : '') },
+          int('events', 'Registros'),
+          date('first_event', 'Primeiro'),
+          date('last_event', 'Último'),
+        ]}
+        rows={b.data!.items}
+        criteria={b.data!.criteria}
+      />
+    </div>
+  )
+}
+
+function GroupsCadastro() {
+  const { c } = useCase()
+  const q = useQuery({ queryKey: ['wa-groups-info', c.id], queryFn: groupsInfo })
+  if (q.isLoading) return <Loading />
+  if (q.error) return <ErrorBox error={q.error} />
+  return (
+    <>
+      <ResultTable
+        title="Grupos em comum entre alvos (cadastro)"
+        columns={[
+          { key: 'subject', label: 'Grupo', fmt: (v, r) => v ?? r.group_id },
+          { key: 'group_id', label: 'ID' },
+          int('size', 'Tamanho'),
+          int('accounts', 'Alvos'),
+          nums('members', 'Alvos no grupo'),
+          nums('owners', 'Administrador/criador'),
+        ]}
+        rows={q.data!.common}
+        empty="Nenhum grupo em comum no cadastro (Groups Info)."
+      />
+      <ResultTable
+        title="WhatsApp — grupos no cadastro (Groups Info)"
+        subtitle="Grupos que a conta criou ou de que participa, mesmo sem mensagens no período."
+        columns={[
+          num('account', 'Conta'),
+          { key: 'subject', label: 'Assunto' },
+          { key: 'group_id', label: 'ID' },
+          { key: 'kind', label: 'Papel' },
+          { key: 'creation', label: 'Criado em (UTC)' },
+          int('size', 'Tamanho'),
+          { key: 'description', label: 'Descrição' },
+        ]}
+        rows={q.data!.items}
+        criteria={q.data!.criteria}
+        empty="Os relatórios carregados não trazem a seção Groups Info."
+      />
+    </>
   )
 }

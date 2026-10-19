@@ -12,17 +12,39 @@ import { resolveErb } from './erb'
 import { addFiles, analyze, createImport, runImport, syncTargetsTable } from './importer'
 import { clearSession, nextId, setState } from './session'
 import { waRecordsHtml } from './waSample'
+import { importAccessLog } from './accessLog'
 import { importWhatsApp } from './whatsapp'
 
 const T_A = '+5561900000001'
 const T_B = '+5561900000002'
 const T_C = '+5561900000003'
 const CENTER: [number, number] = [-15.79, -47.88]
-const OPS: [string, string][] = [['TIM', '02'], ['VIVO', '11'], ['CLARO', '05']]
+const OPS: [string, string][] = [
+  ['TIM', '02'],
+  ['VIVO', '11'],
+  ['CLARO', '05'],
+]
 const N_SITES = 10
 const SHARED_IP = '10.20.30.40'
 
-type Cell = { idx: number; site_idx: number; op: string; tech: string; mcc: string; mnc: string; lac: string; tac: string; ci: string; eci: string; site: string; name: string; lat: number; lon: number; az: number; bw: number }
+type Cell = {
+  idx: number
+  site_idx: number
+  op: string
+  tech: string
+  mcc: string
+  mnc: string
+  lac: string
+  tac: string
+  ci: string
+  eci: string
+  site: string
+  name: string
+  lat: number
+  lon: number
+  az: number
+  bw: number
+}
 type Ev = { ts: Date; kind: 'voz' | 'sms' | 'dados'; out: boolean; other: string | null; dur: number; cell: Cell; imei: string; ip: string }
 
 /** Gerador pseudoaleatório determinístico (mulberry32). */
@@ -36,8 +58,8 @@ function rngOf(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
   const randint = (lo: number, hi: number) => lo + Math.floor(random() * (hi - lo + 1))
-  const choice = <T,>(xs: readonly T[]) => xs[Math.floor(random() * xs.length)]
-  const weighted = <T,>(xs: readonly T[], ws: number[]) => {
+  const choice = <T>(xs: readonly T[]) => xs[Math.floor(random() * xs.length)]
+  const weighted = <T>(xs: readonly T[], ws: number[]) => {
     const tot = ws.reduce((s, w) => s + w, 0)
     let r = random() * tot
     for (let i = 0; i < xs.length; i++) if ((r -= ws[i]) < 0) return xs[i]
@@ -66,10 +88,22 @@ function makeCells(rng: Rng): Cell[] {
       for (const tech of ['3G', '4G']) {
         const g3 = tech === '3G'
         cells.push({
-          idx: cells.length, site_idx: s, op, tech, mcc: '724', mnc,
-          lac: g3 ? String(1100 + Math.floor(s / 4)) : '', tac: g3 ? '' : String(5100 + Math.floor(s / 4)),
-          ci: g3 ? String(20000 + s * 10 + oi) : '', eci: g3 ? '' : String(256 * (3000 + s) + oi + 1),
-          site: `DEMO-SITE-${p2(s + 1)}`, name: `ERB Demonstração ${p2(s + 1)}`, lat, lon, az: oi * 120 + 30, bw: 65,
+          idx: cells.length,
+          site_idx: s,
+          op,
+          tech,
+          mcc: '724',
+          mnc,
+          lac: g3 ? String(1100 + Math.floor(s / 4)) : '',
+          tac: g3 ? '' : String(5100 + Math.floor(s / 4)),
+          ci: g3 ? String(20000 + s * 10 + oi) : '',
+          eci: g3 ? '' : String(256 * (3000 + s) + oi + 1),
+          site: `DEMO-SITE-${p2(s + 1)}`,
+          name: `ERB Demonstração ${p2(s + 1)}`,
+          lat,
+          lon,
+          az: oi * 120 + 30,
+          bw: 65,
         })
       }
     })
@@ -85,7 +119,18 @@ const pick = (cells: Cell[], op: string, site: number, techs: readonly string[],
 const HOUR_W = [1, 1, 1, 1, 1, 1, 2, 4, 7, 8, 8, 8, 9, 8, 8, 8, 8, 8, 7, 6, 5, 4, 3, 2]
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
-function events(rng: Rng, target: string, cells: Cell[], contacts: string[], days: number, peers: [string, number][], op: string, home: number, work: number, techs: readonly string[]): Ev[] {
+function events(
+  rng: Rng,
+  target: string,
+  cells: Cell[],
+  contacts: string[],
+  days: number,
+  peers: [string, number][],
+  op: string,
+  home: number,
+  work: number,
+  techs: readonly string[],
+): Ev[] {
   const evs: Ev[] = []
   const weights = contacts.map((_, k) => 1 / (k + 1) ** 0.9)
   for (let d = 0; d < days; d++) {
@@ -98,17 +143,23 @@ function events(rng: Rng, target: string, cells: Cell[], contacts: string[], day
       const ts = new Date(Date.UTC(2026, 2, 1 + d, hour, rng.randint(0, 59), rng.randint(0, 59)))
       const r = rng.random()
       let peer: string | null = null
-      for (const [p, prob] of peers) if (rng.random() < prob) {
-        peer = p
-        break
-      }
+      for (const [p, prob] of peers)
+        if (rng.random() < prob) {
+          peer = p
+          break
+        }
       const other = peer ?? rng.weighted(contacts, weights)
       const kind = r < 0.12 ? 'dados' : r < 0.3 ? 'sms' : 'voz'
       const out = rng.random() < 0.55
       const dur = kind === 'sms' ? 0 : kind === 'dados' ? rng.randint(60, 7200) : rng.random() < 0.07 ? 0 : Math.floor(rng.expo(95)) + 3
       const site = rng.random() < 0.15 ? rng.randint(0, N_SITES - 1) : hour >= 8 && hour < 18 && weekday < 5 ? work : home
       evs.push({
-        ts, kind, out, other: kind === 'dados' ? null : other, dur, cell: pick(cells, op, site, techs, rng),
+        ts,
+        kind,
+        out,
+        other: kind === 'dados' ? null : other,
+        dur,
+        cell: pick(cells, op, site, techs, rng),
         imei: '35' + Array.from({ length: 13 }, (_, k) => String((target.charCodeAt(target.length - 1) + k) % 10)).join(''),
         ip: kind === 'dados' ? `10.${rng.randint(0, 255)}.${rng.randint(0, 255)}.${rng.randint(1, 254)}` : '',
       })
@@ -142,7 +193,7 @@ function cp1252(s: string) {
 }
 
 /** WhatsApp Records sintético do alvo A: conversas com B e contatos, um grupo com B e C, chamadas e IPs. */
-function waDemo(rng: Rng, contacts: string[]): string {
+function waDemo(rng: Rng, contacts: string[]): { html: string; ips: [string, string][] } {
   const acc = T_A.slice(1)
   const peers = [T_B, ...contacts.slice(0, 5)].map((n) => n.slice(1))
   const ipFor = (day: number) => (day <= 10 ? '177.10.20.30' : day <= 20 ? SHARED_IP : '2804:14c:abcd::1')
@@ -152,7 +203,13 @@ function waDemo(rng: Rng, contacts: string[]): string {
     const d = rng.randint(1, 31)
     const peer = rng.weighted(peers, [5, 3, 2, 2, 1, 1])
     const out = rng.random() < 0.55
-    messages.push([ts(d, rng.randint(10, 23), rng.randint(0, 59), rng.randint(0, 59)), out ? acc : peer, [out ? peer : acc], null, out ? ipFor(d) : '200.150.1.' + rng.randint(1, 254)])
+    messages.push([
+      ts(d, rng.randint(10, 23), rng.randint(0, 59), rng.randint(0, 59)),
+      out ? acc : peer,
+      [out ? peer : acc],
+      null,
+      out ? ipFor(d) : '200.150.1.' + rng.randint(1, 254),
+    ])
   }
   const group = '120363012345678901@g.us'
   const members = [T_B, T_C, contacts[1]].map((n) => n.slice(1))
@@ -171,12 +228,77 @@ function waDemo(rng: Rng, contacts: string[]): string {
     const dur = rng.randint(20, 900)
     const start = Date.UTC(2026, 2, d, h, rng.randint(0, 59), 0)
     const iso = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ') + ' UTC'
-    const evs: [string, string][] = answered ? [['offer', iso(start)], ['accept', iso(start + 4000)], ['terminate', iso(start + 4000 + dur * 1000)]] : [['offer', iso(start)], ['terminate', iso(start + 30000)]]
+    const evs: [string, string][] = answered
+      ? [
+          ['offer', iso(start)],
+          ['accept', iso(start + 4000)],
+          ['terminate', iso(start + 4000 + dur * 1000)],
+        ]
+      : [
+          ['offer', iso(start)],
+          ['terminate', iso(start + 30000)],
+        ]
     calls.push([`DEMO${p2(i)}CALL`, rng.random() < 0.5 ? acc : peers[0], rng.random() < 0.2 ? 'video' : 'audio', evs])
   }
   const ips: [string, string][] = []
   for (let d = 1; d <= 31; d += 2) ips.push([ts(d, 7, rng.randint(0, 59), 0), ipFor(d)])
-  return waRecordsHtml({ account: acc, messages, calls, ips })
+  const html = waRecordsHtml({
+    account: acc,
+    messages,
+    calls,
+    ips,
+    email: 'alvo.a.demo@example.com',
+    book: [[T_B, ...contacts.slice(0, 4)].map((n) => n.slice(1)), [T_C, contacts[10], contacts[11]].map((n) => n.slice(1))],
+    groups: [
+      [group, 'Grupo Demonstração (fictício)', 4, true],
+      [GROUP2, 'Futebol de quinta (fictício)', 28, false],
+    ],
+  })
+  return { html, ips }
+}
+
+const GROUP2 = '120363099999999999@g.us'
+
+/** WhatsApp Records do alvo B: poucas mensagens, agenda e grupos que se cruzam com os do alvo A. */
+function waDemoB(rng: Rng, contacts: string[]): string {
+  const acc = T_B.slice(1)
+  const peers = [T_A, ...contacts.slice(0, 3)].map((n) => n.slice(1))
+  const ts = (d: number, h: number, m: number) => `2026-03-${p2(d)} ${p2(h)}:${p2(m)}:00 UTC`
+  const messages: [string, string, string[], string | null, string | null][] = []
+  for (let i = 0; i < 30; i++) {
+    const d = rng.randint(1, 31)
+    const peer = rng.choice(peers)
+    const out = rng.random() < 0.5
+    messages.push([ts(d, rng.randint(9, 22), rng.randint(0, 59)), out ? acc : peer, [out ? peer : acc], null, out ? (d >= 11 && d <= 20 ? SHARED_IP : '2804:14c:beef::9') : null])
+  }
+  messages.sort((x, y) => x[0].localeCompare(y[0]))
+  return waRecordsHtml({
+    account: acc,
+    messages,
+    calls: [],
+    ips: [
+      [ts(12, 8, 0), SHARED_IP],
+      [ts(25, 8, 0), '2804:14c:beef::9'],
+    ],
+    email: 'alvo.b.demo@example.com',
+    book: [[T_A, ...contacts.slice(0, 3)].map((n) => n.slice(1)), [contacts[25].slice(1)]],
+    groups: [
+      ['120363012345678901@g.us', 'Grupo Demonstração (fictício)', 4, false],
+      [GROUP2, 'Futebol de quinta (fictício)', 28, true],
+    ],
+  })
+}
+
+/** Log de acesso (estilo Google) da conta de e-mail do alvo A: IPs e horários próximos aos do WhatsApp. */
+function googleDemo(rng: Rng, waIps: [string, string][]): string {
+  const lines = ['Timestamp (UTC);IP Address;Port;Activity;Account']
+  for (const [t, ip] of waIps) {
+    const ms = Date.parse(t.replace(' UTC', 'Z').replace(' ', 'T')) + rng.randint(3, 12) * 60000
+    const when = new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+    lines.push([when, ip, ip.includes(':') ? String(rng.randint(20000, 60000)) : '', rng.choice(['Login', 'Gmail', 'Drive']), 'alvo.a.demo@example.com'].join(';'))
+  }
+  lines.push(['2026-03-15 03:10:00', '189.40.50.60', '51515', 'Login', 'alvo.a.demo@example.com'].join(';'))
+  return lines.join('\r\n') + '\r\n'
 }
 
 export async function buildFiles(seed = 20260301): Promise<File[]> {
@@ -184,7 +306,21 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
   const cells = makeCells(rng)
   const contacts = Array.from({ length: 59 }, (_, i) => num(i + 1))
   const common = contacts.slice(0, 6)
-  const a = events(rng, T_A, cells, [...common, ...contacts.slice(6, 28)], 31, [[T_B, 0.06], [T_C, 0.02]], 'TIM', 0, 3, ['3G'])
+  const a = events(
+    rng,
+    T_A,
+    cells,
+    [...common, ...contacts.slice(6, 28)],
+    31,
+    [
+      [T_B, 0.06],
+      [T_C, 0.02],
+    ],
+    'TIM',
+    0,
+    3,
+    ['3G'],
+  )
   let b = events(rng, T_B, cells, [...common, ...contacts.slice(20, 44)], 31, [[T_C, 0.03]], 'VIVO', 1, 3, ['3G', '4G'])
   let c = events(rng, T_C, cells, [...common, ...contacts.slice(36, 59)], 31, [], 'CLARO', 5, 6, ['4G'])
   // registros recíprocos: a célula é a da rede de quem registrou (mesmo local, outra operadora)
@@ -211,13 +347,17 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
   rows.push([local(T_A), local(contacts[4]), '15/03/2026', '25:61:00', 'abc', 'Originada', 'UMTS', '724', '02', '1100', '29999', ''])
   // CI sem LAC/MCC/MNC: casa com duas células do cadastro (mesmo CI em LACs diferentes) → ambígua
   rows.push([local(T_A), local(contacts[5]), '16/03/2026', '11:11:11', '00:02:10', 'Originada', '', '', '', '', '20000', ''])
-  const f1 = csv([
-    ['TIM S.A. - EXTRATO DE CHAMADAS - DOCUMENTO DE DEMONSTRAÇÃO (DADOS SINTÉTICOS)'],
-    [`Linha: ${local(T_A)}`, 'Período: 01/03/2026 a 31/03/2026'],
-    [],
-    ['Número A', 'Número B', 'Data', 'Hora', 'Duração', 'Tipo', 'Tecnologia', 'MCC', 'MNC', 'LAC', 'CI', 'IMEI'],
-    ...rows,
-  ], ';', '\r\n')
+  const f1 = csv(
+    [
+      ['TIM S.A. - EXTRATO DE CHAMADAS - DOCUMENTO DE DEMONSTRAÇÃO (DADOS SINTÉTICOS)'],
+      [`Linha: ${local(T_A)}`, 'Período: 01/03/2026 a 31/03/2026'],
+      [],
+      ['Número A', 'Número B', 'Data', 'Hora', 'Duração', 'Tipo', 'Tecnologia', 'MCC', 'MNC', 'LAC', 'CI', 'IMEI'],
+      ...rows,
+    ],
+    ';',
+    '\r\n',
+  )
 
   // ---- Arquivo 2: XLSX com data/hora ISO e fuso (layout fictício "estilo Vivo")
   const ExcelJS = (await import('exceljs')).default
@@ -231,8 +371,16 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
     const cgi = cl.tech !== '4G' ? `${cl.mcc}-${cl.mnc}-${cl.lac}-${cl.ci}` : `${cl.mcc}-${cl.mnc}-${cl.eci}`
     const dados = e.kind === 'dados'
     ws.addRow([
-      `${iso(e.ts)}-03:00`, T_B.slice(3), e.other ? e.other.slice(3) : '', dados ? '' : e.out ? 'Sainte' : 'Entrante',
-      { voz: 'Voz', sms: 'SMS', dados: 'Dados' }[e.kind], e.dur, cgi, e.ip, dados ? rng.randint(1000, 900000) : '', dados ? rng.randint(1000, 9000000) : '',
+      `${iso(e.ts)}-03:00`,
+      T_B.slice(3),
+      e.other ? e.other.slice(3) : '',
+      dados ? '' : e.out ? 'Sainte' : 'Entrante',
+      { voz: 'Voz', sms: 'SMS', dados: 'Dados' }[e.kind],
+      e.dur,
+      cgi,
+      e.ip,
+      dados ? rng.randint(1000, 900000) : '',
+      dados ? rng.randint(1000, 9000000) : '',
     ])
   }
   const f2 = await wb.xlsx.writeBuffer()
@@ -252,8 +400,26 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
 
   // ---- Cadastro de ERB (versão atual) com problemas propositais
   const regRows = (cs: Cell[], shift = 0) =>
-    cs.map((cl) => [cl.op, cl.tech, cl.mcc, cl.mnc, cl.lac, cl.tac, cl.ci, cl.eci, cl.site, cl.name, `Endereço fictício ${cl.site_idx + 1}, Brasília-DF`,
-      (cl.lat + shift).toFixed(6).replace('.', ','), (cl.lon + shift).toFixed(6).replace('.', ','), cl.az, cl.bw] as (string | number)[])
+    cs.map(
+      (cl) =>
+        [
+          cl.op,
+          cl.tech,
+          cl.mcc,
+          cl.mnc,
+          cl.lac,
+          cl.tac,
+          cl.ci,
+          cl.eci,
+          cl.site,
+          cl.name,
+          `Endereço fictício ${cl.site_idx + 1}, Brasília-DF`,
+          (cl.lat + shift).toFixed(6).replace('.', ','),
+          (cl.lon + shift).toFixed(6).replace('.', ','),
+          cl.az,
+          cl.bw,
+        ] as (string | number)[],
+    )
   const find = (op: string, site: number, tech: string) => cells.find((x) => x.op === op && x.site_idx === site && x.tech === tech)!
   const header = ['Operadora', 'Tecnologia', 'MCC', 'MNC', 'LAC', 'TAC', 'CI', 'ECI', 'Código ERB', 'Nome ERB', 'Endereço', 'Latitude', 'Longitude', 'Azimute', 'Abertura']
   const missing = find('VIVO', 4, '3G') // ausente do cadastro → "ERB não resolvida"
@@ -272,13 +438,24 @@ export async function buildFiles(seed = 20260301): Promise<File[]> {
   twin[11] = (CENTER[0] + 0.12).toFixed(6).replace('.', ',')
   current.push(twin)
   const f4 = csv([header, ...current])
-  const f5 = csv([header, ...regRows(cells.filter((x) => x.site_idx <= 1), 0.004)]) // versão antiga com coordenadas deslocadas
+  const f5 = csv([
+    header,
+    ...regRows(
+      cells.filter((x) => x.site_idx <= 1),
+      0.004,
+    ),
+  ]) // versão antiga com coordenadas deslocadas
 
   // ---- Arquivo 6: WhatsApp Records (formato da Meta) da conta do alvo A
-  const f6 = waDemo(rng, contacts)
+  const wa = waDemo(rng, contacts)
+  const f6 = wa.html
+  const f7 = waDemoB(rng, contacts)
+  const f8 = googleDemo(rng, wa.ips)
 
   return [
     new File([f6], 'DEMO_WhatsApp_records_alvoA.html', { type: 'text/html' }),
+    new File([f7], 'DEMO_WhatsApp_records_alvoB.html', { type: 'text/html' }),
+    new File([f8], 'DEMO_Google_log_de_acesso_alvoA.csv', { type: 'text/csv' }),
     new File([f5], 'DEMO_cadastro_ERB_2025-12.csv', { type: 'text/csv' }),
     new File([f4], 'DEMO_cadastro_ERB_2026-03.csv', { type: 'text/csv' }),
     new File([cp1252(f1)], 'DEMO_TIM_extrato_alvoA.csv', { type: 'text/csv' }),
@@ -294,27 +471,55 @@ export async function loadDemo(onStatus: (s: string, p: number) => void = () => 
   setState({
     isDemo: true,
     meta: {
-      title: 'Operação Exemplo — DEMONSTRAÇÃO (dados sintéticos)', reference: '0000000-00.0000.0.00.0000 (fictício)', unit: 'Unidade de demonstração',
-      period_start: '2026-03-01', period_end: '2026-03-31', description: 'Análise de demonstração com dados 100% sintéticos para validar o fluxo completo da plataforma.',
+      title: 'Operação Exemplo — DEMONSTRAÇÃO (dados sintéticos)',
+      reference: '0000000-00.0000.0.00.0000 (fictício)',
+      unit: 'Unidade de demonstração',
+      period_start: '2026-03-01',
+      period_end: '2026-03-31',
+      description: 'Análise de demonstração com dados 100% sintéticos para validar o fluxo completo da plataforma.',
     },
-    targets: ([[T_A, 'TIM', 'Alvo A'], [T_B, 'VIVO', 'Alvo B'], [T_C, 'CLARO', 'Alvo C']] as const).map(([n, op, id]) => ({
-      id: nextId(), number_normalized: n, number_original: local(n), operator: op, internal_id: id, label: `${id} (fictício)`,
-      period_start: null, period_end: null, source: 'demonstração', notes: null, validation_status: 'validado',
+    targets: (
+      [
+        [T_A, 'TIM', 'Alvo A'],
+        [T_B, 'VIVO', 'Alvo B'],
+        [T_C, 'CLARO', 'Alvo C'],
+      ] as const
+    ).map(([n, op, id]) => ({
+      id: nextId(),
+      number_normalized: n,
+      number_original: local(n),
+      operator: op,
+      internal_id: id,
+      label: `${id} (fictício)`,
+      period_start: null,
+      period_end: null,
+      source: 'demonstração',
+      notes: null,
+      validation_status: 'validado',
     })),
   })
   await syncTargetsTable()
   onStatus('gerando arquivos sintéticos', 0.05)
   const files = await buildFiles()
-  const plan: [string, 'cdr' | 'erb_registry' | 'whatsapp', string | null, Record<string, any>][] = [
+  const plan: [string, 'cdr' | 'erb_registry' | 'whatsapp' | 'access_log', string | null, Record<string, any>][] = [
     ['DEMO_cadastro_ERB_2025-12.csv', 'erb_registry', null, { reference_date: '2025-12-01', version_name: 'Cadastro DEMO dez/2025' }],
     ['DEMO_cadastro_ERB_2026-03.csv', 'erb_registry', null, { reference_date: '2026-03-01', version_name: 'Cadastro DEMO mar/2026' }],
     ['DEMO_TIM_extrato_alvoA.csv', 'cdr', 'TIM', { target_number: T_A, tz_mode: 'assumed', tz_name: 'America/Sao_Paulo' }],
     ['DEMO_VIVO_extrato_alvoB.xlsx', 'cdr', 'VIVO', { target_number: T_B, tz_mode: 'confirmed', tz_name: 'America/Sao_Paulo' }],
-    ['DEMO_CLARO_extrato_alvoC.txt', 'cdr', 'CLARO', {
-      target_number: T_C, tz_mode: 'unknown', default_event_type: 'voz',
-      value_map: { MO: 'voz_originada', MT: 'voz_recebida', 'MO-SMS': 'sms_enviado', 'MT-SMS': 'sms_recebido' },
-    }],
+    [
+      'DEMO_CLARO_extrato_alvoC.txt',
+      'cdr',
+      'CLARO',
+      {
+        target_number: T_C,
+        tz_mode: 'unknown',
+        default_event_type: 'voz',
+        value_map: { MO: 'voz_originada', MT: 'voz_recebida', 'MO-SMS': 'sms_enviado', 'MT-SMS': 'sms_recebido' },
+      },
+    ],
     ['DEMO_WhatsApp_records_alvoA.html', 'whatsapp', null, {}],
+    ['DEMO_WhatsApp_records_alvoB.html', 'whatsapp', null, {}],
+    ['DEMO_Google_log_de_acesso_alvoA.csv', 'access_log', null, {}],
   ]
   for (const [i, [name, kind, op, opts]] of plan.entries()) {
     onStatus(`importando ${name}`, 0.1 + (0.75 * i) / plan.length)
@@ -322,6 +527,11 @@ export async function loadDemo(onStatus: (s: string, p: number) => void = () => 
     if (kind === 'whatsapp') {
       const [wf] = await addFiles([file], 'whatsapp', null)
       await importWhatsApp(wf.id)
+      continue
+    }
+    if (kind === 'access_log') {
+      const [lf] = await addFiles([file], 'access_log', null)
+      await importAccessLog(lf.id)
       continue
     }
     const [sf] = await addFiles([file], kind, op)
