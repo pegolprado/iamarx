@@ -546,8 +546,11 @@ export default function ImportWizard() {
                 <Link to={`../importacoes?i=${importId}`} relative="path" className="btn-ghost">
                   Ver ocorrências por linha
                 </Link>
-                <Link to={kind === 'cdr' ? '../eventos' : '../erb/cadastro'} relative="path" className="btn-primary">
-                  {kind === 'cdr' ? 'Abrir registros importados' : 'Abrir cadastro'} <ArrowRight className="h-4 w-4" />
+                <Link to={kind === 'cdr' ? '../eventos' : '../erb/cadastro'} relative="path" className="btn-ghost">
+                  {kind === 'cdr' ? 'Abrir registros importados' : 'Abrir cadastro'}
+                </Link>
+                <Link to="../completa" relative="path" className="btn-primary">
+                  Ver análise completa <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </>

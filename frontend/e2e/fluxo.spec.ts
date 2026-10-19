@@ -12,7 +12,27 @@ async function login(page: Page) {
   await expect(page.getByText('WORKSPACE INVESTIGATIVO')).toBeVisible()
 }
 
-const tab = (page: Page, label: string) => page.click(`nav[aria-label="Módulos da análise"] >> text="${label}"`)
+// telas agrupadas: [grupo na barra principal, tela na sub-barra]
+const SUB: Record<string, [string, string]> = {
+  Alvos: ['Arquivos', 'Alvos'],
+  Importações: ['Arquivos', 'Importações'],
+  Qualidade: ['Arquivos', 'Qualidade'],
+  Eventos: ['Bilhetagem', 'Eventos'],
+  Contatos: ['Bilhetagem', 'Contatos'],
+  Estatística: ['Bilhetagem', 'Padrões e estatística'],
+  'Linha do tempo': ['Bilhetagem', 'Linha do tempo'],
+  Comparar: ['Vínculos', 'Comparação manual'],
+  Cruzamento: ['Vínculos', 'Cruzamento (ajustes)'],
+  ERB: ['ERB e mapa', 'Células e resolução'],
+  Cadastro: ['ERB e mapa', 'Cadastro de ERB'],
+  Mapa: ['ERB e mapa', 'Mapa'],
+  WhatsApp: ['WhatsApp e IPs', ''],
+}
+async function tab(page: Page, label: string) {
+  const [group, sub] = SUB[label] ?? [label, '']
+  await page.click(`nav[aria-label="Módulos da análise"] >> text="${group}"`)
+  if (sub) await page.click(`nav[aria-label="Telas de ${group}"] >> text="${sub}"`)
+}
 
 test('fluxo completo: demonstração, telas, exportação e apagamento ao sair', async ({ page }) => {
   const errors: string[] = []
@@ -23,7 +43,7 @@ test('fluxo completo: demonstração, telas, exportação e apagamento ao sair',
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
-  for (const t of ['Alvos', 'Arquivos', 'Importações', 'Qualidade', 'Eventos', 'Contatos', 'WhatsApp', 'Comparar', 'Vínculos', 'ERB', 'Mapa', 'Linha do tempo', 'Estatística', 'Cruzamento', 'Alertas', 'Exportar', 'Assistente']) {
+  for (const t of ['Análise completa', 'Alvos', 'Arquivos', 'Importações', 'Qualidade', 'Eventos', 'Contatos', 'Estatística', 'Linha do tempo', 'WhatsApp', 'Vínculos', 'Comparar', 'Cruzamento', 'ERB', 'Cadastro', 'Mapa', 'Alertas', 'Exportar', 'Assistente']) {
     await tab(page, t)
     await page.waitForTimeout(1200)
     await expect(page.locator('[role=alert]'), `erro na tela ${t}`).toHaveCount(0)
@@ -147,4 +167,37 @@ test('WhatsApp Records: importação automática, IPs em comum, grupos e exporta
   await tab(page, 'Eventos')
   await page.click('[role=tablist] >> text=WhatsApp')
   await expect(page.getByText(/WhatsApp: msg (enviada|recebida)/).first()).toBeVisible()
+})
+
+test('análise completa e vínculos: tudo calculado de uma vez a partir da importação', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('dialog', (d) => d.accept())
+  await login(page)
+  await page.click('text=Gerar análise de demonstração')
+  await expect(page.getByText('Registros considerados')).toBeVisible()
+
+  await tab(page, 'Análise completa')
+  const achados = page.getByRole('list', { name: 'Principais achados' })
+  await expect(achados).toBeVisible({ timeout: 60_000 })
+  await expect(achados.getByText(/em comum entre alvos/)).toBeVisible()
+  await expect(achados.getByText(/IPs? usados? por mais de um alvo/)).toBeVisible()
+  await expect(page.getByText('Contatos mais frequentes')).toBeVisible()
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Relatório PDF")')])
+  expect(pdf.suggestedFilename()).toMatch(/analise_completa.*\.pdf$/i)
+
+  // achado leva direto ao resultado detalhado na análise de vínculos
+  await achados.getByText(/em comum entre alvos/).click()
+  await expect(page.getByRole('heading', { name: 'Análise de vínculos' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /Contatos em comum/, selected: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Contatos em comum entre alvos' })).toBeVisible()
+  await expect(page.locator('section table tbody tr').first()).toBeVisible()
+  for (const t of ['Recíprocas', 'Contato direto', 'Coincidências', 'Células em comum', 'Atividade dos alvos', 'Cruzamento multifonte', 'IPs e grupos', 'Todas as conexões']) {
+    await page.click(`[role=tablist] >> text=${t}`)
+    await expect(page.locator('[role=alert]'), `erro na aba ${t}`).toHaveCount(0)
+  }
+  await page.click('[role=tablist] >> text=Cruzamento multifonte')
+  const [x] = await Promise.all([page.waitForEvent('download'), page.locator('section').filter({ hasText: 'Cruzamento multifonte' }).last().locator('button:has-text("Excel")').click()])
+  expect(x.suggestedFilename()).toMatch(/\.xlsx$/)
+  expect(errors).toEqual([])
 })

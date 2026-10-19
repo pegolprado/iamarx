@@ -23,6 +23,7 @@ export default function Overview() {
     { label: 'Informar alvos', done: st.targets.length > 0, to: 'alvos' },
     { label: 'Carregar bilhetagem', done: done.some((i) => i.kind === 'cdr'), to: 'arquivos' },
     { label: 'Carregar cadastro de ERB', done: done.some((i) => i.kind === 'erb_registry'), to: 'arquivos' },
+    { label: 'Ver análise completa', done: false, to: 'completa' },
     { label: 'Revisar alertas', done: st.alerts.length > 0 && st.alerts.every((a) => a.review_status !== 'pendente'), to: 'alertas' },
     { label: 'Exportar resultados', done: false, to: 'relatorios' },
   ]
@@ -62,7 +63,7 @@ export default function Overview() {
       {!st.meta.period_start && <Notice tone="amber">Defina o período autorizado (em “Identificação”) para que o sistema sinalize registros fora do escopo antes de carregar os arquivos.</Notice>}
       <div className="card p-5">
         <div className="label mb-3">Fluxo de trabalho</div>
-        <ol className="grid gap-2 sm:grid-cols-5">
+        <ol className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {steps.map((x, i) => (
             <li key={x.label}>
               <Link to={x.to} className={`block rounded-lg border p-3 text-sm ${x.done ? 'border-ok/40 bg-ok/5 text-ok' : 'border-line text-muted hover:border-accent/50'}`}>

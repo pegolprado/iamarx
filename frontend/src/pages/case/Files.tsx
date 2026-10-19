@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { FileStack, ShieldCheck, Trash2, Upload, Wand2 } from 'lucide-react'
+import { FileStack, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -32,6 +32,7 @@ async function runWhatsApp(id: number) {
 export default function Files() {
   const { c, canWrite } = useCase()
   const navigate = useNavigate()
+  const hasResults = useSession((x) => x.imports.some((i) => i.status === 'done' && i.kind !== 'erb_registry'))
   const files = useSession((s) => s.files)
   const imports = useSession((s) => s.imports)
   const counts = useQuery({
@@ -70,6 +71,13 @@ export default function Files() {
         icon={<FileStack className="h-5 w-5" />}
         title="Arquivos da análise"
         subtitle="Os arquivos são lidos diretamente do seu computador, nesta aba: nada é enviado a servidores nem gravado. O SHA-256 de cada original é calculado localmente e os registros normalizados mantêm o vínculo com a linha/página de origem."
+        actions={
+          hasResults && (
+            <Link to="../completa" relative="path" className="btn-primary">
+              <Sparkles className="h-4 w-4" /> Ver análise completa
+            </Link>
+          )
+        }
       />
       {canWrite && (
         <div

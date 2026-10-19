@@ -22,16 +22,12 @@ export default function Dashboard() {
   const meta: Record<string, string> = {
     cases: s.files.length || s.targets.length ? s.meta.title : 'nenhum dado carregado nesta aba',
     import: `${fmtInt(done.length)} de ${fmtInt(s.files.length)} arquivos processados`,
+    full: events ? `${fmtInt(events)} registros prontos para análise` : 'disponível após a importação',
     cdr: `${fmtInt(events)} registros normalizados`,
     erb: `${fmtInt(cells)} células em cadastros técnicos`,
     links: `${fmtInt(s.targets.length)} alvos informados`,
     whatsapp: `${fmtInt(done.filter((i) => i.kind === 'whatsapp').length)} relatórios do WhatsApp carregados`,
-    timeline: `${fmtInt(events)} eventos em linha do tempo`,
-    geo: `${fmtInt(cells)} células com cadastro`,
-    stats: 'cálculos executados no seu navegador',
-    reports: 'PDF, Excel e CSV',
-    quality: `${fmtInt(pendingAlerts)} alertas aguardando revisão`,
-    files: `${fmtInt(s.files.length)} arquivos na memória desta aba`,
+    reports: `${fmtInt(pendingAlerts)} alertas aguardando revisão · PDF, Excel e CSV`,
     audit: 'nada é gravado no servidor',
   }
   const runDemo = async () => {
@@ -65,7 +61,9 @@ export default function Dashboard() {
           const to = m.inCase ? apath(m.path) : m.path
           return (
             <Link key={m.key} to={to} className="group card card-hover flex flex-col items-center border-accent/50 px-6 py-8 text-center">
-              <div className="mb-5 grid h-14 w-14 place-items-center rounded-xl border border-line-2 bg-panel-2 text-accent transition-colors group-hover:border-accent/60 [&>svg]:h-6 [&>svg]:w-6">{m.icon}</div>
+              <div className="mb-5 grid h-14 w-14 place-items-center rounded-xl border border-line-2 bg-panel-2 text-accent transition-colors group-hover:border-accent/60 [&>svg]:h-6 [&>svg]:w-6">
+                {m.icon}
+              </div>
               <h2 className="text-3xl leading-tight font-bold text-white">{m.title}</h2>
               <p className="mt-4 text-sm leading-relaxed font-medium text-muted">{m.description}</p>
               <p className="mt-3 text-xs text-faint">{meta[m.key]}</p>
@@ -81,7 +79,8 @@ export default function Dashboard() {
           <FlaskConical className="h-6 w-6 text-amber" />
           <div className="font-mono font-bold text-white">Quer conhecer a plataforma antes de usar dados reais?</div>
           <p className="max-w-2xl text-sm text-muted">
-            Gere uma análise de DEMONSTRAÇÃO com três bilhetagens sintéticas em layouts diferentes, cadastro de ERB com inconsistências propositais, alertas e duplicidades. Tudo é gerado no seu navegador e apagado ao sair.
+            Gere uma análise de DEMONSTRAÇÃO com três bilhetagens sintéticas em layouts diferentes, cadastro de ERB com inconsistências propositais, alertas e duplicidades. Tudo é
+            gerado no seu navegador e apagado ao sair.
           </p>
           {demo ? (
             <div className="w-full max-w-md">

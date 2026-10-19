@@ -171,26 +171,57 @@ export function useCase() {
 export const ANALYSIS = '/analise'
 export const apath = (p = '') => (p ? `${ANALYSIS}/${p.replace(/^\//, '')}` : ANALYSIS)
 
-const NAV = [
-  ['', 'Visão geral'],
-  ['alvos', 'Alvos'],
-  ['arquivos', 'Arquivos'],
-  ['importacoes', 'Importações'],
-  ['qualidade', 'Qualidade'],
-  ['eventos', 'Eventos'],
-  ['contatos', 'Contatos'],
-  ['whatsapp', 'WhatsApp'],
-  ['comparar', 'Comparar'],
-  ['vinculos', 'Vínculos'],
-  ['erb', 'ERB'],
-  ['mapa', 'Mapa'],
-  ['linha-do-tempo', 'Linha do tempo'],
-  ['estatistica', 'Estatística'],
-  ['cruzamento', 'Cruzamento'],
-  ['alertas', 'Alertas'],
-  ['relatorios', 'Exportar'],
-  ['assistente', 'Assistente'],
-] as const
+/** Abas da análise agrupadas: cada grupo reúne telas da mesma área (sub-abas). */
+const NAV: { label: string; sub: [string, string][]; also?: string[] }[] = [
+  { label: 'Visão geral', sub: [['', 'Visão geral']] },
+  { label: 'Análise completa', sub: [['completa', 'Análise completa']] },
+  {
+    label: 'Arquivos',
+    sub: [
+      ['arquivos', 'Arquivos'],
+      ['alvos', 'Alvos'],
+      ['importacoes', 'Importações'],
+      ['qualidade', 'Qualidade'],
+    ],
+    also: ['importar'],
+  },
+  {
+    label: 'Bilhetagem',
+    sub: [
+      ['eventos', 'Eventos'],
+      ['contatos', 'Contatos'],
+      ['estatistica', 'Padrões e estatística'],
+      ['linha-do-tempo', 'Linha do tempo'],
+    ],
+  },
+  {
+    label: 'Vínculos',
+    sub: [
+      ['vinculos', 'Análise de vínculos'],
+      ['comparar', 'Comparação manual'],
+      ['cruzamento', 'Cruzamento (ajustes)'],
+    ],
+  },
+  { label: 'WhatsApp e IPs', sub: [['whatsapp', 'WhatsApp e IPs']] },
+  {
+    label: 'ERB e mapa',
+    sub: [
+      ['erb', 'Células e resolução'],
+      ['erb/cadastro', 'Cadastro de ERB'],
+      ['mapa', 'Mapa'],
+    ],
+  },
+  { label: 'Alertas', sub: [['alertas', 'Alertas']] },
+  { label: 'Exportar', sub: [['relatorios', 'Exportar']] },
+  { label: 'Assistente', sub: [['assistente', 'Assistente']] },
+]
+
+/** Grupo da aba atual, a partir do caminho dentro da análise. */
+function navGroup(pathname: string) {
+  const rest = pathname.startsWith(ANALYSIS) ? pathname.slice(ANALYSIS.length).replace(/^\//, '') : ''
+  const seg = rest.split('/')[0]
+  return NAV.find((g) => g.sub.some(([p]) => p.split('/')[0] === seg) || g.also?.includes(seg)) ?? NAV[0]
+}
 
 /** Invalida as consultas sempre que os dados da sessão mudam (importação, remoção, resolução). */
 function useDataVersionSync() {
@@ -212,6 +243,7 @@ export function CaseLayout() {
   const files = useSession((s) => s.files)
   const busy = useSession((s) => s.busy)
   const version = useSession((s) => s.version)
+  const group = navGroup(useLocation().pathname)
   const engineMeta = useQuery({
     queryKey: ['meta', version],
     queryFn: () => engineMetaFn(),
@@ -255,23 +287,44 @@ export function CaseLayout() {
           {busy.progress > 0 && <span className="ml-auto font-mono text-xs text-faint">{Math.round(busy.progress * 100)}%</span>}
         </div>
       )}
-      <nav className="scroll-x -mx-1 mb-6 flex gap-1 border-b border-line pb-px" aria-label="Módulos da análise">
-        {NAV.map(([path, label]) => (
+      <nav className="scroll-x -mx-1 mb-3 flex gap-1 border-b border-line pb-px" aria-label="Módulos da análise">
+        {NAV.map((g) => (
           <NavLink
-            key={path}
-            end={path === ''}
-            to={apath(path)}
-            className={({ isActive }) =>
+            key={g.label}
+            end={g.sub[0][0] === ''}
+            to={apath(g.sub[0][0])}
+            className={() =>
               clsx(
                 'shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors',
-                isActive ? 'border-accent text-white' : 'border-transparent text-muted hover:text-text',
+                g === group ? 'border-accent text-white' : 'border-transparent text-muted hover:text-text',
               )
             }
           >
-            {label}
+            {g.label}
           </NavLink>
         ))}
       </nav>
+      {group.sub.length > 1 ? (
+        <nav className="scroll-x mb-6 flex gap-1" aria-label={`Telas de ${group.label}`}>
+          {group.sub.map(([path, label]) => (
+            <NavLink
+              key={path}
+              end={path === 'erb'}
+              to={apath(path)}
+              className={({ isActive }) =>
+                clsx(
+                  'shrink-0 rounded-lg px-3 py-1 text-xs whitespace-nowrap transition-colors',
+                  isActive ? 'bg-accent/15 text-white' : 'text-muted hover:bg-white/[0.04] hover:text-text',
+                )
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      ) : (
+        <div className="mb-6" />
+      )}
       <Outlet />
     </CaseContext.Provider>
   )

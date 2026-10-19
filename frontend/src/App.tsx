@@ -30,6 +30,7 @@ const Alerts = lazy(() => import('./pages/case/Alerts'))
 const Reports = lazy(() => import('./pages/case/Reports'))
 const Assistant = lazy(() => import('./pages/case/Assistant'))
 const WhatsApp = lazy(() => import('./pages/case/WhatsApp'))
+const FullAnalysis = lazy(() => import('./pages/case/FullAnalysis'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="relatorios" element={<Reports />} />
               <Route path="assistente" element={<Assistant />} />
               <Route path="whatsapp" element={<WhatsApp />} />
+              <Route path="completa" element={<FullAnalysis />} />
             </Route>
             <Route path="casos/*" element={<Navigate to="/analise" replace />} />
             <Route path="*" element={<div className="py-20 text-center text-muted">Página não encontrada.</div>} />
