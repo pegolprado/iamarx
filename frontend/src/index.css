@@ -131,3 +131,18 @@
 .leaflet-control-attribution a {
   color: #8db4ff !important;
 }
+
+/* número de eventos sobre cada ERB no mapa */
+.erb-count {
+  background: none;
+  border: 0;
+}
+.erb-count span {
+  display: block;
+  text-align: center;
+  font: 700 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 3px #fff,
+    0 0 2px #fff;
+}

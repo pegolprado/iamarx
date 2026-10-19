@@ -102,6 +102,7 @@ export async function analyze(fileId: number, kind: Kind, read: ReadOptions) {
   const sample = await table.sample(25)
   const columns = info.columns
   const mapping = suggestMapping(columns, kind)
+  if (kind === 'cdr') refineMapping(mapping, columns, sample)
   const mncCol = mapping.mnc
   let sampleMnc = mncCol ? sample.map((r) => String(r[mncCol] ?? '')) : []
   if (!sampleMnc.length && mapping.cgi) sampleMnc = sample.map((r) => N.splitCgi(N.normalizeCgi(String(r[mapping.cgi] ?? ''))).mnc ?? '')
@@ -126,6 +127,45 @@ export async function analyze(fileId: number, kind: Kind, read: ReadOptions) {
     event_type_values: typeValues,
     event_types: N.EVENT_TYPES,
   }
+}
+
+/**
+ * Ajusta a sugestão pelo CONTEÚDO da amostra (além do nome da coluna):
+ * - "data" que já traz o horário vira "data e hora";
+ * - tipo de evento: entre as colunas candidatas, a que mais se classifica (ex.: "Evento" e não "Tipo = Interceptação");
+ * - célula no formato MCC-MNC-LAC-CI / MCC-MNC-ECI vai para CGI.
+ */
+export function refineMapping(mapping: Record<string, string>, columns: string[], sample: Record<string, unknown>[]) {
+  const vals = (col: string) => sample.map((r) => String(r[col] ?? '').trim()).filter(Boolean)
+  if (mapping.date && !mapping.time && !mapping.datetime && vals(mapping.date).some((v) => /\d{1,2}:\d{2}/.test(v) && !/ 00:00:00$/.test(v))) {
+    mapping.datetime = mapping.date
+    delete mapping.date
+  }
+  const evCands = columns.filter((c) => /^(tipo|evento|tipo de evento|tipo evento|servico|tipo de servico|tipo chamada|tipo da chamada|tp evento|tp chamada|descricao|tipo especifico)$/.test(normHeader(c)))
+  const score = (c: string) => {
+    const v = vals(c)
+    if (!v.length) return 0
+    const ok = v.filter((x) => {
+      const [et, , known] = N.classifyEvent(x, null)
+      return known && et !== 'outro'
+    }).length
+    return ok / v.length + Math.min(new Set(v).size, 5) * 0.01
+  }
+  const best = evCands.sort((x, y) => score(y) - score(x))[0]
+  if (best && score(best) > (mapping.event_type ? score(mapping.event_type) : 0) + 0.05) {
+    const prev = mapping.event_type
+    mapping.event_type = best
+    if (prev && !mapping.status && prev !== best && new Set(vals(prev)).size > 1) mapping.status = prev
+  }
+  const cgiRe = /^\d{3}-\d{2,3}-\d+(?:-\d+)?$/
+  for (const f of ['cell_id', 'erb_raw', 'eci']) {
+    const col = mapping[f]
+    if (col && !mapping.cgi && vals(col).length && vals(col).filter((v) => cgiRe.test(v)).length >= vals(col).length * 0.8) {
+      mapping.cgi = col
+      delete mapping[f]
+    }
+  }
+  return mapping
 }
 
 export function detectFormats(sample: Record<string, unknown>[], mapping: Record<string, string>) {
@@ -196,7 +236,16 @@ export class RowNormalizer {
       else if (direction === 'in') [a, b] = [onum, target]
       else warn('sentido_desconhecido', 'direction', 'sentido não informado: origem/destino não definidos')
     }
-    let other = onum
+    // número local sem DDD (8–9 dígitos): assume o DDD do alvo, com aviso
+    const ddd = target?.startsWith('+55') ? target.slice(3, 5) : null
+    const withDdd = (n: string | null) => {
+      if (!n || !ddd || !/^\d{8,9}$/.test(n)) return n
+      warn('ddd_presumido', 'numero', `número sem DDD (${n}): DDD ${ddd} do alvo presumido`)
+      return `+55${ddd}${n}`
+    }
+    a = withDdd(a)
+    b = withDdd(b)
+    let other = withDdd(onum)
     if (!other) other = target && a === target ? b : target && b === target ? a : null
     if (target && a && b && target !== a && target !== b && !tnum) warn('alvo_ausente', 'target_number', 'o número alvo do arquivo não aparece como origem nem destino')
     if (direction === 'unknown' && target && a && b) {
@@ -291,14 +340,18 @@ export class RowNormalizer {
     const conf = raw.confidence ?? 1
     if (raw.confidence !== null && raw.confidence !== undefined && raw.confidence < 0.8) warn('ocr_baixa_confianca', '*', `linha obtida por OCR com confiança ${Math.round(raw.confidence * 100)}% — revisar`)
 
-    const ip = this.g(rec, 'ip')
+    // IP: descarta valores de preenchimento (0.0.0.0, 127.0.0.1) e conteúdo que não é IP (URL)
+    const ipRaw = this.g(rec, 'ip')
+    const ip = ipRaw && /^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]*::?[0-9a-f:.]*)$/i.test(ipRaw) && !['0.0.0.0', '127.0.0.1', '::', '::1'].includes(ipRaw) ? ipRaw.toLowerCase() : null
+    // IMEI que vem junto do número ("11940268614 (353210502453550)" ou "IMEI: …")
+    const imeiInline = [tRaw, aRaw, bRaw].map((x) => /IMEI\D{0,3}(\d{14,17})|\((\d{14,17})\)/i.exec(x ?? '')).find(Boolean)
     const sig = { operator: o.operator || this.file.operator_declared || null, tech, mcc, mnc, lac, tac, cell_id: cid, eci, nci, cgi, erb_raw: erbRaw ? erbRaw.slice(0, 120) : null }
     const ev = {
       row_number: raw.row, page: raw.page ?? null, event_type: et, direction, a_number: a, b_number: b,
       a_raw: (aRaw || tRaw)?.slice(0, 80) ?? null, b_raw: (bRaw || oRaw)?.slice(0, 80) ?? null, target_number: target, other_number: other,
       ts_original: [dtRaw, dRaw, tmRaw, tzRaw].filter(Boolean).join(' ').slice(0, 80), ts_utc: tsUtc, ts_local: tsLocal, tz_name: tzName, tz_status: tzStatus,
       duration_s: dur, status: this.g(rec, 'status'), ...sig, cell_key: cellKey, lat, lon, azimuth: az,
-      imei: (this.g(rec, 'imei') ?? '').replace(/\D/g, '').slice(0, 20) || null, imsi: (this.g(rec, 'imsi') ?? '').replace(/\D/g, '').slice(0, 20) || null,
+      imei: (this.g(rec, 'imei') ?? '').replace(/\D/g, '').slice(0, 20) || (imeiInline ? imeiInline[1] ?? imeiInline[2] : null), imsi: (this.g(rec, 'imsi') ?? '').replace(/\D/g, '').slice(0, 20) || null,
       ip, port: ((p) => (p !== null && p >= 0 && p <= 65535 ? p : null))(N.parseIntLoose(this.g(rec, 'port'))),
       bytes_up: N.parseIntLoose(this.g(rec, 'bytes_up')), bytes_down: N.parseIntLoose(this.g(rec, 'bytes_down')),
       raw: JSON.stringify(rec), warnings: JSON.stringify(warns), n_warnings: warns.length, confidence: conf, out_of_scope: outOfScope,

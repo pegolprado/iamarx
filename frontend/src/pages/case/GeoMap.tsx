@@ -1,15 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import L from 'leaflet'
-import { Map as MapIcon, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Download, Map as MapIcon, Pause, Play, Share2, SkipBack, SkipForward } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { useAuth } from '../../app/auth'
+import { type AzMode, ErbMap, groupSites } from '../../components/ErbMap'
+import { useSession } from '../../engine/session'
+import { encryptMap, randomPassword, type SitePoint, toKml } from '../../lib/shareMap'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { cellSequence, geoPoints } from '../../engine/analytics'
 import { useCase } from '../../app/layout'
-import { SERIES } from '../../components/charts'
 import { FilterBar } from '../../components/FilterBar'
-import { Badge, Criteria, DrillLink, Empty, ErrorBox, Field, Loading, Notice, PageHeader, Tabs } from '../../components/ui'
-import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtNumber } from '../../lib/format'
+import { Badge, Criteria, DrillLink, Empty, ErrorBox, Field, Loading, Modal, Notice, PageHeader, Tabs } from '../../components/ui'
+import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtInt, fmtNumber } from '../../lib/format'
 import { useUrlFilter } from '../../lib/useUrlFilter'
 
 function sectorPolygon(lat: number, lon: number, az: number, bw: number, radiusM: number): [number, number][] {
@@ -67,113 +71,277 @@ export default function GeoMap() {
   )
 }
 
+const QUICK: { label: string; types: string[] }[] = [
+  { label: 'Todos', types: [] },
+  { label: 'Voz', types: ['voz_originada', 'voz_recebida', 'voz', 'desvio'] },
+  { label: 'Dados', types: ['dados'] },
+  { label: 'SMS', types: ['sms_enviado', 'sms_recebido', 'sms'] },
+]
+
 function StationsMap({ tile, attr }: { tile: string; attr: string }) {
-  const { c, meta } = useCase()
+  const { c } = useCase()
   const [f, setF] = useUrlFilter()
-  const [radius, setRadius] = useState(600)
-  const [showSectors, setShowSectors] = useState(true)
-  const [sel, setSel] = useState<any>(null)
+  const [azMode, setAzMode] = useState<AzMode>('linha')
+  const [azLen, setAzLen] = useState(600)
+  const [sel, setSel] = useState<SitePoint | null>(null)
+  const [share, setShare] = useState(false)
   const q = useQuery({ queryKey: ['geo', c.id, f], queryFn: () => geoPoints(f) as Promise<any> })
-  const { ref, map, layer } = useLeaflet(tile, attr)
-  const targetIdx = useMemo(() => Object.fromEntries((meta?.targets ?? []).map((t: any, i: number) => [t.number, i])), [meta])
-  useEffect(() => {
-    if (!q.data || !map.current || !layer.current) return
-    layer.current.clearLayers()
-    const pts = [...q.data.registry_points.map((p: any) => ({ ...p, src: 'cadastro' })), ...q.data.document_points.map((p: any) => ({ ...p, src: 'documento' }))]
-    if (!pts.length) return
-    const maxE = Math.max(...pts.map((p) => p.events))
-    const bounds: [number, number][] = []
-    for (const p of pts) {
-      const color = p.numbers?.length > 1 ? '#c27f10' : SERIES[(targetIdx[p.numbers?.[0]] ?? 0) % SERIES.length]
-      if (showSectors && p.azimuth !== null && p.azimuth !== undefined) {
-        L.polygon(sectorPolygon(p.lat, p.lon, p.azimuth, p.beamwidth ?? 65, radius), { color, weight: 1, fillOpacity: 0.12, opacity: 0.5, dashArray: '4 3' }).addTo(layer.current)
-      }
-      const m = L.circleMarker([p.lat, p.lon], { radius: 5 + 10 * Math.sqrt(p.events / maxE), color: '#0b0f1a', weight: 2, fillColor: color, fillOpacity: 0.9 })
-      m.on('click', () => setSel(p))
-      m.bindTooltip(`${p.site_name ?? p.cell_key} · ${p.events} eventos`)
-      m.addTo(layer.current)
-      bounds.push([p.lat, p.lon])
-    }
-    map.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 })
-  }, [q.data, radius, showSectors, map, layer, targetIdx])
+  const points = useMemo(() => (q.data ? groupSites([...q.data.registry_points, ...q.data.document_points]) : []), [q.data])
+  const tot = useMemo(
+    () =>
+      points.reduce((a, p) => ({ voice: a.voice + p.voice, data: a.data + p.data, sms: a.sms + p.sms, cells: a.cells + p.cells.length }), { voice: 0, data: 0, sms: 0, cells: 0 }),
+    [points],
+  )
+  const quick = QUICK.find((x) => JSON.stringify(x.types) === JSON.stringify(f.event_types ?? [])) ?? null
+  const onSelect = useCallback((p: SitePoint) => setSel(p), [])
   return (
     <>
       <FilterBar value={f} onChange={setF} compact />
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          ['Voz', tot.voice],
+          ['Dados', tot.data],
+          ['SMS', tot.sms],
+          ['ERBs (células)', tot.cells],
+          ['Estações no mapa', points.length],
+        ].map(([l, v]) => (
+          <div key={l as string} data-stat={l} className="card px-4 py-3 text-center">
+            <div className="text-xs text-muted">{l}</div>
+            <div className="font-mono text-2xl text-white tabular-nums">{fmtInt(v as number)}</div>
+          </div>
+        ))}
+      </div>
       <div className="card mb-4 flex flex-wrap items-end gap-4 p-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={showSectors} onChange={(e) => setShowSectors(e.target.checked)} /> desenhar setores (azimute)
-        </label>
-        <Field label="Raio esquemático do setor (m)">
-          <input type="number" min={100} max={10000} step={100} className="w-28" value={radius} onChange={(e) => setRadius(+e.target.value)} />
+        <div>
+          <span className="label">Eventos</span>
+          <div className="flex gap-1 rounded-xl border border-line bg-ink-2 p-1" role="group" aria-label="Tipo de evento">
+            {QUICK.map((x) => (
+              <button
+                key={x.label}
+                aria-pressed={quick === x}
+                className={`rounded-lg px-3 py-1 text-sm ${quick === x ? 'bg-accent text-white' : 'text-muted hover:text-text'}`}
+                onClick={() => setF({ ...f, event_types: x.types.length ? x.types : undefined })}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="Azimute">
+          <select value={azMode} onChange={(e) => setAzMode(e.target.value as AzMode)}>
+            <option value="linha">linha</option>
+            <option value="setor">setor (esquemático)</option>
+            <option value="nenhum">não mostrar</option>
+          </select>
         </Field>
-        <div className="flex flex-wrap gap-2 text-xs text-muted">
-          {(meta?.targets ?? []).map((t: any, i: number) => (
-            <span key={t.number} className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: SERIES[i % SERIES.length] }} /> {fmtNumber(t.number)}
-            </span>
-          ))}
-          <span className="flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#c27f10]" /> mais de um número
-          </span>
+        <Field label="Comprimento (m)">
+          <input type="number" min={100} max={10000} step={100} className="w-24" value={azLen} onChange={(e) => setAzLen(Math.max(100, +e.target.value))} />
+        </Field>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            className="btn-ghost"
+            disabled={!points.length}
+            onClick={() => downloadKml(points, `MARX_mapa_ERB_${new Date().toISOString().slice(0, 10)}.kml`)}
+            title="Arquivo para Google Earth / Google Maps"
+          >
+            <Download className="h-4 w-4" /> KML
+          </button>
+          <button
+            className="btn-primary"
+            disabled={!points.length || !c.can_export}
+            onClick={() => setShare(true)}
+            title={c.can_export ? 'Gerar link protegido por senha' : 'Exportação desativada para seu usuário'}
+          >
+            <Share2 className="h-4 w-4" /> Compartilhar mapa
+          </button>
         </div>
       </div>
       {q.error && <ErrorBox error={q.error} />}
-      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-        <div className="card relative overflow-hidden">
-          <div ref={ref} className="h-[600px] w-full" />
-          {q.isLoading && <div className="absolute inset-0 grid place-items-center bg-ink/50"><Loading /></div>}
-          {q.data && !q.data.registry_points.length && !q.data.document_points.length && (
-            <div className="absolute inset-0 grid place-items-center bg-ink/70 p-6">
-              <Empty title="Sem coordenadas válidas">Importe o cadastro técnico de ERB e execute a resolução para posicionar as estações.</Empty>
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="relative">
+          <ErbMap points={points} tileUrl={tile} tileAttr={attr} azMode={azMode} azLen={azLen} onSelect={onSelect} />
+          {q.isLoading && (
+            <div className="absolute inset-0 z-[600] grid place-items-center rounded-2xl bg-ink/50">
+              <Loading />
+            </div>
+          )}
+          {q.data && !points.length && (
+            <div className="absolute inset-0 z-[600] grid place-items-center rounded-2xl bg-ink/70 p-6">
+              <Empty title="Sem coordenadas válidas">
+                Carregue um arquivo que traga latitude/longitude por evento (ex.: extrato de interceptação) ou o cadastro técnico de ERB e execute a resolução.
+              </Empty>
             </div>
           )}
         </div>
         <aside className="card p-4 text-sm">
           {sel ? (
             <div className="space-y-2">
-              <div className="font-bold text-white">{sel.site_name ?? 'Ponto informado no documento'}</div>
-              <Badge tone={sel.src === 'cadastro' ? 'green' : 'amber'}>coordenada do {sel.src}</Badge>
+              <div className="font-bold text-white">{sel.name ?? 'Estação (coordenada informada)'}</div>
               <dl className="grid grid-cols-2 gap-1 text-xs">
-                <dt className="text-muted">Célula</dt>
-                <dd className="font-mono break-all">{sel.cell_key}</dd>
                 <dt className="text-muted">Coordenadas</dt>
                 <dd className="font-mono">
                   {sel.lat.toFixed(5)}, {sel.lon.toFixed(5)}
                 </dd>
-                <dt className="text-muted">Azimute</dt>
-                <dd>{sel.azimuth ?? '—'}°</dd>
+                <dt className="text-muted">Azimute(s)</dt>
+                <dd>{sel.az.length ? sel.az.map((a) => `${a}°`).join(', ') : '—'}</dd>
                 <dt className="text-muted">Eventos</dt>
-                <dd>{sel.events}</dd>
-                <dt className="text-muted">Números</dt>
-                <dd>{sel.numbers.map(fmtNumber).join(', ')}</dd>
-                <dt className="text-muted">Período</dt>
                 <dd>
-                  {fmtDateTime(sel.first_event, false)} → {fmtDateTime(sel.last_event, false)}
+                  {fmtInt(sel.events)} (voz {fmtInt(sel.voice)}, SMS {fmtInt(sel.sms)}, dados {fmtInt(sel.data)})
                 </dd>
-                {sel.version_id && (
-                  <>
-                    <dt className="text-muted">Versão cadastro</dt>
-                    <dd>#{sel.version_id}</dd>
-                  </>
-                )}
+                <dt className="text-muted">Primeiro</dt>
+                <dd>{fmtDateTime(sel.first)}</dd>
+                <dt className="text-muted">Último</dt>
+                <dd>{fmtDateTime(sel.last)}</dd>
+                <dt className="text-muted">Números</dt>
+                <dd>{(sel.numbers ?? []).map(fmtNumber).join(', ') || '—'}</dd>
+                <dt className="text-muted">Células</dt>
+                <dd className="font-mono text-[11px] break-all">{sel.cells.join(', ')}</dd>
               </dl>
-              <DrillLink caseId={c.id} filter={{ ...f, cell_keys: [sel.cell_key] }} className="btn-ghost !py-1 text-xs">
-                Abrir registros associados
-              </DrillLink>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <DrillLink caseId={c.id} filter={{ ...f, cell_keys: sel.cells }} className="btn-ghost !py-1 text-xs">
+                  Abrir registros
+                </DrillLink>
+                <a className="btn-ghost !py-1 text-xs" href={`https://www.google.com/maps/search/?api=1&query=${sel.lat},${sel.lon}`} target="_blank" rel="noreferrer noopener">
+                  Google Maps
+                </a>
+              </div>
             </div>
           ) : (
-            <p className="text-muted">Clique numa estação para ver os detalhes e os registros associados.</p>
+            <p className="text-muted">Clique numa estação para ver as células, azimutes, horários e abrir os registros.</p>
           )}
           {q.data && (
             <div className="mt-6 space-y-2">
               <Notice tone="amber">{q.data.criteria.limit_note}</Notice>
-              <p className="text-xs text-faint">Eventos sem coordenada (não resolvidos ou sem cadastro): {q.data.events_without_coordinates}</p>
+              <p className="text-xs text-faint">Eventos sem coordenada (não resolvidos ou sem cadastro): {fmtInt(q.data.events_without_coordinates)}</p>
             </div>
           )}
         </aside>
       </div>
       {q.data && <Criteria criteria={q.data.criteria} />}
+      {share && <ShareMapModal points={points} filter={f} onClose={() => setShare(false)} />}
     </>
+  )
+}
+
+function downloadKml(points: SitePoint[], name: string) {
+  const blob = new Blob([toKml({ title: name.replace(/\.kml$/, ''), points })], { type: 'application/vnd.google-earth.kml+xml' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+}
+
+const EXPIRY: [string, number | null][] = [
+  ['24 horas', 1],
+  ['7 dias', 7],
+  ['30 dias', 30],
+  ['sem validade', null],
+]
+
+/** Gera o link do mapa: dados criptografados no próprio link, abertos só com a senha. */
+function ShareMapModal({ points, filter, onClose }: { points: SitePoint[]; filter: any; onClose: () => void }) {
+  const { me } = useAuth()
+  const st = useSession((s) => s.meta)
+  const [title, setTitle] = useState(`Mapa de ERBs — ${st.title}`)
+  const [password, setPassword] = useState(randomPassword)
+  const [days, setDays] = useState<number | null>(7)
+  const [withNumbers, setWithNumbers] = useState(false)
+  const [link, setLink] = useState('')
+  const [busy, setBusy] = useState(false)
+  const types = (filter.event_types ?? []).length ? (filter.event_types as string[]).map((t) => EVENT_TYPE_LABEL[t] ?? t).join(', ') : 'todos os eventos'
+  const gen = async () => {
+    if (password.length < 8) return toast.error('Use uma senha com pelo menos 8 caracteres.')
+    setBusy(true)
+    try {
+      const firsts = points.map((p) => p.first).filter(Boolean) as string[]
+      const lasts = points.map((p) => p.last).filter(Boolean) as string[]
+      const frag = await encryptMap(
+        {
+          v: 1,
+          title: title.trim() || 'Mapa de ERBs',
+          by: me?.name ?? '',
+          at: new Date().toISOString(),
+          exp: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
+          period: [firsts.sort()[0] ?? null, lasts.sort().slice(-1)[0] ?? null],
+          types,
+          numbers: withNumbers ? [...new Set(points.flatMap((p) => p.numbers ?? []))] : [],
+          points: points.map((p) => ({ ...p, numbers: withNumbers ? p.numbers : [] })),
+        },
+        password,
+      )
+      setLink(`${location.origin}/mapa-compartilhado#${frag}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(`${what} copiado`)
+    } catch {
+      toast.error('Não foi possível copiar; selecione e copie manualmente.')
+    }
+  }
+  return (
+    <Modal open title="Compartilhar mapa" onClose={onClose} wide>
+      <div className="space-y-4 text-sm">
+        <Notice tone="teal">
+          O mapa vai <b>criptografado dentro do próprio link</b> (AES-256): nada é gravado no MARX nem em outro servidor. Quem receber precisa do link <b>e</b> da senha — envie a
+          senha por outro meio.
+        </Notice>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Título" className="sm:col-span-2">
+            <input className="w-full" value={title} maxLength={140} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Senha do link" hint="gerada automaticamente; pode trocar (mínimo 8 caracteres)">
+            <input className="w-full font-mono" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Field>
+          <Field label="Validade">
+            <select className="w-full" value={String(days)} onChange={(e) => setDays(e.target.value === 'null' ? null : +e.target.value)}>
+              {EXPIRY.map(([l, d]) => (
+                <option key={l} value={String(d)}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={withNumbers} onChange={(e) => setWithNumbers(e.target.checked)} /> incluir os números de telefone (por padrão o link leva só as estações,
+          azimutes, contagens e horários)
+        </label>
+        <p className="text-xs text-faint">
+          Conteúdo: {fmtInt(points.length)} estações · {types}. A validade é verificada ao abrir; como o link não fica guardado em lugar nenhum, ele não pode ser “desligado” depois
+          — escolha a validade e a senha com cuidado.
+        </p>
+        {!link ? (
+          <div className="flex justify-end gap-2">
+            <button className="btn-ghost" onClick={onClose}>
+              Cancelar
+            </button>
+            <button className="btn-primary" onClick={gen} disabled={busy}>
+              <Share2 className="h-4 w-4" /> {busy ? 'Criptografando…' : 'Gerar link'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Field label={`Link (${fmtInt(link.length)} caracteres)`}>
+              <textarea readOnly className="w-full font-mono text-[11px]" rows={3} value={link} onFocus={(e) => e.currentTarget.select()} />
+            </Field>
+            {link.length > 60000 && <Notice tone="amber">Link muito longo: alguns aplicativos de mensagem podem cortá-lo. Filtre o período/tipos ou envie o arquivo KML.</Notice>}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button className="btn-ghost" onClick={() => copy(password, 'Senha')}>
+                Copiar senha
+              </button>
+              <button className="btn-primary" onClick={() => copy(link, 'Link')}>
+                Copiar link
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 
@@ -221,7 +389,8 @@ function SequenceView({ tile, attr, playback }: { tile: string; attr: string; pl
     }
     const cur = playback ? items[idx] : null
     if (cur && cur.lat !== null) {
-      if (cur.azimuth !== null) L.polygon(sectorPolygon(cur.lat, cur.lon, cur.azimuth, cur.beamwidth ?? 65, 700), { color: '#f5a524', weight: 1, fillOpacity: 0.2, dashArray: '4 3' }).addTo(layer.current)
+      if (cur.azimuth !== null)
+        L.polygon(sectorPolygon(cur.lat, cur.lon, cur.azimuth, cur.beamwidth ?? 65, 700), { color: '#f5a524', weight: 1, fillOpacity: 0.2, dashArray: '4 3' }).addTo(layer.current)
       L.circleMarker([cur.lat, cur.lon], { radius: 11, color: '#fff', weight: 2, fillColor: '#f5a524', fillOpacity: 1 }).addTo(layer.current)
     }
     if (!playback || idx === 0) map.current.fitBounds(withCoords.map((x) => [x.lat, x.lon]) as [number, number][], { padding: [40, 40], maxZoom: 15 })
@@ -250,7 +419,9 @@ function SequenceView({ tile, attr, playback }: { tile: string; attr: string; pl
           <input type="checkbox" checked={showLine} onChange={(e) => setShowLine(e.target.checked)} /> ligar a ordem dos registros (tracejado)
         </label>
       </div>
-      <Notice tone="amber">Sequência documental de registros de rede. Não representa trajeto físico, velocidade, permanência ou endereço; a posição contínua do aparelho não é simulada.</Notice>
+      <Notice tone="amber">
+        Sequência documental de registros de rede. Não representa trajeto físico, velocidade, permanência ou endereço; a posição contínua do aparelho não é simulada.
+      </Notice>
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
       <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_420px]">
@@ -309,7 +480,11 @@ function SequenceView({ tile, attr, playback }: { tile: string; attr: string; pl
                     {x.tz_status !== 'confirmed' && <span className="text-amber"> *</span>}
                   </td>
                   <td className="text-xs">
-                    {x.cell_changed && <Badge tone="teal" className="mr-1">troca</Badge>}
+                    {x.cell_changed && (
+                      <Badge tone="teal" className="mr-1">
+                        troca
+                      </Badge>
+                    )}
                     {x.site_name ?? <span className="font-mono">{x.cell_key}</span>}
                     {x.lat === null && <span className="text-faint"> (sem coordenada)</span>}
                   </td>

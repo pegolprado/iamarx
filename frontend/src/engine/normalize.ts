@@ -17,6 +17,8 @@ export function normalizeNumber(raw: string | null | undefined): [string | null,
   const w: string[] = []
   if (raw === null || raw === undefined) return [null, w]
   let s = String(raw).trim()
+  // "11940268614 \n(353210502453550)" / "5511940268614 IMEI: 3532…" (sistemas de interceptação): só o número
+  s = s.split(/\r?\n/)[0].replace(/\s*IMEI\b.*$/i, '').replace(/\s*\(\d{14,17}\)\s*$/, '').trim() || s
   if (!s || EMPTY_NUM.has(s)) return [null, w]
   if (/^\d+\.0$/.test(s)) s = s.slice(0, -2)
   const intl = s.startsWith('+')
@@ -162,6 +164,9 @@ export function parseLocalDatetime(
     }
     return [null, null, `data/hora não reconhecida: '${dtS}'`]
   }
+  // coluna "data" que traz também o horário (ex.: 16/10/2026 09:26:39) e nenhuma coluna de hora
+  if (dateS && dateS.trim() && !(timeS && timeS.trim()) && /\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}/.test(dateS) && !/ 00:00:00$/.test(dateS.trim()))
+    return parseLocalDatetime(null, null, dateS, null, null, null)
   if (dateS && dateS.trim()) {
     let dRaw = dateS.trim()
     if (/^\d{4}-\d{2}-\d{2} 00:00:00$/.test(dRaw)) dRaw = dRaw.slice(0, 10)
@@ -308,9 +313,9 @@ export function classifyEvent(typeText: string | null, dirText: string | null, v
   }
   if (has(t, [' sms ', ' mensagem ', ' torpedo ', ' mms '])) return [pick('sms'), direction, true]
   if (has(t, [' dados ', ' gprs ', ' data ', ' internet ', ' pacote ', ' conexao ', ' psd ', ' ps '])) return ['dados', 'unknown', true]
-  if (has(t, [' desvio ', ' desviad', ' encaminhad', ' forward', ' siga me '])) return ['desvio', direction, true]
+  if (has(t, [' desvio ', ' desviad', ' encaminhad', ' forward', ' siga me ', ' redirecionament', ' redirecionad'])) return ['desvio', direction, true]
   if (has(t, [' atualizacao ', ' location update ', ' registro ', ' attach ', ' handover ', ' evento de rede '])) return ['evento_rede', 'unknown', true]
-  if (has(t, [' voz ', ' chamada ', ' call ', ' ligacao ', ' originada ', ' recebida ', ' mo ', ' mt ', ' moc ', ' mtc ', ' sainte ', ' entrante '])) return [pick('voz'), direction, true]
+  if (has(t, [' voz ', ' chamada ', ' chamadas ', ' ligacoes ', ' call ', ' ligacao ', ' originada ', ' recebida ', ' mo ', ' mt ', ' moc ', ' mtc ', ' sainte ', ' entrante '])) return [pick('voz'), direction, true]
   return ['outro', direction, false]
 }
 

@@ -43,7 +43,27 @@ test('fluxo completo: demonstração, telas, exportação e apagamento ao sair',
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
-  for (const t of ['Análise completa', 'Alvos', 'Arquivos', 'Importações', 'Qualidade', 'Eventos', 'Contatos', 'Estatística', 'Linha do tempo', 'WhatsApp', 'Vínculos', 'Comparar', 'Cruzamento', 'ERB', 'Cadastro', 'Mapa', 'Alertas', 'Exportar', 'Assistente']) {
+  for (const t of [
+    'Análise completa',
+    'Alvos',
+    'Arquivos',
+    'Importações',
+    'Qualidade',
+    'Eventos',
+    'Contatos',
+    'Estatística',
+    'Linha do tempo',
+    'WhatsApp',
+    'Vínculos',
+    'Comparar',
+    'Cruzamento',
+    'ERB',
+    'Cadastro',
+    'Mapa',
+    'Alertas',
+    'Exportar',
+    'Assistente',
+  ]) {
     await tab(page, t)
     await page.waitForTimeout(1200)
     await expect(page.locator('[role=alert]'), `erro na tela ${t}`).toHaveCount(0)
@@ -79,7 +99,9 @@ test('carregar arquivo do computador e importar pelo assistente', async ({ page 
   for (let i = 0; i < 2000; i++) {
     const other = `(61) 9${String(1000 + (i % 37)).padStart(4, '0')}-${String(i).padStart(4, '0')}`
     const out = i % 2 === 0
-    lines.push(`${out ? '(61) 99876-5432' : other};${out ? other : '(61) 99876-5432'};${String(1 + (i % 28)).padStart(2, '0')}/04/2026;${String(i % 24).padStart(2, '0')}:10:00;${i % 300};${out ? 'Originada' : 'Recebida'};1100;${20000 + (i % 9)}`)
+    lines.push(
+      `${out ? '(61) 99876-5432' : other};${out ? other : '(61) 99876-5432'};${String(1 + (i % 28)).padStart(2, '0')}/04/2026;${String(i % 24).padStart(2, '0')}:10:00;${i % 300};${out ? 'Originada' : 'Recebida'};1100;${20000 + (i % 9)}`,
+    )
   }
   await page.setInputFiles('input[type=file]', { name: 'extrato.csv', mimeType: 'text/csv', buffer: Buffer.from(lines.join('\n'), 'utf-8') })
   await page.waitForURL(/importar/)
@@ -127,7 +149,12 @@ test('ocultar números na tela e bloquear a tela sem perder a análise', async (
   await tab(page, 'Contatos')
   await expect(page.locator('table tbody tr').first()).toBeVisible()
   await page.click('button:has-text("Ocultar números")')
-  await expect(page.locator('table tbody').getByText(/\(61\) 9••••-••\d\d/).first()).toBeVisible()
+  await expect(
+    page
+      .locator('table tbody')
+      .getByText(/\(61\) 9••••-••\d\d/)
+      .first(),
+  ).toBeVisible()
   await page.click('button:has-text("Números ocultos")')
   await expect(page.locator('table tbody').getByText(/•/)).toHaveCount(0)
 
@@ -154,7 +181,7 @@ test('WhatsApp Records: importação automática, IPs em comum, grupos e exporta
   await page.click('[role=tablist] >> text=IPs em comum')
   await expect(page.getByText('10.20.30.40').first()).toBeVisible()
   await page.click('[role=tablist] >> text=Grupos')
-  await expect(page.getByText('120363012345678901@g.us')).toBeVisible()
+  await expect(page.getByText('120363012345678901@g.us').first()).toBeVisible()
   const [x] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Excel")')])
   expect(x.suggestedFilename()).toMatch(/grupos.*\.xlsx$/i)
 
@@ -192,12 +219,24 @@ test('análise completa e vínculos: tudo calculado de uma vez a partir da impor
   await expect(page.getByRole('tab', { name: /Contatos em comum/, selected: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Contatos em comum entre alvos' })).toBeVisible()
   await expect(page.locator('section table tbody tr').first()).toBeVisible()
-  for (const t of ['Recíprocas', 'Contato direto', 'Coincidências', 'Células em comum', 'Atividade dos alvos', 'Cruzamento multifonte', 'IPs, agenda e grupos', 'Todas as conexões']) {
+  for (const t of [
+    'Recíprocas',
+    'Contato direto',
+    'Coincidências',
+    'Células em comum',
+    'Atividade dos alvos',
+    'Cruzamento multifonte',
+    'IPs, agenda e grupos',
+    'Todas as conexões',
+  ]) {
     await page.click(`[role=tablist] >> text=${t}`)
     await expect(page.locator('[role=alert]'), `erro na aba ${t}`).toHaveCount(0)
   }
   await page.click('[role=tablist] >> text=Cruzamento multifonte')
-  const [x] = await Promise.all([page.waitForEvent('download'), page.locator('section').filter({ hasText: 'Cruzamento multifonte' }).last().locator('button:has-text("Excel")').click()])
+  const [x] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('section').filter({ hasText: 'Cruzamento multifonte' }).last().locator('button:has-text("Excel")').click(),
+  ])
   expect(x.suggestedFilename()).toMatch(/\.xlsx$/)
   expect(errors).toEqual([])
 })
@@ -233,5 +272,75 @@ test('WhatsApp: dados cadastrais e agenda; logs de acesso com correlação de IP
   await page.setInputFiles('input[type=file]', { name: 'log_provedor.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf-8') })
   await expect(page.getByText(/Log de acesso: 2 registros de IP/)).toBeVisible()
   await expect(page.getByRole('cell', { name: 'log de acesso (IP)', exact: true })).toHaveCount(2)
+  expect(errors).toEqual([])
+})
+
+test('extrato de interceptação com coordenadas: importa, plota as ERBs e compartilha o mapa por link com senha', async ({ page, browser }) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('dialog', (d) => d.accept())
+  await login(page)
+  await page.click('text=Análise atual')
+  await tab(page, 'Arquivos')
+  // mesmo layout das exportações de interceptação (dados fictícios)
+  const head =
+    'Tipo;ID Evento;Evento;Interceptação;Alvo;MONB Referência;Direção;Origem;Destino;Tipo Específico;Data Início;Data do evento;Data Fim;Duração;URL/IP;URL/IP Adicional;Conteúdo;Célula;Comentários;Latitude;Longitude;Azimute;Raio;Localização'
+  const rows = [head]
+  const sites = [
+    ['-23.6177654', '-46.7326240', '120'],
+    ['-23.518914', '-46.564651', '240'],
+    ['-23.621525', '-46.720736', '290'],
+  ]
+  for (let i = 0; i < 60; i++) {
+    const [la, lo, az] = sites[i % 3]
+    const ts = `1${i % 7}/10/2026 ${String(i % 24).padStart(2, '0')}:1${i % 6}:0${i % 10}`
+    if (i % 10 === 0)
+      rows.push(
+        `Interceptação;${900 + i};Chamadas;1.0;5511900000001;;Originada;"11900000001 \n(350000000000001)";970500268;CHAMADA;${ts};${ts};${ts};00:00:13;;;;724-05-35711-6340${i % 3};;${la};${lo};${az};0;`,
+      )
+    else
+      rows.push(`Interceptação;${900 + i};Conexão;1.0;5511900000001;;Recebida;;;ATUALIZAÇÃO STATUS;${ts};${ts};;;10.1.2.${i};;;724-05-42911-2872371${i % 3};;${la};${lo};${az};0;`)
+  }
+  await page.setInputFiles('input[type=file]', { name: 'interceptacao.csv', mimeType: 'text/csv', buffer: Buffer.from(rows.join('\r\n'), 'utf-8') })
+  await page.waitForURL(/importar/)
+  for (let i = 0; i < 4; i++) {
+    await page.click('button:has-text("Avançar")')
+    await page.waitForTimeout(500)
+  }
+  await page.click('button:has-text("Confirmar e processar")')
+  await expect(page.getByText('Abrir registros importados')).toBeVisible()
+  await expect(page.locator('text=aceitas').locator('xpath=..')).toContainText('60')
+
+  await tab(page, 'Mapa')
+  const stat = (l: string) => page.locator(`[data-stat="${l}"]`)
+  await expect(stat('Estações no mapa')).toContainText('3')
+  await expect(stat('Voz')).toContainText('6')
+  await expect(stat('Dados')).toContainText('54')
+  await page.click('[role=group][aria-label="Tipo de evento"] >> text=Voz')
+  await expect(stat('Dados')).toContainText('0')
+  await page.click('[role=group][aria-label="Tipo de evento"] >> text=Todos')
+
+  const [kml] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("KML")')])
+  expect(kml.suggestedFilename()).toMatch(/\.kml$/)
+
+  await page.click('button:has-text("Compartilhar mapa")')
+  await page.click('button:has-text("Gerar link")')
+  const link = await page.locator('textarea[readonly]').inputValue()
+  const password = await page.locator('input.font-mono').first().inputValue()
+  expect(link).toMatch(/\/mapa-compartilhado#m1\./)
+  expect(link).not.toContain('724-05')
+
+  // quem recebe abre sem login, só com a senha
+  const ctx = await browser.newContext()
+  const other = await ctx.newPage()
+  await other.goto(link)
+  await other.fill('input[type=password]', 'errada-123')
+  await other.click('button:has-text("Abrir mapa")')
+  await expect(other.getByRole('alert')).toHaveText('Senha incorreta.')
+  await other.fill('input[type=password]', password)
+  await other.click('button:has-text("Abrir mapa")')
+  await expect(other.getByText(/3 estações/)).toBeVisible()
+  await expect(other.getByRole('img', { name: 'Mapa das estações (ERBs)' })).toBeVisible()
+  await ctx.close()
   expect(errors).toEqual([])
 })

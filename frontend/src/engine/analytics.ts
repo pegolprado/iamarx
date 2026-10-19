@@ -461,12 +461,12 @@ export async function candidatesFor(cellKey: string) {
 export async function geoPoints(f: EventFilter) {
   const w = where(f)
   const registryPoints = await q(`SELECT c.id AS cell_ref, c.lat, c.lon, c.azimuth, c.beamwidth, c.site_name, c.site_code, c.tech, c.operator, c.cell_key, c.address,
-      c.version_id, count(*)::INTEGER AS events, list(DISTINCT e.target_number) AS numbers, min(e.ts_local) AS first_event, max(e.ts_local) AS last_event,
+      c.version_id, count(*)::INTEGER AS events, (count(*) FILTER (WHERE e.event_type IN ${VOICE_IN}))::INTEGER AS voice, (count(*) FILTER (WHERE e.event_type LIKE 'sms%'))::INTEGER AS sms, (count(*) FILTER (WHERE e.event_type = 'dados'))::INTEGER AS data, list(DISTINCT e.target_number) AS numbers, min(e.ts_local) AS first_event, max(e.ts_local) AS last_event,
       max(e.resolution_status) AS resolution_status
     FROM events e JOIN erb_cells c ON c.id = e.resolved_cell_id WHERE ${w} AND c.lat IS NOT NULL AND c.lon IS NOT NULL
     GROUP BY c.id, c.lat, c.lon, c.azimuth, c.beamwidth, c.site_name, c.site_code, c.tech, c.operator, c.cell_key, c.address, c.version_id
     ORDER BY events DESC LIMIT 5000`)
-  const documentPoints = await q(`SELECT round(e.lat, 5) AS lat, round(e.lon, 5) AS lon, max(e.azimuth) AS azimuth, e.cell_key, count(*)::INTEGER AS events,
+  const documentPoints = await q(`SELECT round(e.lat, 5) AS lat, round(e.lon, 5) AS lon, max(e.azimuth) AS azimuth, e.cell_key, count(*)::INTEGER AS events, (count(*) FILTER (WHERE e.event_type IN ${VOICE_IN}))::INTEGER AS voice, (count(*) FILTER (WHERE e.event_type LIKE 'sms%'))::INTEGER AS sms, (count(*) FILTER (WHERE e.event_type = 'dados'))::INTEGER AS data,
       list(DISTINCT e.target_number) AS numbers, min(e.ts_local) AS first_event, max(e.ts_local) AS last_event
     FROM events e WHERE ${w} AND e.lat IS NOT NULL AND e.lon IS NOT NULL AND e.resolved_cell_id IS NULL
     GROUP BY 1, 2, e.cell_key ORDER BY events DESC LIMIT 5000`)

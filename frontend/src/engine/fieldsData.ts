@@ -197,6 +197,7 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
   "label": "Status do evento",
   "syn": [
    "status",
+   "tipo especifico",
    "resultado",
    "situacao",
    "causa",
@@ -364,6 +365,7 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
   "label": "Endereço IP",
   "syn": [
    "ip",
+   "url ip",
    "endereco ip",
    "ip origem",
    "ip address",

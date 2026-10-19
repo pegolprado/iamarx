@@ -107,3 +107,21 @@ describe('células e coordenadas', () => {
     expect(r.confidence).toBeGreaterThan(0.5)
   })
 })
+
+describe('exportações de sistemas de interceptação (Vigia)', () => {
+  it('número com IMEI na mesma célula', () => {
+    expect(N.normalizeNumber('11940268614 \n(353210502453550)')[0]).toBe('+5511940268614')
+    expect(N.normalizeNumber('5511940268614 \nIMEI: 353210502453550')[0]).toBe('+5511940268614')
+    expect(N.normalizeNumber('(61) 99876-5432')[0]).toBe('+5561998765432')
+  })
+  it('coluna de data que já traz o horário', () => {
+    const [l, , err] = N.parseLocalDatetime('16/10/2026 09:26:39', null, null)
+    expect(err).toBeNull()
+    expect(l).toMatchObject({ y: 2026, mo: 10, d: 16, h: 9, mi: 26, s: 39 })
+  })
+  it('tipos no plural e redirecionamento', () => {
+    expect(N.classifyEvent('Chamadas', 'Originada')[0]).toBe('voz_originada')
+    expect(N.classifyEvent('Conexão', 'Recebida')[0]).toBe('dados')
+    expect(N.classifyEvent('Redirecionamento', null)[0]).toBe('desvio')
+  })
+})
