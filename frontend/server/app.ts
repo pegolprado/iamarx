@@ -484,8 +484,8 @@ route('POST', '/api/admin/users/(\\d+)/revoke-sessions', async (ctx, [id]) => {
 route('GET', '/api/settings', async (ctx) => {
   await currentUser(ctx)
   return {
-    map_tile_url: ctx.env.MAP_TILE_URL ?? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-    map_attribution: ctx.env.MAP_ATTRIBUTION ?? '&copy; colaboradores do OpenStreetMap &copy; CARTO',
+    map_tile_url: ctx.env.MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    map_attribution: ctx.env.MAP_ATTRIBUTION ?? '&copy; colaboradores do OpenStreetMap',
     app_version: APP_VERSION,
     smtp_configured: false,
     idle_minutes: ctx.c.idle,

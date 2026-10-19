@@ -5,30 +5,37 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { SitePoint } from '../lib/shareMap'
 
 export const OSM = { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© colaboradores do OpenStreetMap' }
-/** Alternativa gratuita usada se o servidor do OpenStreetMap recusar as imagens. */
-export const CARTO = { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', attr: '© OpenStreetMap · © CARTO' }
-
-/**
- * Camada de fundo do mapa. O OpenStreetMap exige saber de qual site vêm os pedidos de imagem
- * (cabeçalho Referer); o site esconde o referer por padrão, então aqui é enviado só o domínio
- * (nunca a página nem os dados). Se mesmo assim as imagens falharem, troca para o CARTO.
- */
-export function baseLayer(url: string, attribution: string): L.TileLayer {
-  const t = L.tileLayer(url, { attribution, maxZoom: 19, referrerPolicy: 'strict-origin', subdomains: 'abcd' } as L.TileLayerOptions)
-  let errors = 0
-  t.on('tileerror', () => {
-    if (++errors === 4 && url !== CARTO.url && !url.includes('arcgisonline')) {
-      t.setUrl(CARTO.url)
-      t.options.attribution = CARTO.attr
-    }
-  })
-  return t
+/** Ruas da Esri: alternativa sem chave ao OpenStreetMap. */
+export const STREETS = {
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  attr: 'Mapa © Esri, HERE, Garmin, © colaboradores do OpenStreetMap',
 }
-
 export const SATELLITE = {
   url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   attr: 'Imagens © Esri, Maxar, Earthstar Geographics',
 }
+
+/**
+ * Camada de fundo do mapa. O OpenStreetMap exige saber de qual site vêm os pedidos de imagem
+ * (cabeçalho Referer); o site esconde o referer por padrão, então aqui é enviado só o domínio
+ * (nunca a página nem os dados). `onFail` é chamado se várias imagens falharem seguidas.
+ */
+export function baseLayer(url: string, attribution: string, onFail?: () => void): L.TileLayer {
+  const t = L.tileLayer(url, { attribution, maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin' } as L.TileLayerOptions)
+  let errors = 0
+  t.on('tileload', () => (errors = 0))
+  t.on('tileerror', () => {
+    if (++errors === 4) onFail?.()
+  })
+  return t
+}
+
+type Base = 'mapa' | 'mapa2' | 'satelite'
+const BASES: { id: Base; label: string }[] = [
+  { id: 'mapa', label: 'Mapa' },
+  { id: 'mapa2', label: 'Mapa 2' },
+  { id: 'satelite', label: 'Satélite' },
+]
 
 /** Cores por intensidade (quantidade de eventos na estação). */
 export const HEAT = [
@@ -96,8 +103,8 @@ export function heatScale(points: SitePoint[]) {
  */
 export function ErbMap({
   points,
-  tileUrl = CARTO.url,
-  tileAttr = CARTO.attr,
+  tileUrl = OSM.url,
+  tileAttr = OSM.attr,
   azMode = 'linha',
   azLen = 600,
   onSelect,
@@ -118,7 +125,7 @@ export function ErbMap({
   const map = useRef<L.Map | null>(null)
   const base = useRef<L.TileLayer | null>(null)
   const layer = useRef<L.LayerGroup | null>(null)
-  const [sat, setSat] = useState(false)
+  const [base_, setBase] = useState<Base>('mapa')
   const [full, setFull] = useState(false)
   const [zoom, setZoom] = useState(4)
   const [levels, setLevels] = useState<string[]>(['', '', ''])
@@ -136,9 +143,12 @@ export function ErbMap({
   useEffect(() => {
     if (!map.current) return
     base.current?.remove()
-    base.current = baseLayer(sat ? SATELLITE.url : tileUrl, sat ? SATELLITE.attr : tileAttr).addTo(map.current)
+    // o CARTO passou a exigir chave: se vier configurado, usa o OpenStreetMap
+    const main = tileUrl && !tileUrl.includes('cartocdn') ? { url: tileUrl, attr: tileAttr } : OSM
+    const src = base_ === 'satelite' ? SATELLITE : base_ === 'mapa2' ? STREETS : main
+    base.current = baseLayer(src.url, src.attr, base_ === 'mapa' ? () => setBase('mapa2') : undefined).addTo(map.current)
     base.current.bringToBack()
-  }, [sat, tileUrl, tileAttr])
+  }, [base_, tileUrl, tileAttr])
 
   // enquadra os pontos só quando os dados mudam (não a cada zoom)
   useEffect(() => {
@@ -194,7 +204,12 @@ export function ErbMap({
       c.addTo(g)
       L.marker([p.lat, p.lon], {
         interactive: false,
-        icon: L.divIcon({ className: 'erb-count', html: `<span style="color:${color}">${p.events ? p.events.toLocaleString('pt-BR') : members.length > 1 ? members.length : ''}</span>`, iconSize: [60, 16], iconAnchor: [30, 8] }),
+        icon: L.divIcon({
+          className: 'erb-count',
+          html: `<span style="color:${color}">${p.events ? p.events.toLocaleString('pt-BR') : members.length > 1 ? members.length : ''}</span>`,
+          iconSize: [60, 16],
+          iconAnchor: [30, 8],
+        }),
       }).addTo(g)
     }
     setLevels(lvl.ranges)
@@ -223,12 +238,16 @@ export function ErbMap({
           {full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
         <div className="flex overflow-hidden rounded-lg border border-black/20 bg-white text-sm font-semibold shadow" role="group" aria-label="Tipo de mapa">
-          <button className={clsx('px-3 py-1.5', !sat ? 'bg-gray-900 text-white' : 'text-gray-700')} onClick={() => setSat(false)} aria-pressed={!sat}>
-            Mapa
-          </button>
-          <button className={clsx('px-3 py-1.5', sat ? 'bg-gray-900 text-white' : 'text-gray-700')} onClick={() => setSat(true)} aria-pressed={sat}>
-            Satélite
-          </button>
+          {BASES.map((b) => (
+            <button
+              key={b.id}
+              className={clsx('px-3 py-1.5', base_ === b.id ? 'bg-gray-900 text-white' : 'text-gray-700')}
+              onClick={() => setBase(b.id)}
+              aria-pressed={base_ === b.id}
+            >
+              {b.label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="absolute bottom-3 left-3 z-[500] max-w-[260px] rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-[11px] leading-5 text-gray-800 shadow">

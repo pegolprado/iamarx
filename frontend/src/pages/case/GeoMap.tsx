@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import L from 'leaflet'
-import { Download, Map as MapIcon, Pause, Play, Share2, SkipBack, SkipForward } from 'lucide-react'
+import { Download, Map as MapIcon, Upload, Pause, Play, Share2, SkipBack, SkipForward } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '../../app/auth'
-import { type AzMode, baseLayer, ErbMap, groupSites } from '../../components/ErbMap'
+import { type AzMode, baseLayer, ErbMap, groupSites, STREETS } from '../../components/ErbMap'
 import { useSession } from '../../engine/session'
 import { encryptMap, randomPassword, type SitePoint, toKml } from '../../lib/shareMap'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { cellSequence, geoPoints, registryMapPoints } from '../../engine/analytics'
-import { useCase } from '../../app/layout'
+import { apath, useCase } from '../../app/layout'
 import { FilterBar } from '../../components/FilterBar'
 import { Badge, Criteria, DrillLink, Empty, ErrorBox, Field, Loading, Modal, Notice, PageHeader, Tabs } from '../../components/ui'
 import { EVENT_TYPE_LABEL, fmtDateTime, fmtDuration, fmtInt, fmtNumber } from '../../lib/format'
@@ -35,7 +35,7 @@ function useLeaflet(tileUrl?: string, attribution?: string) {
   useEffect(() => {
     if (!ref.current || map.current || !tileUrl) return
     map.current = L.map(ref.current, { preferCanvas: true }).setView([-15.79, -47.88], 11)
-    baseLayer(tileUrl, attribution ?? '').addTo(map.current)
+    const t: L.TileLayer = baseLayer(tileUrl, attribution ?? '', () => t.setUrl(STREETS.url)).addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
     return () => {
       map.current?.remove()
@@ -85,6 +85,7 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
   const [azLen, setAzLen] = useState(600)
   const [sel, setSel] = useState<SitePoint | null>(null)
   const [share, setShare] = useState(false)
+  const hasEvents = useSession((x) => x.imports.some((i) => i.status === 'done' && i.kind !== 'erb_registry'))
   const q = useQuery({ queryKey: ['geo', c.id, f], queryFn: () => geoPoints(f) as Promise<any> })
   const eventPoints = useMemo(() => (q.data ? groupSites([...q.data.registry_points, ...q.data.document_points]) : []), [q.data])
   // sem eventos com coordenada: mostra as células do cadastro técnico (se houver)
@@ -164,7 +165,8 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
       {registryOnly && (
         <div className="mb-4">
           <Notice tone="amber" title="Mostrando o cadastro de ERB (sem eventos)">
-            Nenhum evento com localização foi importado, então o mapa mostra as {fmtInt(points.length)} estações do cadastro técnico, sem contagem. Para ver a quantidade de eventos por ERB, carregue o extrato (bilhetagem ou interceptação) em Arquivos.
+            Nenhum evento com localização foi importado, então o mapa mostra as {fmtInt(points.length)} estações do cadastro técnico, sem contagem. Para ver a quantidade de eventos
+            por ERB, carregue o extrato (bilhetagem ou interceptação) em Arquivos.
           </Notice>
         </div>
       )}
@@ -178,9 +180,20 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
           )}
           {q.data && !points.length && (
             <div className="absolute inset-0 z-[600] grid place-items-center rounded-2xl bg-ink/70 p-6">
-              <Empty title="Sem coordenadas válidas">
-                Carregue um arquivo que traga latitude/longitude por evento (ex.: extrato de interceptação) ou o cadastro técnico de ERB e execute a resolução.
-              </Empty>
+              {!hasEvents ? (
+                <Empty title="Nenhum arquivo carregado nesta análise">
+                  <p>
+                    Nada fica salvo: a cada novo acesso é preciso carregar os arquivos de novo. Carregue o extrato (com latitude/longitude) ou a bilhetagem e o cadastro de ERB.
+                  </p>
+                  <Link to={apath('arquivos')} className="btn-primary mt-4">
+                    <Upload className="h-4 w-4" /> Carregar arquivos
+                  </Link>
+                </Empty>
+              ) : (
+                <Empty title="Sem coordenadas válidas">
+                  Os registros importados não trazem latitude/longitude. Carregue o cadastro técnico de ERB (planilha com célula e coordenadas) para posicionar as antenas.
+                </Empty>
+              )}
             </div>
           )}
         </div>
