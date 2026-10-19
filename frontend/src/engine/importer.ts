@@ -102,7 +102,7 @@ export async function analyze(fileId: number, kind: Kind, read: ReadOptions) {
   const sample = await table.sample(25)
   const columns = info.columns
   const mapping = suggestMapping(columns, kind)
-  if (kind === 'cdr') refineMapping(mapping, columns, sample)
+  refineMapping(mapping, columns, sample)
   const mncCol = mapping.mnc
   let sampleMnc = mncCol ? sample.map((r) => String(r[mncCol] ?? '')) : []
   if (!sampleMnc.length && mapping.cgi) sampleMnc = sample.map((r) => N.splitCgi(N.normalizeCgi(String(r[mapping.cgi] ?? ''))).mnc ?? '')
@@ -126,7 +126,23 @@ export async function analyze(fileId: number, kind: Kind, read: ReadOptions) {
     target_hint: targetHint,
     event_type_values: typeValues,
     event_types: N.EVENT_TYPES,
+    kind_suggestion: suggestKind(columns, sample),
   }
+}
+
+/**
+ * Tipo do arquivo pelo conteúdo: data/hora + números (ou tipo de evento) = extrato de eventos;
+ * coordenadas/célula sem data/hora = cadastro de ERB. Evita importar um extrato como cadastro.
+ */
+export function suggestKind(columns: string[], sample: Record<string, unknown>[]): 'cdr' | 'erb_registry' | null {
+  const m = refineMapping(suggestMapping(columns, 'cdr'), columns, sample)
+  const timed = (col?: string) => !!col && sample.some((r) => /\d{1,2}:\d{2}/.test(String(r[col] ?? '')))
+  const hasTime = timed(m.datetime) || (!!m.date && timed(m.time))
+  const hasNum = !!(m.target_number || m.a_number || m.b_number || m.other_number)
+  if (hasTime && (hasNum || m.event_type)) return 'cdr'
+  const e = suggestMapping(columns, 'erb_registry')
+  if (!hasTime && ((e.lat && e.lon) || e.cell_id || e.cgi || e.eci)) return 'erb_registry'
+  return null
 }
 
 /**

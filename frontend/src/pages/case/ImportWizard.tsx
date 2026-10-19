@@ -44,7 +44,20 @@ export default function ImportWizard() {
     setAnalyzing(true)
     setErr(null)
     try {
-      const a: any = await analyzeFile(+fileId!, k as any, r)
+      let a: any = await analyzeFile(+fileId!, k as any, r)
+      // tipo escolhido não confere com o conteúdo (ex.: extrato de eventos marcado como cadastro de ERB)
+      if (a.kind_suggestion && a.kind_suggestion !== k) {
+        const nk = a.kind_suggestion
+        toast.info(
+          nk === 'cdr'
+            ? 'O arquivo tem data/hora e números por linha: foi reconhecido como extrato de eventos (bilhetagem/interceptação) e será importado assim. As coordenadas de cada linha vão para o mapa.'
+            : 'O arquivo não tem data/hora por linha: foi reconhecido como cadastro técnico de ERB.',
+          { duration: 12000 },
+        )
+        setKind(nk)
+        k = nk
+        a = await analyzeFile(+fileId!, nk, r)
+      }
       setAnalysis(a)
       setMapping(a.suggested_mapping)
       const o: any = { ...opts, operator: opts.operator ?? file?.operator_declared ?? a.operator_detection.operator ?? '' }
@@ -549,6 +562,11 @@ export default function ImportWizard() {
                 <Link to={kind === 'cdr' ? '../eventos' : '../erb/cadastro'} relative="path" className="btn-ghost">
                   {kind === 'cdr' ? 'Abrir registros importados' : 'Abrir cadastro'}
                 </Link>
+                {kind === 'cdr' && (
+                  <Link to="../mapa" relative="path" className="btn-ghost">
+                    Ver no mapa
+                  </Link>
+                )}
                 <Link to="../completa" relative="path" className="btn-primary">
                   Ver análise completa <ArrowRight className="h-4 w-4" />
                 </Link>

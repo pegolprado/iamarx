@@ -482,6 +482,14 @@ export async function geoPoints(f: EventFilter) {
   }
 }
 
+/** Células do cadastro técnico com coordenadas (para ver o cadastro no mapa mesmo sem eventos). */
+export async function registryMapPoints(limit = 20000) {
+  return q(`SELECT c.lat, c.lon, c.azimuth, c.beamwidth, c.site_name, c.cell_key, 0 AS events, 0 AS voice, 0 AS sms, 0 AS data
+    FROM erb_cells c WHERE c.lat IS NOT NULL AND c.lon IS NOT NULL
+      AND c.version_id = (SELECT max(c2.version_id) FROM erb_cells c2 WHERE c2.cell_key = c.cell_key)
+    LIMIT ${Number(limit)}`)
+}
+
 export async function cellSequence(f: EventFilter, limit = 5000) {
   const rows = await q(`SELECT e.id, e.ts_local, e.tz_status, e.target_number, e.event_type, e.cell_key, e.file_id, e.row_number,
       coalesce(c.lat, e.lat) AS lat, coalesce(c.lon, e.lon) AS lon, coalesce(c.azimuth, e.azimuth) AS azimuth, c.beamwidth, c.site_name, e.resolution_status,

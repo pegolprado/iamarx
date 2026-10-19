@@ -4,12 +4,12 @@ import { Download, Map as MapIcon, Pause, Play, Share2, SkipBack, SkipForward } 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '../../app/auth'
-import { type AzMode, ErbMap, groupSites } from '../../components/ErbMap'
+import { type AzMode, baseLayer, ErbMap, groupSites } from '../../components/ErbMap'
 import { useSession } from '../../engine/session'
 import { encryptMap, randomPassword, type SitePoint, toKml } from '../../lib/shareMap'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { cellSequence, geoPoints } from '../../engine/analytics'
+import { cellSequence, geoPoints, registryMapPoints } from '../../engine/analytics'
 import { useCase } from '../../app/layout'
 import { FilterBar } from '../../components/FilterBar'
 import { Badge, Criteria, DrillLink, Empty, ErrorBox, Field, Loading, Modal, Notice, PageHeader, Tabs } from '../../components/ui'
@@ -35,7 +35,7 @@ function useLeaflet(tileUrl?: string, attribution?: string) {
   useEffect(() => {
     if (!ref.current || map.current || !tileUrl) return
     map.current = L.map(ref.current, { preferCanvas: true }).setView([-15.79, -47.88], 11)
-    L.tileLayer(tileUrl, { attribution, maxZoom: 19 }).addTo(map.current)
+    baseLayer(tileUrl, attribution ?? '').addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
     return () => {
       map.current?.remove()
@@ -86,7 +86,11 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
   const [sel, setSel] = useState<SitePoint | null>(null)
   const [share, setShare] = useState(false)
   const q = useQuery({ queryKey: ['geo', c.id, f], queryFn: () => geoPoints(f) as Promise<any> })
-  const points = useMemo(() => (q.data ? groupSites([...q.data.registry_points, ...q.data.document_points]) : []), [q.data])
+  const eventPoints = useMemo(() => (q.data ? groupSites([...q.data.registry_points, ...q.data.document_points]) : []), [q.data])
+  // sem eventos com coordenada: mostra as células do cadastro técnico (se houver)
+  const reg = useQuery({ queryKey: ['geo-registry', c.id], queryFn: () => registryMapPoints(), enabled: !!q.data && !eventPoints.length })
+  const registryOnly = !eventPoints.length && !!reg.data?.length
+  const points = useMemo(() => (registryOnly ? groupSites(reg.data!) : eventPoints), [registryOnly, reg.data, eventPoints])
   const tot = useMemo(
     () =>
       points.reduce((a, p) => ({ voice: a.voice + p.voice, data: a.data + p.data, sms: a.sms + p.sms, cells: a.cells + p.cells.length }), { voice: 0, data: 0, sms: 0, cells: 0 }),
@@ -157,6 +161,13 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
         </div>
       </div>
       {q.error && <ErrorBox error={q.error} />}
+      {registryOnly && (
+        <div className="mb-4">
+          <Notice tone="amber" title="Mostrando o cadastro de ERB (sem eventos)">
+            Nenhum evento com localização foi importado, então o mapa mostra as {fmtInt(points.length)} estações do cadastro técnico, sem contagem. Para ver a quantidade de eventos por ERB, carregue o extrato (bilhetagem ou interceptação) em Arquivos.
+          </Notice>
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="relative">
           <ErbMap points={points} tileUrl={tile} tileAttr={attr} azMode={azMode} azLen={azLen} onSelect={onSelect} />

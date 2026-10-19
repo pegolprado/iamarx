@@ -301,8 +301,11 @@ test('extrato de interceptação com coordenadas: importa, plota as ERBs e compa
     else
       rows.push(`Interceptação;${900 + i};Conexão;1.0;5511900000001;;Recebida;;;ATUALIZAÇÃO STATUS;${ts};${ts};;;10.1.2.${i};;;724-05-42911-2872371${i % 3};;${la};${lo};${az};0;`)
   }
+  // escolhido por engano como cadastro de ERB: o sistema reconhece o extrato pelo conteúdo
+  await page.selectOption('select >> nth=0', 'erb_registry')
   await page.setInputFiles('input[type=file]', { name: 'interceptacao.csv', mimeType: 'text/csv', buffer: Buffer.from(rows.join('\r\n'), 'utf-8') })
   await page.waitForURL(/importar/)
+  await expect(page.getByText(/reconhecido como extrato de eventos/)).toBeVisible()
   for (let i = 0; i < 4; i++) {
     await page.click('button:has-text("Avançar")')
     await page.waitForTimeout(500)

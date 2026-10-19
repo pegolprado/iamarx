@@ -5,6 +5,26 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { SitePoint } from '../lib/shareMap'
 
 export const OSM = { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© colaboradores do OpenStreetMap' }
+/** Alternativa gratuita usada se o servidor do OpenStreetMap recusar as imagens. */
+export const CARTO = { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', attr: '© OpenStreetMap · © CARTO' }
+
+/**
+ * Camada de fundo do mapa. O OpenStreetMap exige saber de qual site vêm os pedidos de imagem
+ * (cabeçalho Referer); o site esconde o referer por padrão, então aqui é enviado só o domínio
+ * (nunca a página nem os dados). Se mesmo assim as imagens falharem, troca para o CARTO.
+ */
+export function baseLayer(url: string, attribution: string): L.TileLayer {
+  const t = L.tileLayer(url, { attribution, maxZoom: 19, referrerPolicy: 'strict-origin', subdomains: 'abcd' } as L.TileLayerOptions)
+  let errors = 0
+  t.on('tileerror', () => {
+    if (++errors === 4 && url !== CARTO.url && !url.includes('arcgisonline')) {
+      t.setUrl(CARTO.url)
+      t.options.attribution = CARTO.attr
+    }
+  })
+  return t
+}
+
 export const SATELLITE = {
   url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   attr: 'Imagens © Esri, Maxar, Earthstar Geographics',
@@ -76,8 +96,8 @@ export function heatScale(points: SitePoint[]) {
  */
 export function ErbMap({
   points,
-  tileUrl = OSM.url,
-  tileAttr = OSM.attr,
+  tileUrl = CARTO.url,
+  tileAttr = CARTO.attr,
   azMode = 'linha',
   azLen = 600,
   onSelect,
@@ -116,7 +136,7 @@ export function ErbMap({
   useEffect(() => {
     if (!map.current) return
     base.current?.remove()
-    base.current = L.tileLayer(sat ? SATELLITE.url : tileUrl, { attribution: sat ? SATELLITE.attr : tileAttr, maxZoom: 19 }).addTo(map.current)
+    base.current = baseLayer(sat ? SATELLITE.url : tileUrl, sat ? SATELLITE.attr : tileAttr).addTo(map.current)
     base.current.bringToBack()
   }, [sat, tileUrl, tileAttr])
 
@@ -154,25 +174,27 @@ export function ErbMap({
     const lvl = heatScale(items.map((x) => x.p))
     const maxE = Math.max(...items.map((x) => x.p.events))
     for (const { p, members } of items.sort((a, b) => a.p.events - b.p.events)) {
-      const color = HEAT[lvl.level(p.events)].color
+      const color = p.events ? HEAT[lvl.level(p.events)].color : '#64748b'
       const single = members.length === 1
       if (single && azMode !== 'nenhum')
         for (const az of p.az) {
           if (azMode === 'linha') L.polyline([[p.lat, p.lon], dest(p.lat, p.lon, az, azLen)], { color: AZ_COLOR, weight: 2.5, opacity: 0.9 }).addTo(g)
           else L.polygon(sector(p.lat, p.lon, az, 65, azLen), { color: AZ_COLOR, weight: 1, fillOpacity: 0.12, opacity: 0.6 }).addTo(g)
         }
-      const r = 13 + 17 * Math.sqrt(p.events / maxE)
+      const r = p.events ? 13 + 17 * Math.sqrt(p.events / (maxE || 1)) : members.length > 1 ? 14 : 8
       const c = L.circleMarker([p.lat, p.lon], { radius: r, color, weight: 2, fillColor: color, fillOpacity: 0.32 })
       c.bindTooltip(
         single
-          ? `${p.name ? `${p.name} · ` : ''}${p.events} eventos (voz ${p.voice}, SMS ${p.sms}, dados ${p.data})`
-          : `${members.length} estações próximas · ${p.events} eventos — clique para aproximar`,
+          ? p.events
+            ? `${p.name ? `${p.name} · ` : ''}${p.events} eventos (voz ${p.voice}, SMS ${p.sms}, dados ${p.data})`
+            : `${p.name ? `${p.name} · ` : ''}${p.cells.length} célula(s) do cadastro · azimute ${p.az.join('°, ') || '—'}°`
+          : `${members.length} estações próximas${p.events ? ` · ${p.events} eventos` : ''} — clique para aproximar`,
       )
       c.on('click', () => (single ? onSelect?.(p) : m.fitBounds(L.latLngBounds(members.map((x) => [x.lat, x.lon] as [number, number])), { padding: [60, 60], maxZoom: 17 })))
       c.addTo(g)
       L.marker([p.lat, p.lon], {
         interactive: false,
-        icon: L.divIcon({ className: 'erb-count', html: `<span style="color:${color}">${p.events.toLocaleString('pt-BR')}</span>`, iconSize: [60, 16], iconAnchor: [30, 8] }),
+        icon: L.divIcon({ className: 'erb-count', html: `<span style="color:${color}">${p.events ? p.events.toLocaleString('pt-BR') : members.length > 1 ? members.length : ''}</span>`, iconSize: [60, 16], iconAnchor: [30, 8] }),
       }).addTo(g)
     }
     setLevels(lvl.ranges)
