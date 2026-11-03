@@ -146,3 +146,38 @@
     0 0 3px #fff,
     0 0 2px #fff;
 }
+
+/* torre (ERB) no mapa de localização */
+.erb-tower {
+  background: none;
+  border: 0;
+}
+.erb-tower-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #111827;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff);
+}
+.erb-tower-in span {
+  margin-top: -2px;
+  border-radius: 4px;
+  background: #b91c1c;
+  padding: 0 4px;
+  font: 700 10px/14px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #fff;
+}
+.erb-tower-in.is-active {
+  color: #f97316;
+}
+.erb-pulse {
+  animation: erb-pulse 1.2s ease-out infinite;
+}
+@keyframes erb-pulse {
+  from {
+    stroke-opacity: 1;
+  }
+  to {
+    stroke-opacity: 0.2;
+  }
+}

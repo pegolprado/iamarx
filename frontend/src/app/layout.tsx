@@ -175,6 +175,7 @@ export const apath = (p = '') => (p ? `${ANALYSIS}/${p.replace(/^\//, '')}` : AN
 const NAV: { label: string; sub: [string, string][]; also?: string[] }[] = [
   { label: 'Visão geral', sub: [['', 'Visão geral']] },
   { label: 'Análise completa', sub: [['completa', 'Análise completa']] },
+  { label: 'Localização (ERB)', sub: [['localizacao', 'Localização do alvo']] },
   {
     label: 'Arquivos',
     sub: [

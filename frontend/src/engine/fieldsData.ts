@@ -1,6 +1,22 @@
 // Gerado a partir do catálogo validado no back-end anterior (mesmos sinônimos).
 export type FieldSpec = { label: string; syn: string[] }
 export const CDR_FIELDS: Record<string, FieldSpec> = {
+ "address": {
+  "label": "Endereço da ERB",
+  "syn": ["endereco", "endereco erb", "endereco da erb", "endereco celula", "logradouro", "endereco antena", "localizacao"]
+ },
+ "district": {
+  "label": "Bairro / distrito da ERB",
+  "syn": ["distrito", "bairro", "bairro erb"]
+ },
+ "city": {
+  "label": "Cidade da ERB",
+  "syn": ["cidade", "municipio", "cidade erb", "municipio erb"]
+ },
+ "state": {
+  "label": "UF da ERB",
+  "syn": ["estado", "uf", "uf erb"]
+ },
  "target_number": {
   "label": "Número alvo",
   "syn": [
@@ -121,6 +137,7 @@ export const CDR_FIELDS: Record<string, FieldSpec> = {
    "timestamp",
    "data hora inicio",
    "inicio",
+   "incio",
    "data hora evento",
    "data hora chamada",
    "start time",

@@ -147,6 +147,10 @@ export function parseLocalDatetime(
   dateFmt?: string | null, timeFmt?: string | null, dtFmt?: string | null,
 ): [LocalDT | null, string | null, string | null] {
   let offset: string | null = null
+  // "03/11/2026–17:09:44" (traço longo entre data e hora, comum em relatórios de operadoras)
+  const dash = (x: string | null) => (x ? x.replace(/(\d)\s*[–—]\s*(\d{1,2}:\d{2})/, '$1 $2') : x)
+  dateS = dash(dateS)
+  dtS = dash(dtS)
   if (dtS && dtS.trim()) {
     let raw = dtS.trim()
     const m = ISO_OFFSET.exec(raw)
@@ -267,7 +271,7 @@ export const EVENT_TYPES: Record<string, string> = {
   sms: 'SMS (sentido não informado)',
   dados: 'Sessão de dados',
   desvio: 'Chamada desviada/encaminhada',
-  evento_rede: 'Evento de rede',
+  evento_rede: 'Registro de localização (rede)',
   wa_msg_enviada: 'WhatsApp: mensagem enviada',
   wa_msg_recebida: 'WhatsApp: mensagem recebida',
   wa_chamada_originada: 'WhatsApp: chamada originada',

@@ -63,10 +63,10 @@ export const MODULES: ModuleDef[] = [
   },
   {
     key: 'erb',
-    title: 'ERB e Geolocalização',
-    description: 'Resolução de células com cadastro versionado, inconsistências, mapa de estações, sequência de células e reprodução cronológica.',
+    title: 'Localização do Alvo (ERB)',
+    description: 'Carregue o extrato ou o relatório de localização: torres no mapa com setores e deslocamentos, reprodução dos eventos, provável residência e trabalho, ERBs mais frequentes e relatório em HTML.',
     icon: <RadioTower />,
-    path: 'erb',
+    path: 'localizacao',
     inCase: true,
     tone: 'amber',
   },
@@ -193,7 +193,20 @@ export const TOOL_GROUPS: ToolGroup[] = [
         ],
       },
       {
-        title: 'ERB e geolocalização',
+        title: 'Localização do alvo (ERB)',
+        description: 'Carregou o extrato com ERBs (bilhetagem, interceptação ou relatório de localização da operadora) e o mapa já mostra onde o alvo esteve, com os padrões de rotina.',
+        path: 'localizacao',
+        includes: [
+          'Torres no mapa com total de eventos',
+          'Setores de azimute e deslocamentos',
+          'Reprodução (playback) dos eventos',
+          'Provável residência e trabalho',
+          'ERBs mais frequentes e volume por dia',
+          'Relatório HTML, KML e link com senha',
+        ],
+      },
+      {
+        title: 'ERB: cadastro e resolução',
         description: 'Resolve as células dos registros com o cadastro técnico e mostra onde e em que ordem as estações foram registradas.',
         path: 'erb',
         includes: [

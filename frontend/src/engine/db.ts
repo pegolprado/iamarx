@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS events (
   is_duplicate BOOLEAN DEFAULT FALSE, duplicate_of BIGINT, out_of_scope BOOLEAN,
   resolved_cell_id INTEGER, resolution_status VARCHAR, resolution_rule VARCHAR, resolution_version_id INTEGER, resolution_note VARCHAR,
   resolution_candidates VARCHAR, resolution_manual BOOLEAN DEFAULT FALSE, revision INTEGER DEFAULT 0,
-  app VARCHAR, group_id VARCHAR, participants VARCHAR, port INTEGER, device VARCHAR, media VARCHAR, ext_id VARCHAR
+  app VARCHAR, group_id VARCHAR, participants VARCHAR, port INTEGER, device VARCHAR, media VARCHAR, ext_id VARCHAR,
+  address VARCHAR, city VARCHAR
 );
 CREATE TABLE IF NOT EXISTS erb_versions (id INTEGER, file_id INTEGER, import_id INTEGER, operator VARCHAR, name VARCHAR, reference_date DATE, rows INTEGER);
 CREATE TABLE IF NOT EXISTS erb_cells (

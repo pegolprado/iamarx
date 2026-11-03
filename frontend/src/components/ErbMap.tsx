@@ -135,6 +135,8 @@ export function ErbMap({
     map.current = L.map(box.current, { preferCanvas: false, zoomControl: true }).setView([-15.79, -47.88], 4)
     layer.current = L.layerGroup().addTo(map.current)
     return () => {
+      map.current?.stop()
+      map.current?.off()
       map.current?.remove()
       map.current = null
     }
@@ -154,7 +156,7 @@ export function ErbMap({
   useEffect(() => {
     const m = map.current
     if (!m || !points.length) return
-    m.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number])), { padding: [40, 40], maxZoom: 15 })
+    m.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number])), { padding: [40, 40], maxZoom: 15, animate: false })
     setZoom(m.getZoom())
   }, [points])
   useEffect(() => {

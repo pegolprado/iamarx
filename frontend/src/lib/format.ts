@@ -7,7 +7,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   sms: 'SMS (sentido n/i)',
   dados: 'Sessão de dados',
   desvio: 'Chamada desviada',
-  evento_rede: 'Evento de rede',
+  evento_rede: 'Registro de localização',
   wa_msg_enviada: 'WhatsApp: msg enviada',
   wa_msg_recebida: 'WhatsApp: msg recebida',
   wa_chamada_originada: 'WhatsApp: chamada originada',

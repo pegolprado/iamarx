@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { analyze as analyzeFile, cancelImport, createImport, preview as previewImport, runImport, saveDraft, saveProfile } from '../../engine/importer'
 import { useSession } from '../../engine/session'
-import { useCase } from '../../app/layout'
+import { apath, useCase } from '../../app/layout'
 import { Badge, ErrorBox, Field, Loading, Notice, PageHeader, Progress } from '../../components/ui'
 import { EVENT_TYPE_LABEL, fmtBytes, fmtInt, fmtNumber, shortHash } from '../../lib/format'
 
@@ -13,7 +13,7 @@ const STEPS = ['Arquivo', 'Leitura', 'Mapeamento', 'Datas e regras', 'Validaçã
 const CDR_GROUPS: [string, string[]][] = [
   ['Números', ['target_number', 'a_number', 'b_number', 'other_number', 'direction']],
   ['Evento', ['event_type', 'datetime', 'date', 'time', 'timezone', 'duration', 'status']],
-  ['Rede / célula', ['tech', 'mcc', 'mnc', 'lac', 'tac', 'cell_id', 'eci', 'nci', 'cgi', 'erb_raw', 'lat', 'lon', 'azimuth']],
+  ['Rede / célula', ['tech', 'mcc', 'mnc', 'lac', 'tac', 'cell_id', 'eci', 'nci', 'cgi', 'erb_raw', 'lat', 'lon', 'azimuth', 'address', 'district', 'city', 'state']],
   ['Aparelho e dados', ['imei', 'imsi', 'ip', 'port', 'bytes_up', 'bytes_down']],
 ]
 const ERB_GROUPS: [string, string[]][] = [
@@ -63,6 +63,7 @@ export default function ImportWizard() {
       const o: any = { ...opts, operator: opts.operator ?? file?.operator_declared ?? a.operator_detection.operator ?? '' }
       for (const f of ['date', 'time', 'datetime']) if (a.formats[f]?.format) o[`${f}_format`] = a.formats[f].format
       if (a.target_hint?.length === 1 && !o.target_number) o.target_number = a.target_hint[0]
+      if (a.default_event_type && !o.default_event_type) o.default_event_type = a.default_event_type
       if (a.profile?.options) Object.assign(o, a.profile.options)
       setOpts(o)
       setImportId(null)
@@ -556,18 +557,18 @@ export default function ImportWizard() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link to={`../importacoes?i=${importId}`} relative="path" className="btn-ghost">
+                <Link to={apath(`importacoes?i=${importId}`)} className="btn-ghost">
                   Ver ocorrências por linha
                 </Link>
-                <Link to={kind === 'cdr' ? '../eventos' : '../erb/cadastro'} relative="path" className="btn-ghost">
+                <Link to={apath(kind === 'cdr' ? 'eventos' : 'erb/cadastro')} className="btn-ghost">
                   {kind === 'cdr' ? 'Abrir registros importados' : 'Abrir cadastro'}
                 </Link>
                 {kind === 'cdr' && (
-                  <Link to="../mapa" relative="path" className="btn-ghost">
+                  <Link to={apath('localizacao')} className="btn-ghost">
                     Ver no mapa
                   </Link>
                 )}
-                <Link to="../completa" relative="path" className="btn-primary">
+                <Link to={apath('completa')} className="btn-primary">
                   Ver análise completa <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

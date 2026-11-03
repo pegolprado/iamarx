@@ -33,6 +33,7 @@ const Assistant = lazy(() => import('./pages/case/Assistant'))
 const WhatsApp = lazy(() => import('./pages/case/WhatsApp'))
 const FullAnalysis = lazy(() => import('./pages/case/FullAnalysis'))
 const Ips = lazy(() => import('./pages/case/Ips'))
+const Location = lazy(() => import('./pages/case/Location'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="whatsapp" element={<WhatsApp />} />
               <Route path="completa" element={<FullAnalysis />} />
               <Route path="ips" element={<Ips />} />
+              <Route path="localizacao" element={<Location />} />
             </Route>
             <Route path="casos/*" element={<Navigate to="/analise" replace />} />
             <Route path="*" element={<div className="py-20 text-center text-muted">Página não encontrada.</div>} />

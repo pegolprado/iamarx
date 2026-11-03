@@ -190,6 +190,20 @@ async function* rowsLines(file: Blob, o: ReadOptions, info: TableInfo, fixed: bo
 }
 
 async function* rowsXlsx(file: Blob, o: ReadOptions, info: TableInfo): AsyncGenerator<RawRow> {
+  // leitor próprio (tolera planilhas de sistemas: texto inline, células sem referência, dimensão errada)
+  let raw: ReturnType<typeof import('./xlsxRaw').readXlsx> | null = null
+  try {
+    const { readXlsx } = await import('./xlsxRaw')
+    raw = readXlsx(new Uint8Array(await file.arrayBuffer()), o.sheet)
+  } catch {
+    raw = null
+  }
+  if (raw) {
+    info.sheets = raw.sheets
+    info.sheet = raw.sheet
+    for (const [row, cells] of raw.rows()) yield { row, cells }
+    return
+  }
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(await file.arrayBuffer())

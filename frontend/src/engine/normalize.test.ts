@@ -125,3 +125,10 @@ describe('exportações de sistemas de interceptação (Vigia)', () => {
     expect(N.classifyEvent('Redirecionamento', null)[0]).toBe('desvio')
   })
 })
+
+describe('relatório de localização (Claro)', () => {
+  it('data e hora separadas por traço longo', () => {
+    expect(N.parseLocalDatetime(null, null, '03/11/2026–17:09:44')[0]).toMatchObject({ y: 2026, mo: 11, d: 3, h: 17, mi: 9, s: 44 })
+    expect(N.parseLocalDatetime('03/11/2026–17:09:44', null, null)[0]).toMatchObject({ d: 3, h: 17 })
+  })
+})
