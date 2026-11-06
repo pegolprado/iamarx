@@ -112,7 +112,7 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
         ].map(([l, v]) => (
           <div key={l as string} data-stat={l} className="card px-4 py-3 text-center">
             <div className="text-xs text-muted">{l}</div>
-            <div className="font-mono text-2xl text-white tabular-nums">{fmtInt(v as number)}</div>
+            <div className="text-[20px] font-semibold text-white tabular-nums">{fmtInt(v as number)}</div>
           </div>
         ))}
       </div>

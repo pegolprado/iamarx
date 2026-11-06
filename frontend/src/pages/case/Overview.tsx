@@ -38,7 +38,7 @@ export default function Overview() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white md:text-3xl">{st.meta.title}</h1>
+          <h1 className="text-[22px] leading-tight font-semibold text-white">{st.meta.title}</h1>
           <p className="mt-2 text-sm text-muted">
             {st.meta.reference && <>Referência {st.meta.reference} · </>}
             {st.meta.unit && <>{st.meta.unit} · </>}
@@ -57,27 +57,46 @@ export default function Overview() {
       </div>
       <Notice tone="teal" title="Privacidade">
         <span className="inline-flex items-center gap-1.5">
-          <Lock className="h-3.5 w-3.5" /> Esta análise existe apenas na memória desta aba. Os arquivos não foram enviados a nenhum servidor. Sair, fechar a aba, recarregar a página ou ficar inativo por muito tempo apaga tudo — exporte em Excel ou PDF o que precisar guardar.
+          <Lock className="h-3.5 w-3.5" /> Esta análise existe apenas na memória desta aba. Os arquivos não foram enviados a nenhum servidor. Sair, fechar a aba, recarregar a
+          página ou ficar inativo por muito tempo apaga tudo — exporte em Excel ou PDF o que precisar guardar.
         </span>
       </Notice>
-      {!st.meta.period_start && <Notice tone="amber">Defina o período autorizado (em “Identificação”) para que o sistema sinalize registros fora do escopo antes de carregar os arquivos.</Notice>}
+      {!st.meta.period_start && (
+        <Notice tone="amber">Defina o período autorizado (em “Identificação”) para que o sistema sinalize registros fora do escopo antes de carregar os arquivos.</Notice>
+      )}
       <div className="card p-5">
         <div className="label mb-3">Fluxo de trabalho</div>
         <ol className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {steps.map((x, i) => (
             <li key={x.label}>
               <Link to={x.to} className={`block rounded-lg border p-3 text-sm ${x.done ? 'border-ok/40 bg-ok/5 text-ok' : 'border-line text-muted hover:border-accent/50'}`}>
-                <span className="font-mono text-xs">{i + 1}.</span> {x.label}
+                <span className="text-[12px] text-faint tabular-nums">{i + 1}.</span> {x.label}
               </Link>
             </li>
           ))}
         </ol>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Registros considerados" value={fmtInt(t?.events)} hint={t ? `${fmtInt(s.data!.excluded.duplicates)} duplicados e ${fmtInt(s.data!.excluded.out_of_scope)} fora do período excluídos` : undefined} />
-        <Stat label="Chamadas / SMS / dados" value={t ? `${fmtInt(t.calls)} / ${fmtInt(t.sms)} / ${fmtInt(t.data_sessions)}` : '—'} hint={t ? `duração total ${fmtDuration(t.call_seconds)}${t.whatsapp ? ` · ${fmtInt(t.whatsapp)} registros de WhatsApp` : ''}` : undefined} />
-        <Stat label="Contatos distintos" value={fmtInt(t?.distinct_contacts)} hint={t ? `${fmtInt(t.distinct_cells)} células · ${fmtInt(t.distinct_imeis)} IMEIs · ${fmtInt(t.distinct_ips)} IPs` : undefined} />
-        <Stat label="Primeiro / último registro" value={<span className="text-base">{t?.first_event ? `${fmtDate(t.first_event)} → ${fmtDate(t.last_event)}` : '—'}</span>} hint={t ? `${fmtInt(t.active_days)} dias com atividade` : undefined} />
+        <Stat
+          label="Registros considerados"
+          value={fmtInt(t?.events)}
+          hint={t ? `${fmtInt(s.data!.excluded.duplicates)} duplicados e ${fmtInt(s.data!.excluded.out_of_scope)} fora do período excluídos` : undefined}
+        />
+        <Stat
+          label="Chamadas / SMS / dados"
+          value={t ? `${fmtInt(t.calls)} / ${fmtInt(t.sms)} / ${fmtInt(t.data_sessions)}` : '—'}
+          hint={t ? `duração total ${fmtDuration(t.call_seconds)}${t.whatsapp ? ` · ${fmtInt(t.whatsapp)} registros de WhatsApp` : ''}` : undefined}
+        />
+        <Stat
+          label="Contatos distintos"
+          value={fmtInt(t?.distinct_contacts)}
+          hint={t ? `${fmtInt(t.distinct_cells)} células · ${fmtInt(t.distinct_imeis)} IMEIs · ${fmtInt(t.distinct_ips)} IPs` : undefined}
+        />
+        <Stat
+          label="Primeiro / último registro"
+          value={<span className="text-base">{t?.first_event ? `${fmtDate(t.first_event)} → ${fmtDate(t.last_event)}` : '—'}</span>}
+          hint={t ? `${fmtInt(t.active_days)} dias com atividade` : undefined}
+        />
       </div>
       {s.data && s.data.by_day.length > 0 && (
         <BarsChart

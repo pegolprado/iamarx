@@ -4,9 +4,9 @@ import { type ReactNode, useRef, useState } from 'react'
 
 export function ToolTitle({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-3">
-      <div className="grid h-11 w-11 place-items-center rounded-xl border border-teal/40 bg-teal/10 text-teal [&>svg]:h-5 [&>svg]:w-5">{icon}</div>
-      <h1 className="text-2xl font-bold text-white sm:text-3xl">{title}</h1>
+    <div className="mb-5 flex flex-wrap items-center gap-3 border-b border-line pb-4">
+      <div className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel-2 text-teal [&>svg]:h-[18px] [&>svg]:w-[18px]">{icon}</div>
+      <h1 className="text-[22px] leading-tight font-semibold text-white">{title}</h1>
       <div className="ml-auto flex flex-wrap gap-2">{children}</div>
     </div>
   )
@@ -15,8 +15,8 @@ export function ToolTitle({ icon, title, children }: { icon: ReactNode; title: s
 export function Panel({ icon, title, tone = 'text-accent', note, children }: { icon: ReactNode; title: string; tone?: string; note?: string; children: ReactNode }) {
   return (
     <section className="card mb-3 p-4">
-      <h2 className="mb-3 flex items-center gap-2 border-b border-line pb-2 text-base font-semibold text-white">
-        <span className={clsx('grid h-7 w-7 place-items-center rounded-lg bg-white/5 [&>svg]:h-4 [&>svg]:w-4', tone)}>{icon}</span>
+      <h2 className="mb-3 flex items-center gap-2 border-b border-line pb-2.5 text-[14px] font-semibold text-white">
+        <span className={clsx('grid h-6 w-6 place-items-center rounded-md bg-panel-2 [&>svg]:h-3.5 [&>svg]:w-3.5', tone)}>{icon}</span>
         {title}
         {note && <span className="text-xs font-normal text-faint">({note})</span>}
       </h2>
@@ -38,7 +38,7 @@ export function Extracts({ items }: { items: [string, ReactNode][] }) {
     <Panel icon={<Search />} title="O que é extraído">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {items.map(([label, icon]) => (
-          <div key={label} className="flex flex-col items-center gap-2 rounded-xl border border-line bg-ink-2 px-3 py-3 text-center text-xs font-semibold text-white">
+          <div key={label} className="flex flex-col items-center gap-2 rounded-lg border border-line bg-panel-2/60 px-3 py-3 text-center text-[12px] font-medium text-text">
             {label}
             <span className="text-accent [&>svg]:h-5 [&>svg]:w-5">{icon}</span>
           </div>
@@ -114,12 +114,12 @@ export function Dropzone({
           add(e.dataTransfer.files)
         }}
         className={clsx(
-          'flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors',
+          'flex w-full flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-9 text-center transition-colors duration-150',
           drag ? 'border-accent bg-accent/5' : 'border-line-2 hover:border-accent/60',
         )}
       >
-        <CloudUpload className="h-10 w-10 text-accent" />
-        <span className="font-semibold text-white">Arraste os arquivos aqui ou clique para selecionar</span>
+        <CloudUpload className="h-7 w-7 text-accent" />
+        <span className="text-[13.5px] font-medium text-white">Arraste os arquivos aqui ou clique para selecionar</span>
         <span className="text-xs text-faint">
           Até {max} arquivo{max > 1 ? 's' : ''} · {accept.replace(/\./g, '').toUpperCase().replace(/,/g, ', ')}
         </span>
@@ -148,11 +148,11 @@ export function Dropzone({
 
 export function Indicator({ label, value, icon }: { label: string; value: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex min-w-[96px] flex-col items-center gap-0.5 rounded-xl border border-line bg-ink-2 px-3 py-2 text-center">
+    <div className="flex min-w-[96px] flex-col items-center gap-0.5 rounded-lg border border-line bg-panel-2/60 px-3 py-2 text-center">
       <span className="flex items-center gap-1 text-[11px] text-muted [&>svg]:h-3.5 [&>svg]:w-3.5">
         {icon} {label}
       </span>
-      <span className="font-mono text-lg font-bold text-white tabular-nums">{value}</span>
+      <span className="text-[18px] font-semibold text-white tabular-nums">{value}</span>
     </div>
   )
 }

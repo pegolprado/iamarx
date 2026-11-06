@@ -1,6 +1,7 @@
 import { Download, Lock, MapPinned } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { ErbMap } from '../components/ErbMap'
+import { BrandLockup } from '../components/brand'
 import { Notice } from '../components/ui'
 import { fmtDateTime, fmtInt, fmtNumberPlain } from '../lib/format'
 import { decryptMap, type SharedMap, type SitePoint, toKml, WrongPassword } from '../lib/shareMap'
@@ -42,14 +43,9 @@ export default function SharedMapPage() {
   }
   return (
     <div className="min-h-screen px-4 py-6 sm:px-8">
-      <header className="mx-auto mb-6 flex max-w-7xl items-center gap-3">
-        <img src="/icon-192.png" alt="" className="h-10 w-10 rounded-xl" />
-        <div>
-          <div className="text-lg leading-tight font-bold text-white">
-            MAR<span className="text-gold">X</span> <span className="text-sm font-normal text-muted">· mapa compartilhado</span>
-          </div>
-          <div className="font-mono text-[10px] tracking-[0.25em] text-gold">ANÁLISE • CONEXÕES • INTELIGÊNCIA</div>
-        </div>
+      <header className="mx-auto mb-6 flex max-w-7xl items-center gap-3 border-b border-line pb-4">
+        <BrandLockup />
+        <span className="ml-1 border-l border-line pl-3 text-[13px] text-muted">Mapa compartilhado</span>
       </header>
       <main className="mx-auto max-w-7xl">
         {!frag ? (
@@ -82,7 +78,7 @@ export default function SharedMapPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+                <h1 className="flex items-center gap-2 text-[20px] font-semibold text-white">
                   <MapPinned className="h-6 w-6 text-accent" /> {map.title}
                 </h1>
                 <p className="mt-1 text-sm text-muted">

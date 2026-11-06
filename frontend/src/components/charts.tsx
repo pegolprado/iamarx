@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-/** Paleta categórica validada (tema escuro, superfície #161b2e): ordem fixa, nunca reciclada. */
-export const SERIES = ['#4c8dff', '#0f9e8e', '#c27f10', '#9a7cf0', '#e05c9e']
-const AXIS = { stroke: '#5d6780', fontSize: 11, tickLine: false, axisLine: false } as const
-const GRID = '#273049'
+/** Paleta categórica validada (tema escuro, superfície #151E2B): ordem fixa, nunca reciclada. */
+export const SERIES = ['#5689D8', '#B5822B', '#0E9BAE', '#D06A72', '#8A7BD0']
+const AXIS = { stroke: '#68778B', fontSize: 11, tickLine: false, axisLine: false } as const
+const GRID = 'rgba(38, 52, 71, 0.7)'
 
 function Tip({ active, payload, label, labelFmt }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-line-2 bg-ink px-3 py-2 text-xs shadow-xl">
-      <div className="mb-1 font-mono text-muted">{labelFmt ? labelFmt(label) : label}</div>
+    <div className="rounded-lg border border-line-2 bg-panel-2 px-3 py-2 text-[12px] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)]">
+      <div className="mb-1 text-muted tabular-nums">{labelFmt ? labelFmt(label) : label}</div>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2 text-text">
           <span className="h-2 w-2 rounded-sm" style={{ background: p.color }} />
@@ -45,7 +45,7 @@ export function BarsChart({
   return (
     <figure className="card p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        {title && <figcaption className="font-mono text-xs font-bold tracking-wider text-muted uppercase">{title}</figcaption>}
+        {title && <figcaption className="text-[13px] font-semibold text-text">{title}</figcaption>}
         <button className="text-xs text-faint hover:text-text" onClick={() => setTable(!table)}>
           {table ? 'ver gráfico' : 'ver tabela'}
         </button>

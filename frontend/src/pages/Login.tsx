@@ -85,7 +85,7 @@ export default function Login() {
   return (
     <AuthCard
       title={mfa ? 'VERIFICAÇÃO EM DUAS ETAPAS' : 'ACESSO AO SISTEMA'}
-      subtitle={mfa ? 'Digite o código do seu aplicativo autenticador para concluir o acesso.' : 'Autenticação necessária para acessar a plataforma de inteligência.'}
+      subtitle={mfa ? 'Digite o código do seu aplicativo autenticador para concluir o acesso.' : 'Autenticação necessária para acessar a plataforma de análises.'}
       icon={mfa ? <ShieldCheck className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
     >
       <form onSubmit={submit} className="space-y-3 sm:space-y-4 [@media(max-height:820px)]:space-y-3" aria-busy={busy}>

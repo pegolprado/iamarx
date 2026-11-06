@@ -137,14 +137,21 @@ export default function ImportWizard() {
             <button
               disabled={i > step && !(i <= 4 && analysis)}
               onClick={() => i < 5 && setStep(i)}
-              className={clsx('w-full rounded-lg border px-2 py-2 text-left text-xs', i === step ? 'border-accent bg-accent/15 text-white' : i < step ? 'border-ok/40 text-ok' : 'border-line text-faint')}
+              className={clsx(
+                'w-full rounded-lg border px-2 py-2 text-left text-xs',
+                i === step ? 'border-accent bg-accent/15 text-white' : i < step ? 'border-ok/40 text-ok' : 'border-line text-faint',
+              )}
             >
               <span className="font-mono">{i + 1}.</span> {s}
             </button>
           </li>
         ))}
       </ol>
-      {err ? <div className="mb-4"><ErrorBox error={err} /></div> : null}
+      {err ? (
+        <div className="mb-4">
+          <ErrorBox error={err} />
+        </div>
+      ) : null}
       {analyzing && <Loading label="Analisando estrutura do arquivo…" />}
 
       {step === 0 && analysis && (
@@ -200,14 +207,16 @@ export default function ImportWizard() {
             <div className="label">Identificação da operadora</div>
             {det?.operator ? (
               <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-white">{det.operator}</span>
+                <span className="text-[20px] font-semibold text-white">{det.operator}</span>
                 <Badge tone={det.confidence >= 0.6 ? 'green' : 'amber'}>confiança {Math.round(det.confidence * 100)}%</Badge>
               </div>
             ) : (
               <div className="text-muted">Sem indícios suficientes.</div>
             )}
             <ul className="list-inside list-disc text-xs text-faint">
-              {det?.evidence?.map((e: string) => <li key={e}>{e}</li>)}
+              {det?.evidence?.map((e: string) => (
+                <li key={e}>{e}</li>
+              ))}
             </ul>
             <Field label="Operadora (confirme ou corrija)">
               <select className="w-full" value={opts.operator ?? ''} onChange={(e) => setO('operator', e.target.value)}>
@@ -249,7 +258,14 @@ export default function ImportWizard() {
               </select>
             </Field>
             <Field label="Linha do cabeçalho" hint="0 = sem cabeçalho">
-              <input type="number" min={0} className="w-full" value={read.header_row === undefined ? '' : read.header_row + 1} placeholder={String(analysis.table.header_row + 1)} onChange={(e) => setRead({ ...read, header_row: e.target.value === '' ? undefined : +e.target.value - 1 })} />
+              <input
+                type="number"
+                min={0}
+                className="w-full"
+                value={read.header_row === undefined ? '' : read.header_row + 1}
+                placeholder={String(analysis.table.header_row + 1)}
+                onChange={(e) => setRead({ ...read, header_row: e.target.value === '' ? undefined : +e.target.value - 1 })}
+              />
             </Field>
             {analysis.table.sheets?.length > 1 && (
               <Field label="Planilha">
@@ -262,7 +278,19 @@ export default function ImportWizard() {
             )}
             {(analysis.table.fmt === 'fixed' || read.fixed_widths) && (
               <Field label="Início das colunas (largura fixa)" hint="posições separadas por vírgula, a partir de 0">
-                <input className="w-full font-mono" defaultValue={(analysis.table.fixed_widths ?? []).join(',')} onBlur={(e) => setRead({ ...read, fixed_widths: e.target.value.split(',').map((x) => +x.trim()).filter((x) => !isNaN(x)) })} />
+                <input
+                  className="w-full font-mono"
+                  defaultValue={(analysis.table.fixed_widths ?? []).join(',')}
+                  onBlur={(e) =>
+                    setRead({
+                      ...read,
+                      fixed_widths: e.target.value
+                        .split(',')
+                        .map((x) => +x.trim())
+                        .filter((x) => !isNaN(x)),
+                    })
+                  }
+                />
               </Field>
             )}
             {analysis.table.fmt === 'pdf' && (
@@ -283,7 +311,8 @@ export default function ImportWizard() {
       {step === 2 && analysis && (
         <div className="space-y-4">
           <Notice>
-            Associe as colunas recebidas aos campos padronizados. Sugestões vêm de sinônimos de cabeçalho e de mapeamentos salvos — confira. Identificadores tecnicamente diferentes (CI, ECI, NCI, CGI, LAC, TAC) nunca são equiparados.
+            Associe as colunas recebidas aos campos padronizados. Sugestões vêm de sinônimos de cabeçalho e de mapeamentos salvos — confira. Identificadores tecnicamente diferentes
+            (CI, ECI, NCI, CGI, LAC, TAC) nunca são equiparados.
           </Notice>
           <div className="grid gap-4 xl:grid-cols-2">
             {groups.map(([g, keys]) => (
@@ -303,7 +332,15 @@ export default function ImportWizard() {
                             </option>
                           ))}
                         </select>
-                        <span className="truncate font-mono text-xs text-faint">{mapping[k] ? sample.slice(0, 3).map((r) => r[mapping[k]]).filter(Boolean).join(' · ') : ''}</span>
+                        <span className="truncate font-mono text-xs text-faint">
+                          {mapping[k]
+                            ? sample
+                                .slice(0, 3)
+                                .map((r) => r[mapping[k]])
+                                .filter(Boolean)
+                                .join(' · ')
+                            : ''}
+                        </span>
                       </div>
                     ))}
                 </div>
@@ -311,7 +348,10 @@ export default function ImportWizard() {
             ))}
           </div>
           <div className="card p-4">
-            <Field label="Reaproveitar este mapeamento nesta sessão (opcional)" hint="Aplicado automaticamente a outros arquivos com os mesmos cabeçalhos enquanto a aba estiver aberta; nada é gravado.">
+            <Field
+              label="Reaproveitar este mapeamento nesta sessão (opcional)"
+              hint="Aplicado automaticamente a outros arquivos com os mesmos cabeçalhos enquanto a aba estiver aberta; nada é gravado."
+            >
               <input className="w-full" placeholder="ex.: TIM — extrato de chamadas (modelo 2026)" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
             </Field>
           </div>
@@ -327,8 +367,21 @@ export default function ImportWizard() {
                 {(['datetime', 'date', 'time'] as const)
                   .filter((f) => mapping[f])
                   .map((f) => (
-                    <Field key={f} label={`Formato de ${f === 'datetime' ? 'data e hora' : f === 'date' ? 'data' : 'horário'}`} hint={analysis.formats[f] ? `detectado em ${Math.round(analysis.formats[f].rate * 100)}% da amostra${analysis.formats[f].ambiguous ? ' — AMBÍGUO (dia/mês): confirme' : ''}` : undefined}>
-                      <input className="w-full font-mono" value={opts[`${f}_format`] ?? ''} placeholder="automático" onChange={(e) => setO(`${f}_format`, e.target.value || undefined)} />
+                    <Field
+                      key={f}
+                      label={`Formato de ${f === 'datetime' ? 'data e hora' : f === 'date' ? 'data' : 'horário'}`}
+                      hint={
+                        analysis.formats[f]
+                          ? `detectado em ${Math.round(analysis.formats[f].rate * 100)}% da amostra${analysis.formats[f].ambiguous ? ' — AMBÍGUO (dia/mês): confirme' : ''}`
+                          : undefined
+                      }
+                    >
+                      <input
+                        className="w-full font-mono"
+                        value={opts[`${f}_format`] ?? ''}
+                        placeholder="automático"
+                        onChange={(e) => setO(`${f}_format`, e.target.value || undefined)}
+                      />
                     </Field>
                   ))}
                 <Field label="Fuso horário dos registros">
@@ -411,7 +464,9 @@ export default function ImportWizard() {
                     </select>
                   </Field>
                 </div>
-                <p className="text-xs text-faint">Preencha MCC/MNC/tecnologia somente quando o documento os declarar (ex.: no cabeçalho). Valores declarados ficam sinalizados em cada registro.</p>
+                <p className="text-xs text-faint">
+                  Preencha MCC/MNC/tecnologia somente quando o documento os declarar (ex.: no cabeçalho). Valores declarados ficam sinalizados em cada registro.
+                </p>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={!!opts.hex_ids} onChange={(e) => setO('hex_ids', e.target.checked)} /> Identificadores (LAC/TAC/CI/ECI) em hexadecimal
                 </label>
@@ -466,7 +521,7 @@ export default function ImportWizard() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="card p-4">
                   <div className="label">Linhas verificadas na prévia</div>
-                  <div className="text-2xl font-bold">{fmtInt(preview.checked)}</div>
+                  <div className="text-[20px] font-semibold tabular-nums">{fmtInt(preview.checked)}</div>
                 </div>
                 <div className="card p-4 md:col-span-2">
                   <div className="label">Ocorrências de validação</div>
@@ -483,7 +538,10 @@ export default function ImportWizard() {
                   )}
                   {preview.event_types && (
                     <div className="mt-2 text-xs text-muted">
-                      Tipos: {Object.entries(preview.event_types).map(([k, v]) => `${EVENT_TYPE_LABEL[k] ?? k}: ${v}`).join(' · ')}
+                      Tipos:{' '}
+                      {Object.entries(preview.event_types)
+                        .map(([k, v]) => `${EVENT_TYPE_LABEL[k] ?? k}: ${v}`)
+                        .join(' · ')}
                     </div>
                   )}
                 </div>
@@ -528,7 +586,10 @@ export default function ImportWizard() {
         <div className="card space-y-4 p-6">
           <div className="flex items-center justify-between">
             <div className="font-mono text-sm">
-              Importação #{job.id} · <b>{({ done: 'concluída', running: 'processando', failed: 'falhou', cancelled: 'cancelada', draft: 'rascunho' } as Record<string, string>)[job.status] ?? job.status}</b>
+              Importação #{job.id} ·{' '}
+              <b>
+                {({ done: 'concluída', running: 'processando', failed: 'falhou', cancelled: 'cancelada', draft: 'rascunho' } as Record<string, string>)[job.status] ?? job.status}
+              </b>
             </div>
             {job.status === 'running' && (
               <button className="btn-danger !py-1 text-xs" onClick={() => cancelImport(job.id)}>

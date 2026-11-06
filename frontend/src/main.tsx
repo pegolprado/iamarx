@@ -17,7 +17,20 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <App />
-        <Toaster theme="dark" richColors position="top-right" />
+        <Toaster
+          theme="dark"
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              toast: '!bg-panel-2 !border-line-2 !text-text !rounded-[10px] !text-[13px]',
+              description: '!text-muted',
+              success: '[&_[data-icon]]:!text-ok',
+              error: '[&_[data-icon]]:!text-danger',
+              warning: '[&_[data-icon]]:!text-amber',
+              info: '[&_[data-icon]]:!text-accent',
+            },
+          }}
+        />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

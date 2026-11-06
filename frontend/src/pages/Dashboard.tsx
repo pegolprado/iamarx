@@ -1,11 +1,11 @@
-import { ArrowRight, FlaskConical, Lock } from 'lucide-react'
+import { FlaskConical, Lock } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../app/auth'
 import { apath } from '../app/layout'
 import { MODULES } from '../app/modules'
-import { Progress } from '../components/ui'
+import { ModuleCard, Progress } from '../components/ui'
 import { loadDemo } from '../engine/demo'
 import { getState, setState, useSession } from '../engine/session'
 import { fmtInt } from '../lib/format'
@@ -46,49 +46,63 @@ export default function Dashboard() {
       setDemo(null)
     }
   }
+  const hasData = s.files.length > 0 || s.targets.length > 0
   return (
     <div>
-      <div className="mt-2 mb-10 text-center">
-        <div className="font-mono text-xs tracking-[0.35em] text-faint">WORKSPACE INVESTIGATIVO</div>
-        <div className="mt-2 font-mono text-[11px] tracking-[0.3em] text-gold">ANÁLISE • CONEXÕES • INTELIGÊNCIA</div>
-        <p className="mt-3 text-sm text-muted">Olá, {me?.name}. Carregue os arquivos, consulte, exporte em Excel ou PDF — ao sair, tudo é apagado.</p>
-        <p className="mx-auto mt-2 flex max-w-xl items-center justify-center gap-1.5 text-xs text-faint">
-          <Lock className="h-3 w-3 text-teal" /> Os arquivos não saem do seu computador: leitura, cálculos e exportação acontecem nesta aba do navegador.
-        </p>
-      </div>
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {MODULES.map((m) => {
-          const to = m.inCase ? apath(m.path) : m.path
-          return (
-            <Link key={m.key} to={to} className="group card card-hover flex flex-col items-center border-accent/50 px-6 py-8 text-center">
-              <div className="mb-5 grid h-14 w-14 place-items-center rounded-xl border border-line-2 bg-panel-2 text-accent transition-colors group-hover:border-accent/60 [&>svg]:h-6 [&>svg]:w-6">
-                {m.icon}
-              </div>
-              <h2 className="text-3xl leading-tight font-bold text-white">{m.title}</h2>
-              <p className="mt-4 text-sm leading-relaxed font-medium text-muted">{m.description}</p>
-              <p className="mt-3 text-xs text-faint">{meta[m.key]}</p>
-              <span className="mt-5 inline-flex items-center gap-2 font-mono text-sm text-faint group-hover:text-accent">
-                Acessar <ArrowRight className="h-4 w-4" />
-              </span>
-            </Link>
-          )
-        })}
-      </div>
-      {s.files.length === 0 && (
-        <div className="card mt-10 flex flex-col items-center gap-3 p-6 text-center">
-          <FlaskConical className="h-6 w-6 text-amber" />
-          <div className="font-mono font-bold text-white">Quer conhecer a plataforma antes de usar dados reais?</div>
-          <p className="max-w-2xl text-sm text-muted">
-            Gere uma análise de DEMONSTRAÇÃO com três bilhetagens sintéticas em layouts diferentes, cadastro de ERB com inconsistências propositais, alertas e duplicidades. Tudo é
-            gerado no seu navegador e apagado ao sair.
+      <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
+        <div className="min-w-0">
+          <div className="eyebrow">MARX Intelligence Pro</div>
+          <h1 className="mt-1 text-[22px] leading-tight font-semibold text-white">Workspace investigativo</h1>
+          <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-muted">
+            Olá, {me?.name}. Carregue os arquivos, consulte e exporte em Excel ou PDF — ao sair, tudo é apagado.
           </p>
-          {demo ? (
-            <div className="w-full max-w-md">
-              <Progress value={demo.p} />
-              <div className="mt-1 text-xs text-faint">{demo.label}</div>
-            </div>
-          ) : (
-            <button className="btn-ghost" onClick={runDemo}>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="chip border-line bg-panel text-muted">
+            <span className={hasData ? 'h-1.5 w-1.5 rounded-full bg-ok' : 'h-1.5 w-1.5 rounded-full bg-faint'} />
+            {hasData ? `${fmtInt(s.files.length)} arquivo${s.files.length === 1 ? '' : 's'} nesta aba` : 'Nenhum dado carregado'}
+          </span>
+          {pendingAlerts > 0 && (
+            <span className="chip border-amber/30 bg-amber/10 text-amber">
+              {fmtInt(pendingAlerts)} alerta{pendingAlerts === 1 ? '' : 's'} para revisar
+            </span>
+          )}
+          <span className="chip border-line bg-panel text-muted" title="Leitura, cálculos e exportação acontecem nesta aba do navegador.">
+            <Lock className="h-3 w-3 text-teal" /> Processamento local
+          </span>
+        </div>
+      </header>
+
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="section-title">Módulos</h2>
+        <span className="text-[12px] text-faint">{MODULES.length} módulos</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {MODULES.map((m) => (
+          <ModuleCard key={m.key} icon={m.icon} tone={m.tone} title={m.title} description={m.description} to={m.inCase ? apath(m.path) : m.path} meta={meta[m.key]} />
+        ))}
+      </div>
+
+      {s.files.length === 0 && (
+        <div className="card mt-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-panel-2 text-amber">
+            <FlaskConical className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-semibold text-white">Quer conhecer a plataforma antes de usar dados reais?</div>
+            <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted">
+              Gere uma análise de DEMONSTRAÇÃO com três bilhetagens sintéticas em layouts diferentes, cadastro de ERB com inconsistências propositais, alertas e duplicidades. Tudo
+              é gerado no seu navegador e apagado ao sair.
+            </p>
+            {demo && (
+              <div className="mt-3 max-w-md">
+                <Progress value={demo.p} />
+                <div className="mt-1 text-[12px] text-faint">{demo.label}</div>
+              </div>
+            )}
+          </div>
+          {!demo && (
+            <button className="btn-ghost shrink-0" onClick={runDemo}>
               Gerar análise de demonstração
             </button>
           )}

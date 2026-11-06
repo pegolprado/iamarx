@@ -9,7 +9,7 @@ async function login(page: Page) {
   await page.fill('input[type=email]', EMAIL)
   await page.fill('input[type=password]', PASSWORD)
   await page.click('form button.btn-primary')
-  await expect(page.getByText('WORKSPACE INVESTIGATIVO')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Workspace investigativo' })).toBeVisible()
 }
 
 // telas agrupadas: [grupo na barra principal, tela na sub-barra]
@@ -137,7 +137,7 @@ test('administrador cadastra usuário, que ativa a conta pelo link e entra', asy
   await other.fill('input[type=email]', novo)
   await other.fill('input[type=password]', 'SenhaDaAna2026')
   await other.click('form button.btn-primary')
-  await expect(other.getByText('WORKSPACE INVESTIGATIVO')).toBeVisible()
+  await expect(other.getByRole('heading', { name: 'Workspace investigativo' })).toBeVisible()
   await expect(other.getByText('Usuários', { exact: true })).toHaveCount(0)
 })
 

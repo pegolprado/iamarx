@@ -201,7 +201,7 @@ function LocationView({
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-danger/15 text-danger">
               <MapPin className="h-5 w-5" />
             </div>
-            <div className="text-xl font-bold text-white sm:text-2xl">
+            <div className="text-[20px] font-semibold text-white">
               Número: <span className="font-mono text-accent">{fmtNumber(number)}</span>
             </div>
             {info?.operator && <Badge tone="red">{String(info.operator).toUpperCase()}</Badge>}
@@ -365,7 +365,7 @@ function LocationView({
                 </button>
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-line bg-ink-2 px-3 py-1.5" aria-label="Reprodução">
-                <span className="text-[10px] font-bold tracking-wider text-muted uppercase">Playback</span>
+                <span className="text-[11.5px] font-medium text-muted">Playback</span>
                 <button
                   aria-label={playing ? 'Pausar' : 'Reproduzir'}
                   onClick={() => (playIdx >= located.length - 1 ? (setPlayIdx(0), setPlaying(true)) : setPlaying(!playing))}
@@ -503,7 +503,7 @@ function PlaceCard({ title, icon, tone, c }: { title: string; icon: React.ReactN
               ['Azimute', c.az !== null ? `${c.az}°` : '—'],
             ].map(([k, v]) => (
               <div key={k as string}>
-                <dt className="text-[10px] font-bold tracking-wider text-faint uppercase">{k}</dt>
+                <dt className="text-[11.5px] font-medium text-faint">{k}</dt>
                 <dd className="font-mono text-sm break-words text-white">{v}</dd>
               </div>
             ))}
@@ -542,14 +542,14 @@ function Patterns({ pat }: { pat: ReturnType<typeof locationPatterns> }) {
           {pat.top.map((c, i) => (
             <li key={c.cell} className="grid gap-1 py-3 sm:grid-cols-2">
               <div>
-                <div className="text-[10px] font-bold tracking-wider text-faint uppercase">ERB {i + 1}</div>
+                <div className="text-[11.5px] font-medium text-faint">ERB {i + 1}</div>
                 <div className="font-mono text-white">{c.cell}</div>
                 <div className="text-xs text-muted">
                   Registros: <span className="font-mono text-text">{fmtInt(c.n)}</span> ({pct(c.pct)}) · azimute {c.az ?? '—'}°
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-bold tracking-wider text-faint uppercase">Localização</div>
+                <div className="text-[11.5px] font-medium text-faint">Localização</div>
                 <div className="text-sm text-text">{[c.address, c.city].filter(Boolean).join(' · ') || '—'}</div>
               </div>
             </li>

@@ -196,7 +196,7 @@ function Contacts({ r }: { r: Result }) {
     <div className="space-y-5">
       <Graph r={r} />
       <div>
-        <h3 className="mb-2 text-xs font-bold tracking-wider text-danger uppercase"># Comunicação direta entre alvos</h3>
+        <h3 className="mb-2 text-[13px] font-semibold text-danger"># Comunicação direta entre alvos</h3>
         {!r.direct.length ? (
           <p className="text-sm text-faint">Nenhuma comunicação direta entre os alvos.</p>
         ) : (
@@ -215,7 +215,7 @@ function Contacts({ r }: { r: Result }) {
         )}
       </div>
       <div>
-        <h3 className="mb-2 text-xs font-bold tracking-wider text-amber uppercase"># Comunicação com interlocutores em comum entre os alvos</h3>
+        <h3 className="mb-2 text-[13px] font-semibold text-amber"># Comunicação com interlocutores em comum entre os alvos</h3>
         {!r.commonSets.length ? (
           <p className="text-sm text-faint">Os alvos não têm interlocutores em comum.</p>
         ) : (
