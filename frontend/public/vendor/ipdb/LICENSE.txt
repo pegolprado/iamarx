@@ -1,0 +1,3 @@
+Provedor (ASN): IPtoASN (https://iptoasn.com), licença PDDL 1.0.
+Cidade/país: IP Geolocation by DB-IP (https://db-ip.com), licença CC BY 4.0.
+Gerado por scripts/build-ipdb.mjs a partir dos pacotes @ip-location-db.

@@ -1,3 +1,4 @@
-public/vendor/
+public/vendor/*
+!public/vendor/ipdb/
 test-results/
 playwright-report/
