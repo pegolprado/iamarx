@@ -4,9 +4,7 @@
  * Guarda SOMENTE a lista de usuários e links de definição de senha. Não existe rota que receba
  * arquivos, consultas ou resultados: tudo isso é processado no navegador de cada usuário.
  */
-import {
-  KEY_RE, newTotpSecret, passwordHash, randomToken, safeEqual, saltFor, type SessionPayload, signSession, totpVerify, verifySession, hmacHex,
-} from './crypto'
+import { KEY_RE, newTotpSecret, passwordHash, randomToken, safeEqual, saltFor, type SessionPayload, signSession, totpVerify, verifySession, hmacHex } from './crypto'
 
 export const APP_VERSION = '2.1.0'
 
@@ -38,9 +36,20 @@ export type Env = {
 }
 
 type User = {
-  id: number; email: string; name: string; pw: string; role: 'admin' | 'user'; is_active: number; can_export: number
-  mfa_secret: string | null; mfa_enabled: number; failed_logins: number; locked_until: number | null
-  must_change_password: number; session_version: number; created_at: number
+  id: number
+  email: string
+  name: string
+  pw: string
+  role: 'admin' | 'user'
+  is_active: number
+  can_export: number
+  mfa_secret: string | null
+  mfa_enabled: number
+  failed_logins: number
+  locked_until: number | null
+  must_change_password: number
+  session_version: number
+  created_at: number
 }
 
 const SESSION_COOKIE = 'marx_session'
@@ -75,7 +84,10 @@ function ensureSchema(db: DB) {
 // ---------------------------------------------------------------- utilidades HTTP
 
 class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message)
   }
 }
@@ -105,7 +117,14 @@ function cookies(req: Request): Record<string, string> {
 }
 
 function cookie(name: string, value: string, opts: { maxAge?: number; httpOnly?: boolean; secure: boolean }) {
-  return [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Strict', opts.httpOnly ? 'HttpOnly' : '', opts.secure ? 'Secure' : '', opts.maxAge !== undefined ? `Max-Age=${opts.maxAge}` : '']
+  return [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'SameSite=Strict',
+    opts.httpOnly ? 'HttpOnly' : '',
+    opts.secure ? 'Secure' : '',
+    opts.maxAge !== undefined ? `Max-Age=${opts.maxAge}` : '',
+  ]
     .filter(Boolean)
     .join('; ')
 }
@@ -204,7 +223,9 @@ async function ipHash(ctx: Ctx) {
 
 async function ipBlocked(ctx: Ctx) {
   const h = await ipHash(ctx)
-  const r = await ctx.env.DB.prepare('SELECT count(*) AS n FROM login_failures WHERE ip_hash = ? AND ts > ?').bind(h, now() - IP_WINDOW_S).first<{ n: number }>()
+  const r = await ctx.env.DB.prepare('SELECT count(*) AS n FROM login_failures WHERE ip_hash = ? AND ts > ?')
+    .bind(h, now() - IP_WINDOW_S)
+    .first<{ n: number }>()
   return (r?.n ?? 0) >= IP_MAX_FAILS
 }
 
@@ -221,13 +242,17 @@ async function registerFailure(ctx: Ctx, u: User | null, bumpSessions = false) {
   if (!u) return
   const fails = u.failed_logins + 1
   if (fails >= ctx.c.maxAttempts)
-    await ctx.env.DB.prepare(`UPDATE users SET failed_logins = 0, locked_until = ?${bumpSessions ? ', session_version = session_version + 1' : ''} WHERE id = ?`).bind(now() + ctx.c.lockMinutes * 60, u.id).run()
+    await ctx.env.DB.prepare(`UPDATE users SET failed_logins = 0, locked_until = ?${bumpSessions ? ', session_version = session_version + 1' : ''} WHERE id = ?`)
+      .bind(now() + ctx.c.lockMinutes * 60, u.id)
+      .run()
   else await ctx.env.DB.prepare('UPDATE users SET failed_logins = ? WHERE id = ?').bind(fails, u.id).run()
 }
 
 async function createResetLink(ctx: Ctx, userId: number, hours: number) {
   const raw = randomToken(32)
-  await ctx.env.DB.prepare('INSERT INTO reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)').bind(await hmacHex(ctx.c.secret, `reset:${raw}`), userId, now() + hours * 3600).run()
+  await ctx.env.DB.prepare('INSERT INTO reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
+    .bind(await hmacHex(ctx.c.secret, `reset:${raw}`), userId, now() + hours * 3600)
+    .run()
   const base = (ctx.env.PUBLIC_URL || new URL(ctx.req.url).origin).replace(/\/$/, '')
   return `${base}/redefinir-senha?token=${raw}`
 }
@@ -269,6 +294,8 @@ route('POST', '/api/auth/login', async (ctx) => {
   const u = await ctx.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(e).first<User>()
   if (u?.locked_until && u.locked_until > now()) throw new HttpError(423, 'Conta bloqueada temporariamente por tentativas inválidas')
   const h = await passwordHash(ctx.c.secret, k)
+  // cadastro feito pela própria pessoa, ainda não liberado (só informa quando a senha confere)
+  if (u && !u.is_active && safeEqual(h, u.pw)) throw new HttpError(403, 'Seu cadastro está aguardando liberação pelo administrador.')
   if (!u || !u.is_active || !safeEqual(h, u.pw)) {
     await registerFailure(ctx, u)
     throw new HttpError(401, 'E-mail ou senha inválidos')
@@ -329,7 +356,10 @@ route('POST', '/api/auth/password/reset', async (ctx) => {
   const { u, th } = await tokenUser(ctx, b.token)
   const h = await passwordHash(ctx.c.secret, key(b.key))
   await ctx.env.DB.batch([
-    ctx.env.DB.prepare('UPDATE users SET pw = ?, must_change_password = 0, session_version = session_version + 1, failed_logins = 0, locked_until = NULL WHERE id = ?').bind(h, u.id),
+    ctx.env.DB.prepare('UPDATE users SET pw = ?, must_change_password = 0, session_version = session_version + 1, failed_logins = 0, locked_until = NULL WHERE id = ?').bind(
+      h,
+      u.id,
+    ),
     ctx.env.DB.prepare('DELETE FROM reset_tokens WHERE token_hash = ? OR expires_at < ?').bind(th, now()),
   ])
   return { ok: true }
@@ -341,7 +371,9 @@ route('POST', '/api/auth/password/change', async (ctx) => {
   if (!safeEqual(await passwordHash(ctx.c.secret, key(b.current)), u.pw)) throw new HttpError(400, 'Senha atual incorreta')
   const nk = key(b.new)
   if (nk === b.current) throw new HttpError(422, 'A nova senha deve ser diferente da atual')
-  await ctx.env.DB.prepare('UPDATE users SET pw = ?, must_change_password = 0, session_version = session_version + 1 WHERE id = ?').bind(await passwordHash(ctx.c.secret, nk), u.id).run()
+  await ctx.env.DB.prepare('UPDATE users SET pw = ?, must_change_password = 0, session_version = session_version + 1 WHERE id = ?')
+    .bind(await passwordHash(ctx.c.secret, nk), u.id)
+    .run()
   await setSession(ctx, { ...u, session_version: u.session_version + 1 }, true)
   return { ok: true }
 })
@@ -390,8 +422,34 @@ route('POST', '/api/setup', async (ctx) => {
     throw new HttpError(403, 'Código de configuração incorreto')
   }
   const e = email(b.email)
-  await ctx.env.DB.prepare('INSERT INTO users (email, name, pw, role, created_at) VALUES (?, ?, ?, ?, ?)').bind(e, str(b.name, 200, 'nome'), await passwordHash(ctx.c.secret, key(b.key)), 'admin', now()).run()
+  await ctx.env.DB.prepare('INSERT INTO users (email, name, pw, role, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(e, str(b.name, 200, 'nome'), await passwordHash(ctx.c.secret, key(b.key)), 'admin', now())
+    .run()
   return { ok: true }
+})
+
+// ---------- cadastro pela própria pessoa (fica inativo até o administrador liberar)
+
+route('POST', '/api/auth/register', async (ctx) => {
+  if (await ipBlocked(ctx)) throw new HttpError(429, 'Muitas tentativas. Aguarde alguns minutos.')
+  if ((await userCount(ctx)) === 0) throw new HttpError(409, 'O sistema ainda não foi configurado. Use o primeiro acesso.')
+  const b = await readJson(ctx.req)
+  const e = email(b.email)
+  const name = str(b.name, 200, 'nome')
+  const k = key(b.key)
+  // limita cadastros pendentes (evita uso abusivo do formulário)
+  const pend = await ctx.env.DB.prepare('SELECT count(*) AS n FROM users WHERE is_active = 0 AND created_at > ?')
+    .bind(now() - 86400)
+    .first<{ n: number }>()
+  if ((pend?.n ?? 0) >= 50) throw new HttpError(429, 'Muitos cadastros aguardando liberação. Tente mais tarde.')
+  await ipFail(ctx) // cada cadastro conta no limite por IP
+  const exists = await ctx.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(e).first()
+  if (!exists)
+    await ctx.env.DB.prepare('INSERT INTO users (email, name, pw, role, is_active, created_at) VALUES (?, ?, ?, ?, 0, ?)')
+      .bind(e, name, await passwordHash(ctx.c.secret, k), 'user', now())
+      .run()
+  // mesma resposta se o e-mail já existir (não revela quem tem conta)
+  return { ok: true, message: 'Cadastro recebido. O acesso será liberado pelo administrador.' }
 })
 
 // ---------- administração de usuários
@@ -451,7 +509,9 @@ route('PATCH', '/api/admin/users/(\\d+)', async (ctx, [id]) => {
   }
   if (!sets.length) return userOut(u)
   if (b.role !== undefined || b.is_active !== undefined || b.can_export !== undefined) sets.push('session_version = session_version + 1')
-  await ctx.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, u.id).run()
+  await ctx.env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
+    .bind(...vals, u.id)
+    .run()
   return userOut((await target(ctx, id))!)
 })
 
@@ -471,13 +531,17 @@ route('POST', '/api/admin/users/(\\d+)/reset-link', async (ctx, [id]) => {
 
 route('POST', '/api/admin/users/(\\d+)/unlock', async (ctx, [id]) => {
   await requireAdmin(ctx)
-  await ctx.env.DB.prepare('UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ?').bind((await target(ctx, id)).id).run()
+  await ctx.env.DB.prepare('UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ?')
+    .bind((await target(ctx, id)).id)
+    .run()
   return { ok: true }
 })
 
 route('POST', '/api/admin/users/(\\d+)/revoke-sessions', async (ctx, [id]) => {
   await requireAdmin(ctx)
-  await ctx.env.DB.prepare('UPDATE users SET session_version = session_version + 1 WHERE id = ?').bind((await target(ctx, id)).id).run()
+  await ctx.env.DB.prepare('UPDATE users SET session_version = session_version + 1 WHERE id = ?')
+    .bind((await target(ctx, id)).id)
+    .run()
   return { ok: true }
 })
 

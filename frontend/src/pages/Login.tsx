@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, User } from 'lucide-react'
+import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, User, UserPlus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -88,7 +88,7 @@ export default function Login() {
       subtitle={mfa ? 'Digite o código do seu aplicativo autenticador para concluir o acesso.' : 'Autenticação necessária para acessar a plataforma de inteligência.'}
       icon={mfa ? <ShieldCheck className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
     >
-      <form onSubmit={submit} className="space-y-4 [@media(max-height:820px)]:space-y-3" aria-busy={busy}>
+      <form onSubmit={submit} className="space-y-3 sm:space-y-4 [@media(max-height:820px)]:space-y-3" aria-busy={busy}>
         {!mfa ? (
           <>
             <AuthField label="E-mail" icon={<Mail />}>
@@ -98,7 +98,7 @@ export default function Login() {
                 autoComplete="username"
                 required
                 autoFocus
-                placeholder="nome@instituicao.gov.br"
+                placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -139,10 +139,93 @@ export default function Login() {
             className="flex items-center gap-1.5 text-[#6f7ea3]"
             title="A senha é transformada no seu navegador (PBKDF2-SHA256, 600 mil iterações) antes de ser enviada: o servidor nunca recebe a senha."
           >
-            <Fingerprint className="h-3.5 w-3.5 text-ok" /> Senha protegida<span className="hidden sm:inline"> no navegador</span>
+            <Fingerprint className="h-3.5 w-3.5 text-ok" />
+            <span>
+              Senha protegida<span className="hidden sm:inline">&nbsp;no navegador</span>
+            </span>
           </span>
         </div>
+        {!mfa && (
+          <div className="border-t border-[rgba(96,140,255,0.14)] pt-3 text-center text-[12.5px] text-[#8d9abb]">
+            Não tem acesso?{' '}
+            <Link to="/cadastro" className="font-semibold text-gold hover:text-[#f7d27a] hover:underline">
+              Solicitar cadastro
+            </Link>
+          </div>
+        )}
       </form>
+    </AuthCard>
+  )
+}
+
+/** Cadastro pela própria pessoa: qualquer e-mail válido; o acesso é liberado pelo administrador. */
+export function Register() {
+  const [f, setF] = useState({ name: '', email: '', p1: '', p2: '' })
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [err, setErr] = useState<unknown>(null)
+  return (
+    <AuthCard title="SOLICITAR CADASTRO" subtitle="Preencha os dados; o acesso é liberado pelo administrador." icon={<UserPlus className="h-4 w-4" />}>
+      {done ? (
+        <div className="space-y-4">
+          <Notice tone="green" title="Cadastro enviado">
+            Assim que o administrador liberar o seu acesso, entre com o e-mail <b>{f.email}</b> e a senha que você criou.
+          </Notice>
+          <Link to="/login" className="btn-primary auth-btn w-full !py-3">
+            Ir para o login
+          </Link>
+        </div>
+      ) : (
+        <form
+          className="space-y-3"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setErr(null)
+            try {
+              if (f.p1 !== f.p2) throw new Error('As senhas não conferem')
+              assertStrong(f.p1)
+              setBusy(true)
+              const key = await deriveKey(f.email, f.p1)
+              await api('/auth/register', { body: { name: f.name, email: f.email, key } })
+              setDone(true)
+            } catch (e) {
+              setErr(e)
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <AuthField label="Nome completo" icon={<User />}>
+            <input className="auth-input" autoComplete="name" required maxLength={200} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          </AuthField>
+          <AuthField label="E-mail" icon={<Mail />}>
+            <input
+              className="auth-input"
+              type="email"
+              autoComplete="username"
+              required
+              placeholder="seu@email.com"
+              value={f.email}
+              onChange={(e) => setF({ ...f, email: e.target.value })}
+            />
+          </AuthField>
+          <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+            <PasswordInput value={f.p1} onChange={(v) => setF({ ...f, p1: v })} autoComplete="new-password" />
+          </AuthField>
+          <AuthField label="Repita a senha" icon={<KeyRound />}>
+            <PasswordInput value={f.p2} onChange={(v) => setF({ ...f, p2: v })} autoComplete="new-password" />
+          </AuthField>
+          {err ? <ErrorBox error={err} /> : null}
+          <button className="btn-primary auth-btn w-full !py-3" disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} {busy ? 'PROTEGENDO A SENHA…' : 'ENVIAR CADASTRO'}
+          </button>
+          <div className="text-center text-[12px]">
+            <Link to="/login" className="text-[#93c5fd] hover:text-white hover:underline">
+              Já tenho acesso — voltar ao login
+            </Link>
+          </div>
+        </form>
+      )}
     </AuthCard>
   )
 }

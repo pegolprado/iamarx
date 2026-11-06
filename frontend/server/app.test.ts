@@ -9,8 +9,8 @@ function memoryD1(): DB & { raw: DatabaseSync } {
   const raw = new DatabaseSync(':memory:')
   const stmt = (sql: string, args: unknown[] = []): Stmt => ({
     bind: (...v: unknown[]) => stmt(sql, v),
-    first: async <T,>() => (raw.prepare(sql).get(...(args as any[])) as T) ?? null,
-    all: async <T,>() => ({ results: raw.prepare(sql).all(...(args as any[])) as T[] }),
+    first: async <T>() => (raw.prepare(sql).get(...(args as any[])) as T) ?? null,
+    all: async <T>() => ({ results: raw.prepare(sql).all(...(args as any[])) as T[] }),
     run: async () => {
       const r = raw.prepare(sql).run(...(args as any[]))
       return { meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } }
@@ -82,7 +82,10 @@ beforeEach(() => {
 describe('servidor de login', () => {
   it('guarda somente usuários e não tem rotas de dados', async () => {
     const c = await setupAdmin()
-    const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all().map((r: any) => r.name)
+    const tables = db.raw
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .all()
+      .map((r: any) => r.name)
     expect(new Set(tables)).toEqual(new Set(['users', 'reset_tokens', 'login_failures']))
     await c.login('admin@marx.local', 'SenhaForte123')
     for (const p of ['/api/cases', '/api/files', '/api/events', '/api/reports', '/api/upload']) expect((await c.req('POST', p, {})).status).toBe(404)
@@ -119,7 +122,10 @@ describe('servidor de login', () => {
     // requisições forjadas por outro site são bloqueadas
     expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'x', origin: 'https://site-malicioso.com' })).status).toBe(403)
     expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'x', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
-    const semCabecalho = await handle(new Request('https://iamarx.com.br/api/auth/logout', { method: 'POST', headers: { cookie: [...c.jar].map(([k, v]) => `${k}=${v}`).join('; ') } }), env)
+    const semCabecalho = await handle(
+      new Request('https://iamarx.com.br/api/auth/logout', { method: 'POST', headers: { cookie: [...c.jar].map(([k, v]) => `${k}=${v}`).join('; ') } }),
+      env,
+    )
     expect(semCabecalho.status).toBe(403)
     // mesmo site, sem depender do cookie anti-CSRF
     expect((await c.req('GET', '/api/auth/me')).status).toBe(200)
@@ -178,6 +184,28 @@ describe('servidor de login', () => {
     expect((await admin.req('PATCH', '/api/admin/users/1', { role: 'user' })).status).toBe(400)
     expect((await admin.req('DELETE', `/api/admin/users/${cr.body.user.id}`)).status).toBe(200)
     expect((await admin.req('GET', '/api/admin/users')).body).toHaveLength(1)
+  })
+
+  it('cadastro pela própria pessoa fica aguardando liberação do administrador', async () => {
+    const pub = await client()
+    expect((await pub.req('POST', '/api/auth/register', { email: 'x@y.com', name: 'X', key: await pub.keyFor('x@y.com', 'SenhaDoBeto1234') })).status).toBe(409) // sem administrador ainda
+    const admin = await setupAdmin()
+    await admin.login('admin@marx.local', 'SenhaForte123')
+    const r = await pub.req('POST', '/api/auth/register', { email: 'Beto@Gmail.com', name: 'Beto', key: await pub.keyFor('beto@gmail.com', 'SenhaDoBeto1234') })
+    expect(r.status).toBe(200)
+    // e-mail já existente: mesma resposta, sem criar outra conta
+    expect((await pub.req('POST', '/api/auth/register', { email: 'admin@marx.local', name: 'Intruso', key: await pub.keyFor('admin@marx.local', 'Outra12345678') })).status).toBe(
+      200,
+    )
+    expect((await pub.login('beto@gmail.com', 'SenhaDoBeto1234')).body.detail ?? '').toMatch(/aguardando liberação/)
+    expect((await pub.login('beto@gmail.com', 'SenhaErrada12345')).status).toBe(401)
+    const users = (await admin.req('GET', '/api/admin/users')).body
+    expect(users).toHaveLength(2)
+    const beto = users.find((u: any) => u.email === 'beto@gmail.com')
+    expect(beto).toMatchObject({ is_active: false, role: 'user' })
+    expect((await admin.req('PATCH', `/api/admin/users/${beto.id}`, { is_active: true })).status).toBe(200)
+    expect((await pub.login('beto@gmail.com', 'SenhaDoBeto1234')).status).toBe(200)
+    expect((await pub.req('POST', '/api/auth/register', { email: 'sem-arroba', name: 'X', key: 'a'.repeat(64) })).status).toBe(422)
   })
 
   it('verificação em duas etapas', async () => {

@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './app/auth'
 import { CaseLayout, Shell } from './app/layout'
 import { Loading } from './components/ui'
-import Login, { FirstSetup, ForgotPassword, ResetPassword } from './pages/Login'
+import Login, { FirstSetup, ForgotPassword, Register, ResetPassword } from './pages/Login'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const SharedMapPage = lazy(() => import('./pages/SharedMap'))
@@ -55,6 +55,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route path="/cadastro" element={<Register />} />
           <Route path="/redefinir-senha" element={<ResetPassword />} />
           <Route path="/primeiro-acesso" element={<FirstSetup />} />
           <Route path="/mapa-compartilhado" element={<SharedMapPage />} />

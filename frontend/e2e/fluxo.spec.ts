@@ -411,7 +411,11 @@ test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato t
   const rows = [
     'Alvo:;5511900000009',
     head,
-    ...Array.from({ length: 30 }, (_, i) => `5511900000009;0${1 + (i % 9)}/11/2026–${String(i % 24).padStart(2, '0')}:10:00;724-05-2862055${i % 3};-23.6479${i % 3};-46.7915${i % 3};${(i % 3) * 120};0;RUA TESTE ${i % 3};;SAO_PAULO;SP;`),
+    ...Array.from(
+      { length: 30 },
+      (_, i) =>
+        `5511900000009;0${1 + (i % 9)}/11/2026–${String(i % 24).padStart(2, '0')}:10:00;724-05-2862055${i % 3};-23.6479${i % 3};-46.7915${i % 3};${(i % 3) * 120};0;RUA TESTE ${i % 3};;SAO_PAULO;SP;`,
+    ),
   ]
   await page.setInputFiles('input[type=file]', { name: 'localizacao.csv', mimeType: 'text/csv', buffer: Buffer.from(rows.join('\r\n'), 'utf-8') })
   await page.click('button:has-text("Processar arquivo")')
@@ -419,4 +423,34 @@ test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato t
   await expect(page.locator('[data-stat="ERBs no mapa"]')).toContainText('3')
   await expect(page.getByText('RUA TESTE', { exact: false }).first()).toBeVisible()
   expect(errors).toEqual([])
+})
+
+test('cadastro pela tela de acesso: aguarda liberação do administrador e depois entra', async ({ page, browser }) => {
+  const novo = `cad.${Date.now()}@gmail.com`
+  const ctx = await browser.newContext()
+  const p = await ctx.newPage()
+  await p.goto('/login')
+  await p.click('text=Solicitar cadastro')
+  await p.fill('input[autocomplete=name]', 'Pessoa Cadastrada')
+  await p.fill('input[type=email]', novo)
+  await p.locator('input[autocomplete=new-password]').nth(0).fill('SenhaDaPessoa2026')
+  await p.locator('input[autocomplete=new-password]').nth(1).fill('SenhaDaPessoa2026')
+  await p.click('button:has-text("ENVIAR CADASTRO")')
+  await expect(p.getByText('Cadastro enviado')).toBeVisible({ timeout: 30_000 })
+  // antes da liberação: aviso claro
+  await p.click('text=Ir para o login')
+  await p.fill('input[type=email]', novo)
+  await p.fill('input[type=password]', 'SenhaDaPessoa2026')
+  await p.click('form button.btn-primary')
+  await expect(p.getByText(/aguardando liberação/)).toBeVisible({ timeout: 30_000 })
+
+  await login(page)
+  await page.click('text=Usuários')
+  await expect(page.getByText('Cadastros aguardando liberação')).toBeVisible()
+  await page.locator('tr', { hasText: novo }).locator('button:has-text("Liberar acesso")').click()
+  await expect(page.locator('tr', { hasText: novo }).getByText('ativo', { exact: true })).toBeVisible()
+
+  await p.click('form button.btn-primary')
+  await expect(p.getByText('WORKSPACE INVESTIGATIVO')).toBeVisible({ timeout: 30_000 })
+  await ctx.close()
 })

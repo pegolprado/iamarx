@@ -53,6 +53,14 @@ export default function AdminUsers() {
           </button>
         }
       />
+      {(q.data ?? []).some((u: any) => !u.is_active && !u.must_change_password) && (
+        <div className="mb-4">
+          <Notice tone="amber" title="Cadastros aguardando liberação">
+            {(q.data ?? []).filter((u: any) => !u.is_active && !u.must_change_password).length} pessoa(s) se cadastraram pela tela de acesso. Confira os dados e use{' '}
+            <b>Liberar acesso</b> para permitir a entrada (ou <b>Excluir</b> para recusar).
+          </Notice>
+        </div>
+      )}
       {link && (
         <div className="mb-4 space-y-2">
           <Notice tone="amber" title="Link de definição de senha">
@@ -92,12 +100,25 @@ export default function AdminUsers() {
                       ))}
                     </select>
                     <label className="mt-1 flex items-center gap-1 text-xs text-muted">
-                      <input type="checkbox" checked={u.can_export} onChange={(e) => patch.mutate({ id: u.id, body: { can_export: e.target.checked } })} /> pode exportar (Excel/PDF/CSV)
+                      <input type="checkbox" checked={u.can_export} onChange={(e) => patch.mutate({ id: u.id, body: { can_export: e.target.checked } })} /> pode exportar
+                      (Excel/PDF/CSV)
                     </label>
                   </td>
                   <td>
-                    {u.locked ? <Badge tone="red">bloqueado</Badge> : u.is_active ? <Badge tone="green">ativo</Badge> : <Badge>inativo</Badge>}
-                    {u.must_change_password && <Badge tone="amber" className="ml-1">senha pendente</Badge>}
+                    {u.locked ? (
+                      <Badge tone="red">bloqueado</Badge>
+                    ) : u.is_active ? (
+                      <Badge tone="green">ativo</Badge>
+                    ) : u.must_change_password ? (
+                      <Badge>inativo</Badge>
+                    ) : (
+                      <Badge tone="amber">aguardando liberação</Badge>
+                    )}
+                    {u.must_change_password && (
+                      <Badge tone="amber" className="ml-1">
+                        senha pendente
+                      </Badge>
+                    )}
                   </td>
                   <td>{u.mfa_enabled ? <Badge tone="green">ativa</Badge> : <Badge>—</Badge>}</td>
                   <td>
@@ -115,7 +136,7 @@ export default function AdminUsers() {
                       </button>
                       {u.id !== me.id && (
                         <button className="btn-ghost !px-2 !py-1 text-xs" onClick={() => patch.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
-                          {u.is_active ? 'Desativar' : 'Reativar'}
+                          {u.is_active ? 'Desativar' : 'Liberar acesso'}
                         </button>
                       )}
                       {u.id !== me.id && (

@@ -67,16 +67,16 @@ function StatusChip({ c, compact }: { c: Check; compact?: boolean }) {
 }
 
 /** Símbolo original da coruja (arquivo do projeto, sem alteração) com halo e anéis tecnológicos. */
-function OwlEmblem() {
+function OwlEmblem({ className }: { className: string }) {
   return (
-    <div className="relative mx-auto h-[92px] w-[92px] sm:h-[132px] sm:w-[132px] 2xl:h-[156px] 2xl:w-[156px] [@media(max-height:820px)]:h-[96px] [@media(max-height:820px)]:w-[96px]">
-      <div className="auth-halo absolute -inset-8 rounded-full" aria-hidden="true" />
-      <svg className="auth-ring absolute -inset-[14px]" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="48.5" fill="none" stroke="rgba(226,169,59,0.45)" strokeWidth="0.35" strokeDasharray="1.2 2.6" />
+    <div className={clsx('relative mx-auto', className)}>
+      <div className="auth-halo absolute -inset-[18%] rounded-full" aria-hidden="true" />
+      <svg className="auth-ring absolute -inset-[9%]" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="48.5" fill="none" stroke="rgba(226,169,59,0.5)" strokeWidth="0.35" strokeDasharray="1.2 2.6" />
         <circle cx="50" cy="1.5" r="0.9" fill="#e2a93b" />
       </svg>
-      <svg className="auth-ring-rev absolute -inset-[26px]" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="49" fill="none" stroke="rgba(96,165,250,0.28)" strokeWidth="0.25" strokeDasharray="18 6 2 6" />
+      <svg className="auth-ring-rev absolute -inset-[17%]" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="49" fill="none" stroke="rgba(96,165,250,0.3)" strokeWidth="0.25" strokeDasharray="18 6 2 6" />
         <circle cx="99" cy="50" r="0.8" fill="#60a5fa" />
       </svg>
       <img
@@ -84,25 +84,64 @@ function OwlEmblem() {
         alt="Símbolo MARX — coruja"
         width={512}
         height={512}
-        className="auth-owl relative h-full w-full rounded-full object-cover ring-1 ring-[rgba(226,169,59,0.35)]"
-        style={{ boxShadow: '0 0 0 6px rgba(8,13,24,0.9), 0 0 40px -6px rgba(226,169,59,0.35), inset 0 0 20px rgba(0,0,0,0.6)' }}
+        className="auth-owl relative h-full w-full rounded-full object-cover ring-1 ring-[rgba(226,169,59,0.4)]"
+        style={{ boxShadow: '0 0 0 6px rgba(8,13,24,0.9), 0 0 60px -8px rgba(226,169,59,0.45), inset 0 0 20px rgba(0,0,0,0.6)' }}
       />
     </div>
   )
 }
 
-/** Moldura das telas de acesso (login, recuperação, definição de senha, primeiro acesso). */
+/** Marca: o "MARX / INTELLIGENCE PRO" original do logotipo (recorte do arquivo, só sem o fundo preto). */
+function Wordmark({ className }: { className: string }) {
+  return (
+    <h1 className={clsx('auth-in auth-in-1', className)}>
+      <img src="/brand/marx-wordmark.webp" alt="MARX Intelligence Pro" width={618} height={168} className="mx-auto h-auto w-full drop-shadow-[0_6px_18px_rgba(0,0,0,0.6)]" />
+    </h1>
+  )
+}
+
+function Tagline() {
+  return (
+    <>
+      <p className="auth-in auth-in-2 -mx-16 mt-3 font-[family-name:var(--font-display)] text-[12px] font-semibold tracking-[0.12em] text-[#dbe5ff] sm:text-[13.5px] lg:mx-0 lg:mt-6 lg:text-[15px] xl:text-[17px]">
+        <span className="block sm:inline lg:block">INTELIGÊNCIA QUE CONECTA.</span> <span className="block sm:inline lg:block lg:text-gold">ANÁLISE QUE REVELA.</span>
+      </p>
+      <p className="auth-in auth-in-2 -mx-16 mt-1.5 font-mono text-[8.5px] tracking-[0.16em] text-[#6f7ea3] sm:text-[10px] sm:tracking-[0.22em] lg:mx-0 lg:mt-3 lg:text-[10.5px]">
+        DIGITAL INTELLIGENCE • DATA ANALYSIS • CYBER INVESTIGATION
+      </p>
+    </>
+  )
+}
+
+/** Moldura das telas de acesso (login, cadastro, recuperação, definição de senha, primeiro acesso). */
 export function AuthShell({ title, subtitle, icon, children }: { title: string; subtitle?: string; icon?: ReactNode; children: ReactNode }) {
   const checks = useChecks()
+  const panel = (
+    <section className="auth-glass auth-in auth-in-3 relative w-full rounded-2xl p-5 sm:p-7 [@media(max-height:720px)]:py-5" aria-labelledby="auth-title">
+      <span className="pointer-events-none absolute inset-x-10 -top-px h-px bg-gradient-to-r from-transparent via-[#60a5fa] to-transparent opacity-70" aria-hidden="true" />
+      <div className="mb-4 flex items-start gap-3 sm:mb-5 [@media(max-height:720px)]:mb-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[rgba(96,140,255,0.3)] bg-[rgba(37,99,235,0.12)] text-[#93c5fd]">
+          {icon ?? <Lock className="h-4 w-4" />}
+        </span>
+        <div>
+          <h2 id="auth-title" className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-[0.16em] text-white">
+            {title}
+          </h2>
+          {subtitle && <p className="mt-1 text-[12.5px] leading-snug text-[#8d9abb]">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  )
   return (
-    <div className="auth-bg relative isolate flex min-h-[100dvh] flex-col overflow-hidden text-text">
+    <div className="auth-bg relative isolate flex min-h-[100dvh] flex-col overflow-x-hidden text-text">
       <div className="auth-grid pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
       <div className="absolute inset-0 -z-10">
         <NetworkBackground />
       </div>
 
       {/* barra de status (telas médias e grandes) */}
-      <header className="relative z-10 hidden items-center justify-between gap-4 border-b border-[rgba(96,140,255,0.12)] bg-[rgba(8,13,24,0.45)] px-6 py-2.5 backdrop-blur-sm md:flex">
+      <header className="relative z-10 hidden items-center justify-between gap-4 border-b border-[rgba(96,140,255,0.12)] bg-[rgba(8,13,24,0.45)] px-6 py-2 backdrop-blur-sm md:flex">
         <div className="flex gap-6">
           <StatusChip c={checks[0]} />
           <StatusChip c={checks[1]} />
@@ -113,44 +152,15 @@ export function AuthShell({ title, subtitle, icon, children }: { title: string; 
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pt-7 pb-4 sm:py-6 [@media(max-height:820px)]:py-3">
-        <div className="w-full max-w-[440px]">
-          <div className="mb-4 text-center sm:mb-5 [@media(max-height:820px)]:mb-3">
-            <OwlEmblem />
-            <h1 className="auth-in auth-in-1 mt-5 sm:mt-7 [@media(max-height:820px)]:mt-5">
-              <span className="auth-wordmark block text-[30px] leading-none sm:text-[40px] [@media(max-height:820px)]:text-[32px]">
-                MAR<span className="auth-gold">X</span>
-              </span>
-              <span className="mt-2 flex items-center justify-center gap-3 font-[family-name:var(--font-display)] text-[11px] font-semibold tracking-[0.42em] text-gold sm:text-[12px]">
-                <span className="h-px w-8 bg-gradient-to-r from-transparent to-gold/70" />
-                INTELLIGENCE PRO
-                <span className="h-px w-8 bg-gradient-to-l from-transparent to-gold/70" />
-              </span>
-            </h1>
-            <p className="auth-in auth-in-2 -mx-16 mt-3.5 font-[family-name:var(--font-display)] text-[12px] font-semibold tracking-[0.12em] text-[#dbe5ff] sm:text-[13.5px] [@media(max-height:820px)]:mt-3">
-              <span className="block sm:inline">INTELIGÊNCIA QUE CONECTA.</span> <span className="block sm:inline">ANÁLISE QUE REVELA.</span>
-            </p>
-            <p className="auth-in auth-in-2 -mx-16 mt-1.5 font-mono text-[8.5px] tracking-[0.16em] text-[#6f7ea3] sm:text-[10px] sm:tracking-[0.22em]">
-              DIGITAL INTELLIGENCE • DATA ANALYSIS • CYBER INVESTIGATION
-            </p>
-          </div>
-
-          <section className="auth-glass auth-in auth-in-3 relative rounded-2xl p-5 sm:p-7 [@media(max-height:820px)]:py-5" aria-labelledby="auth-title">
-            <span className="pointer-events-none absolute inset-x-10 -top-px h-px bg-gradient-to-r from-transparent via-[#60a5fa] to-transparent opacity-70" aria-hidden="true" />
-            <div className="mb-4 flex items-start gap-3 sm:mb-5 [@media(max-height:820px)]:mb-4">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[rgba(96,140,255,0.3)] bg-[rgba(37,99,235,0.12)] text-[#93c5fd]">
-                {icon ?? <Lock className="h-4 w-4" />}
-              </span>
-              <div>
-                <h2 id="auth-title" className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-[0.16em] text-white">
-                  {title}
-                </h2>
-                {subtitle && <p className="mt-1 text-[12.5px] leading-snug text-[#8d9abb]">{subtitle}</p>}
-              </div>
-            </div>
-            {children}
-          </section>
-
+      {/* celular/tablet: empilhado; telas largas: marca à esquerda e acesso à direita */}
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pt-5 pb-3 sm:py-6 lg:flex-row lg:gap-[clamp(32px,6vw,110px)] lg:px-8 lg:py-4">
+        <div className="mb-3 flex w-full max-w-[440px] flex-col items-center text-center sm:mb-5 lg:mb-0 lg:w-[min(44vw,560px)] lg:max-w-none">
+          <OwlEmblem className="h-[clamp(96px,14.5vh,170px)] w-[clamp(96px,14.5vh,170px)] lg:h-[clamp(150px,34vh,300px)] lg:w-[clamp(150px,34vh,300px)]" />
+          <Wordmark className="mt-5 w-[min(68vw,250px)] sm:mt-6 sm:w-[340px] lg:mt-[clamp(20px,4.5vh,44px)] lg:w-[clamp(260px,min(30vw,46vh),440px)]" />
+          <Tagline />
+        </div>
+        <div className="w-full max-w-[440px] lg:max-w-[430px]">
+          {panel}
           {/* indicadores no celular */}
           <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl border border-[rgba(96,140,255,0.12)] bg-[rgba(8,13,24,0.55)] px-3 py-2 md:hidden">
             {checks.map((c) => (
@@ -160,11 +170,11 @@ export function AuthShell({ title, subtitle, icon, children }: { title: string; 
         </div>
       </main>
 
-      <footer className="relative z-10 px-4 pb-4 text-center [@media(max-height:820px)]:pb-3">
-        <div className="font-[family-name:var(--font-display)] text-[10.5px] font-bold tracking-[0.32em] text-[#aab6d3]">
+      <footer className="relative z-10 px-4 pb-3 text-center">
+        <div className="hidden font-[family-name:var(--font-display)] text-[10.5px] font-bold tracking-[0.32em] text-[#aab6d3] sm:block">
           MARX INTELLIGENCE PRO <span className="mx-1.5 text-gold">·</span> <span className="font-semibold text-[#6f7ea3]">ADVANCED DIGITAL INTELLIGENCE</span>
         </div>
-        <p className="mx-auto mt-1.5 flex max-w-xl items-start justify-center gap-1.5 text-[11.5px] leading-snug text-[#8d9abb]">
+        <p className="mx-auto flex max-w-2xl sm:mt-1 items-start justify-center gap-1.5 text-[11.5px] leading-snug text-[#8d9abb]">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
           <span>Acesso restrito a usuários autorizados. Seus arquivos e consultas são processados só no seu navegador e apagados ao sair — nada fica salvo.</span>
         </p>
