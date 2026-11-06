@@ -665,3 +665,28 @@ export async function discardImport(id: number) {
   await recomputeDuplicates()
   return n
 }
+
+/**
+ * Importação sem o assistente: reconhece o tipo e as colunas pelo conteúdo e processa direto
+ * (usado pelas ferramentas da INVMARX, em que o arquivo é enviado e o resultado aparece).
+ */
+export async function quickImport(fileId: number, onStatus?: (s: string) => void) {
+  onStatus?.('reconhecendo as colunas')
+  let a: any = await analyze(fileId, 'cdr', {})
+  const kind: Kind = a.kind_suggestion ?? 'cdr'
+  if (kind !== 'cdr') a = await analyze(fileId, kind, {})
+  const mapping = { ...a.suggested_mapping }
+  const fmt: Record<string, string> = {}
+  for (const k of ['date', 'time', 'datetime'] as const) if (a.formats[k]?.format && !a.formats[k].ambiguous) fmt[`${k}_format`] = a.formats[k].format
+  const opts: Record<string, any> = { operator: a.operator_detection?.operator ?? '', read: {}, tz_mode: 'assumed', tz_name: 'America/Sao_Paulo', duration_unit: 's', ...fmt }
+  if (a.default_event_type) opts.default_event_type = a.default_event_type
+  if (a.target_hint?.length === 1) opts.target_number = a.target_hint[0]
+  // "Alvo: 5511…" no preâmbulo do relatório
+  const pre = (a.table.preamble ?? []).join(' ')
+  const alvo = /alvo\s*:?\s*(\+?\d[\d\s().-]{9,}\d)/i.exec(pre)
+  if (!mapping.target_number && !opts.target_number && alvo) opts.target_number = N.normalizeNumber(alvo[1])[0]
+  onStatus?.('processando os registros')
+  const imp = createImport(fileId, kind, mapping, opts)
+  await runImport(imp.id)
+  return { kind, importId: imp.id, mapping, operator: opts.operator as string }
+}

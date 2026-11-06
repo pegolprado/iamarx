@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { EyeOff, FolderKanban, LayoutGrid, Lock, LogOut, Menu, Settings, Users, Wrench, X } from 'lucide-react'
+import { Boxes, Clock, EyeOff, FileText, FolderKanban, LayoutGrid, Lock, LogOut, Menu, Network, Settings, Users, Wrench, X } from 'lucide-react'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { DemoBanner } from '../components/ui'
@@ -48,6 +48,19 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </NavItem>
       <NavItem to="/analise" icon={<FolderKanban />} onClick={onNavigate}>
         Análise atual
+      </NavItem>
+      <div className="mt-4 mb-1 px-3 font-mono text-[10px] tracking-widest text-gold uppercase">INVMARX</div>
+      <NavItem to="/invmarx" end icon={<Boxes />} onClick={onNavigate}>
+        Ferramentas INVMARX
+      </NavItem>
+      <NavItem to="/invmarx/whatsapp" icon={<FileText />} onClick={onNavigate}>
+        Bilhetagem WhatsApp
+      </NavItem>
+      <NavItem to="/invmarx/whatsapp-vinculos" icon={<Network />} onClick={onNavigate}>
+        WhatsApp — vínculos
+      </NavItem>
+      <NavItem to="/invmarx/extrato" icon={<Clock />} onClick={onNavigate}>
+        Extrato Tempo Real
       </NavItem>
       {me?.role === 'admin' && (
         <>
@@ -241,16 +254,14 @@ function useDataVersionSync() {
   }, [version, qc])
 }
 
-export function CaseLayout() {
+/** Monta o contexto da análise aberta (sessão em memória). */
+function useCaseCtx(): CaseCtx {
   const { me } = useAuth()
-  useDataVersionSync()
   const st = useSession((s) => s.meta)
   const isDemo = useSession((s) => s.isDemo)
   const targets = useSession((s) => s.targets)
   const files = useSession((s) => s.files)
-  const busy = useSession((s) => s.busy)
   const version = useSession((s) => s.version)
-  const group = navGroup(useLocation().pathname)
   const engineMeta = useQuery({
     queryKey: ['meta', version],
     queryFn: () => engineMetaFn(),
@@ -273,7 +284,24 @@ export function CaseLayout() {
     is_demo: isDemo,
     can_export: !!me?.can_export,
   }
-  const ctx: CaseCtx = { c, canWrite: true, canReview: true, meta }
+  return { c, canWrite: true, canReview: true, meta }
+}
+
+/** Contexto da análise sem a moldura de navegação (usado pelas ferramentas da INVMARX). */
+export function CaseScope({ children }: { children: ReactNode }) {
+  useDataVersionSync()
+  return <CaseContext.Provider value={useCaseCtx()}>{children}</CaseContext.Provider>
+}
+
+export function CaseLayout() {
+  const ctx = useCaseCtx()
+  useDataVersionSync()
+  const { c } = ctx
+  const st = useSession((s) => s.meta)
+  const busy = useSession((s) => s.busy)
+  const group = navGroup(useLocation().pathname)
+  const { me } = useAuth()
+  const isDemo = c.is_demo
   return (
     <CaseContext.Provider value={ctx}>
       <DemoBanner show={isDemo} />

@@ -34,6 +34,10 @@ const WhatsApp = lazy(() => import('./pages/case/WhatsApp'))
 const FullAnalysis = lazy(() => import('./pages/case/FullAnalysis'))
 const Ips = lazy(() => import('./pages/case/Ips'))
 const Location = lazy(() => import('./pages/case/Location'))
+const InvmarxHub = lazy(() => import('./pages/invmarx/Hub'))
+const InvWaBilling = lazy(() => import('./pages/invmarx/WaBilling'))
+const InvWaLinks = lazy(() => import('./pages/invmarx/WaLinks'))
+const InvExtrato = lazy(() => import('./pages/invmarx/Extrato'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -65,6 +69,10 @@ export default function App() {
             <Route path="ferramentas" element={<Catalog />} />
             <Route path="configuracoes" element={<SettingsPage />} />
             <Route path="admin/usuarios" element={<AdminUsers />} />
+            <Route path="invmarx" element={<InvmarxHub />} />
+            <Route path="invmarx/whatsapp" element={<InvWaBilling />} />
+            <Route path="invmarx/whatsapp-vinculos" element={<InvWaLinks />} />
+            <Route path="invmarx/extrato" element={<InvExtrato />} />
             <Route path="analise" element={<CaseLayout />}>
               <Route index element={<Overview />} />
               <Route path="alvos" element={<Targets />} />

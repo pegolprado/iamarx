@@ -362,3 +362,61 @@ test('extrato de interceptação com coordenadas: importa, plota as ERBs e compa
   await ctx.close()
   expect(errors).toEqual([])
 })
+
+test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato tempo real', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('dialog', (d) => d.accept())
+  await login(page)
+  const A = '5561900000001'
+  const B = '5561900000002'
+  const X = '5561980000001'
+  const fa = waRecordsHtml({
+    account: A,
+    messages: [
+      ['2026-10-30 12:00:00 UTC', A, [X], null, '45.231.155.194'],
+      ['2026-10-30 12:05:00 UTC', X, [A], null, '45.231.155.194'],
+      ['2026-10-30 13:00:00 UTC', A, [B], null, '177.10.20.30'],
+    ],
+    calls: [],
+    ips: [['2026-10-30 03:00:00 UTC', '45.231.155.194']],
+  })
+  const fb = waRecordsHtml({ account: B, messages: [['2026-10-30 15:00:00 UTC', B, [X], null, '177.10.20.30']], calls: [], ips: [] })
+  const file = (name: string, html: string) => ({ name, mimeType: 'text/html', buffer: Buffer.from(html, 'utf-8') })
+
+  await page.click('text=Ferramentas INVMARX')
+  await expect(page.getByRole('heading', { name: 'INVMARX' })).toBeVisible()
+  await page.click('main >> text=Bilhetagem WhatsApp')
+  await page.setInputFiles('input[type=file][accept=".html,.htm,.zip,.txt"]', [file('a.html', fa)])
+  await page.click('button:has-text("Processar e analisar dados")')
+  await expect(page.getByText('Resumo da análise')).toBeVisible()
+  await expect(page.getByText('PROXER TELECOMUNICACOES LTDA ME').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/2 coincidências/)).toBeVisible() // X no mesmo IP do alvo (mensagem e login em 12 h)
+  const [x1] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Exportar análise")')])
+  expect(x1.suggestedFilename()).toMatch(/\.xlsx$/)
+
+  await page.click('aside >> text=WhatsApp — vínculos')
+  await page.setInputFiles('input[type=file][accept=".html,.htm,.zip,.txt"]', [file('a.html', fa), file('b.html', fb)])
+  await page.click('button:has-text("Processar e cruzar bilhetagem")')
+  await expect(page.getByText(/Comunicação direta entre alvos/i)).toBeVisible()
+  await expect(page.getByText('(61) 90000-0001 ⟷ (61) 90000-0002').first()).toBeVisible()
+  await expect(page.getByText(/Interlocutores em comum \(1\)/)).toBeVisible()
+  await page.click('[role=tab] >> text=IPs')
+  await expect(page.getByText('177.10.20.30').first()).toBeVisible()
+  const [x2] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("XLSX")')])
+  expect(x2.suggestedFilename()).toMatch(/vinculos.*\.xlsx$/)
+
+  await page.click('aside >> text=Extrato Tempo Real')
+  const head = 'Alvo;Incio;Célula Origem;Latitude;Longitude;Azimute;Raio Médio;Endereço;Distrito;Cidade;Estado;CEP'
+  const rows = [
+    'Alvo:;5511900000009',
+    head,
+    ...Array.from({ length: 30 }, (_, i) => `5511900000009;0${1 + (i % 9)}/11/2026–${String(i % 24).padStart(2, '0')}:10:00;724-05-2862055${i % 3};-23.6479${i % 3};-46.7915${i % 3};${(i % 3) * 120};0;RUA TESTE ${i % 3};;SAO_PAULO;SP;`),
+  ]
+  await page.setInputFiles('input[type=file]', { name: 'localizacao.csv', mimeType: 'text/csv', buffer: Buffer.from(rows.join('\r\n'), 'utf-8') })
+  await page.click('button:has-text("Processar arquivo")')
+  await expect(page.locator('[data-stat="Total eventos"]')).toContainText('30', { timeout: 60_000 })
+  await expect(page.locator('[data-stat="ERBs no mapa"]')).toContainText('3')
+  await expect(page.getByText('RUA TESTE', { exact: false }).first()).toBeVisible()
+  expect(errors).toEqual([])
+})

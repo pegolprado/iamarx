@@ -25,6 +25,9 @@ const SECTIONS: Record<string, Section> = {
   'call log': 'calls',
   'ip addresses': 'ips',
   'ip address log': 'ips',
+  // bilhetagem diária (pen register)
+  'prospective login ips': 'ips',
+  'login ips': 'ips',
   // dados cadastrais
   'connection info': 'profile',
   'connection information': 'profile',
@@ -46,7 +49,10 @@ const SECTIONS: Record<string, Section> = {
 }
 const OTHER_SECTIONS = ['ncmec reports', 'profile picture', 'about', 'status']
 
+/** Rótulos do cabeçalho do pedido: reconhecidos em qualquer ponto (o índice de seções vem antes deles). */
+const HEADER_ANY = ['service', 'internal ticket number', 'target', 'logical id', 'account identifier', 'account type', 'generated', 'date range']
 const HEADER_LABELS = [
+  'logical id',
   'service',
   'internal ticket number',
   'target',
@@ -193,7 +199,8 @@ export function tokenize(content: string, isHtml: boolean): string[] {
   const out: string[] = []
   const push = (t: string) => {
     const v = t.replace(/\s+/g, ' ').trim()
-    if (!v) return
+    // quebra de página do documento ("WhatsApp Business Record Page 3") cai no meio dos registros
+    if (!v || /^WhatsApp Business Record Page \d+$/i.test(v)) return
     // "Label: valor" ou "Labelvalor" no mesmo texto → separa (rótulos e nomes de seção inteiros ficam como estão)
     const low = norm(v)
     if (SECTIONS[low] || OTHER_SECTIONS.includes(low) || ALL_LABELS.includes(low) || low.endsWith(' definition')) {
@@ -358,7 +365,20 @@ export function parseWhatsApp(content: string, isHtml = /<\s*(html|div|table|bod
       label = null
       continue
     }
+    // cabeçalho do pedido (Service, Target, Account Identifier…), mesmo depois do índice de seções
+    if (HEADER_ANY.includes(low) && !header[low]) {
+      flushAll()
+      section = 'header'
+      label = low
+      header[label] = ''
+      continue
+    }
     if (section === 'ignore' || section === 'other') continue
+    // separadores de registro ("Message", "Call") não são valores
+    if ((section === 'messages' && low === 'message') || (section === 'calls' && low === 'call')) {
+      label = null
+      continue
+    }
 
     if (section === 'profile') {
       if (PROFILE_LABELS.includes(low) || HEADER_LABELS.includes(low)) {

@@ -21,6 +21,10 @@
 /vendor/duckdb/*
   ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
+/vendor/ipdb/*
+  ! Cache-Control
+  Cache-Control: public, max-age=604800
+  Content-Type: application/octet-stream
 /vendor/duckdb/manifest.json
   ! Cache-Control
   Cache-Control: no-cache
