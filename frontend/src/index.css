@@ -2,6 +2,9 @@
 @import '@fontsource/roboto/400.css';
 @import '@fontsource/roboto/500.css';
 @import '@fontsource/roboto/700.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/800.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/700.css';
 @import 'leaflet/dist/leaflet.css';
@@ -9,6 +12,7 @@
 @theme {
   --font-sans: 'Roboto', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Montserrat', 'Roboto', system-ui, sans-serif;
   --color-ink: #0b0f1a;
   --color-ink-2: #0f1424;
   --color-panel: #161b2e;
@@ -179,5 +183,209 @@
   }
   to {
     stroke-opacity: 0.2;
+  }
+}
+
+/* ================================================================ tela de acesso — "Dark Intelligence" */
+.auth-bg {
+  background-color: #080d18;
+  background-image:
+    radial-gradient(900px 520px at 50% -8%, rgba(37, 99, 235, 0.22), transparent 62%),
+    radial-gradient(520px 360px at 50% 22%, rgba(226, 169, 59, 0.07), transparent 70%),
+    radial-gradient(900px 600px at 50% 115%, rgba(37, 99, 235, 0.12), transparent 60%);
+}
+/* grade quase imperceptível, apagando nas bordas */
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(120, 160, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, #000 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, #000 30%, transparent 100%);
+}
+.auth-glass {
+  background: linear-gradient(180deg, rgba(14, 22, 42, 0.78), rgba(8, 13, 24, 0.82));
+  border: 1px solid rgba(96, 140, 255, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 1px 0 rgba(140, 180, 255, 0.12) inset,
+    0 24px 60px -20px rgba(0, 0, 0, 0.75),
+    0 0 42px -12px rgba(59, 130, 246, 0.35);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+.auth-input {
+  width: 100%;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(96, 140, 255, 0.22) !important;
+  background: rgba(6, 10, 20, 0.7) !important;
+  padding: 0.7rem 2.75rem 0.7rem 2.6rem !important;
+  color: #eef2fb;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+}
+.auth-input::placeholder {
+  color: #5d6a86;
+}
+.auth-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.85) !important;
+  background: rgba(8, 14, 28, 0.9) !important;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.18),
+    0 0 18px -4px rgba(59, 130, 246, 0.6);
+}
+.auth-field:focus-within .auth-icon {
+  color: #60a5fa;
+}
+.auth-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem !important;
+  background: linear-gradient(180deg, #3b82f6, #1d4ed8) !important;
+  box-shadow:
+    0 0 0 1px rgba(147, 197, 253, 0.25) inset,
+    0 10px 24px -10px rgba(37, 99, 235, 0.8);
+  letter-spacing: 0.14em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  transition:
+    box-shadow 0.25s,
+    transform 0.15s,
+    filter 0.25s;
+}
+.auth-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow:
+    0 0 0 1px rgba(191, 219, 254, 0.45) inset,
+    0 0 28px -4px rgba(59, 130, 246, 0.85);
+}
+.auth-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.auth-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.22) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.auth-btn:hover:not(:disabled)::after {
+  transition: transform 0.9s ease;
+  transform: translateX(120%);
+}
+.auth-wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  background: linear-gradient(180deg, #f4f6fa 0%, #c3c9d4 45%, #8a93a3 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.auth-gold {
+  background: linear-gradient(180deg, #f7d27a, #e2a93b 55%, #b67c1c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* halo da coruja */
+.auth-halo {
+  background: radial-gradient(closest-side, rgba(226, 169, 59, 0.28), rgba(59, 130, 246, 0.12) 60%, transparent 75%);
+  filter: blur(6px);
+  animation: auth-breathe 6s ease-in-out infinite;
+}
+.auth-ring {
+  animation: auth-spin 60s linear infinite;
+}
+.auth-ring-rev {
+  animation: auth-spin 90s linear infinite reverse;
+}
+.auth-in {
+  animation: auth-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.auth-in-1 {
+  animation-delay: 0.15s;
+}
+.auth-in-2 {
+  animation-delay: 0.3s;
+}
+.auth-in-3 {
+  animation-delay: 0.45s;
+}
+.auth-owl {
+  animation:
+    auth-owl-in 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    auth-owl-glow 6s ease-in-out 1.2s infinite;
+}
+.auth-dot {
+  animation: auth-blink 2.4s ease-in-out infinite;
+}
+@keyframes auth-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes auth-owl-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+    filter: brightness(0.4) drop-shadow(0 0 0 rgba(226, 169, 59, 0));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: brightness(1) drop-shadow(0 0 18px rgba(226, 169, 59, 0.25));
+  }
+}
+@keyframes auth-owl-glow {
+  0%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 14px rgba(226, 169, 59, 0.18));
+  }
+  50% {
+    filter: brightness(1.08) drop-shadow(0 0 26px rgba(226, 169, 59, 0.38));
+  }
+}
+@keyframes auth-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes auth-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-in,
+  .auth-owl,
+  .auth-halo,
+  .auth-ring,
+  .auth-ring-rev,
+  .auth-dot {
+    animation: none !important;
   }
 }

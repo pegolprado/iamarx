@@ -1,34 +1,45 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { KeyRound, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, Lock, LogIn, Mail, ShieldCheck, User } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import { ErrorBox, Field, Notice } from '../components/ui'
+import { AuthField, AuthShell } from '../components/auth/AuthShell'
+import { ErrorBox, Notice } from '../components/ui'
 import { assertStrong, deriveKey, deriveWithSalt } from '../lib/passkey'
 
-function AuthCard({ title, children }: { title: string; children: React.ReactNode }) {
+function AuthCard({ title, subtitle, icon, children }: { title: string; subtitle?: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <img
-            src="/logo.webp"
-            alt="MARX Intelligence Pro — Análise • Conexões • Inteligência"
-            width={640}
-            height={678}
-            className="mx-auto h-auto w-72 sm:w-80"
-            style={{ maskImage: 'radial-gradient(ellipse 72% 70% at 50% 48%, #000 62%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 72% 70% at 50% 48%, #000 62%, transparent 100%)' }}
-          />
-          <h1 className="sr-only">MARX Intelligence Pro</h1>
-        </div>
-        <div className="card border-accent/40 p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">{title}</h2>
-          {children}
-        </div>
-        <p className="mt-6 text-center text-xs text-faint">Acesso restrito a usuários autorizados. Seus arquivos e consultas são processados só no seu navegador e apagados ao sair — nada fica salvo.</p>
-      </div>
-    </div>
+    <AuthShell title={title} subtitle={subtitle} icon={icon}>
+      {children}
+    </AuthShell>
+  )
+}
+
+/** Senha com botão de mostrar/ocultar. */
+function PasswordInput({ value, onChange, autoComplete, placeholder }: { value: string; onChange: (v: string) => void; autoComplete: string; placeholder?: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <>
+      <input
+        className="auth-input"
+        type={show ? 'text' : 'password'}
+        autoComplete={autoComplete}
+        required
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="absolute top-1/2 right-2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[#6f7ea3] transition-colors hover:bg-white/5 hover:text-[#cfe0ff]"
+        onClick={() => setShow(!show)}
+        aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
+        aria-pressed={show}
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </>
   )
 }
 
@@ -72,33 +83,65 @@ export default function Login() {
     }
   }
   return (
-    <AuthCard title={mfa ? 'Verificação em duas etapas' : 'Entrar'}>
-      <form onSubmit={submit} className="space-y-4">
+    <AuthCard
+      title={mfa ? 'VERIFICAÇÃO EM DUAS ETAPAS' : 'ACESSO AO SISTEMA'}
+      subtitle={mfa ? 'Digite o código do seu aplicativo autenticador para concluir o acesso.' : 'Autenticação necessária para acessar a plataforma de inteligência.'}
+      icon={mfa ? <ShieldCheck className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+    >
+      <form onSubmit={submit} className="space-y-4 [@media(max-height:820px)]:space-y-3" aria-busy={busy}>
         {!mfa ? (
           <>
-            <Field label="E-mail">
-              <input className="w-full" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            <Field label="Senha">
-              <input className="w-full" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </Field>
+            <AuthField label="E-mail" icon={<Mail />}>
+              <input
+                className="auth-input"
+                type="email"
+                autoComplete="username"
+                required
+                autoFocus
+                placeholder="nome@instituicao.gov.br"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </AuthField>
+            <AuthField label="Senha" icon={<KeyRound />}>
+              <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" placeholder="••••••••••••" />
+            </AuthField>
           </>
         ) : (
-          <Field label="Código do aplicativo autenticador" hint="Seis dígitos exibidos no aplicativo (Google Authenticator, Authy, etc.)">
-            <input className="w-full text-center font-mono text-xl tracking-[0.5em]" inputMode="numeric" autoFocus maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-          </Field>
+          <AuthField label="Código do aplicativo autenticador" icon={<ShieldCheck />} hint="Seis dígitos exibidos no aplicativo (Google Authenticator, Authy, etc.)">
+            <input
+              className="auth-input text-center font-mono text-xl tracking-[0.5em]"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            />
+          </AuthField>
         )}
         {err ? <ErrorBox error={err} /> : null}
-        <button className="btn-primary w-full" disabled={busy}>
-          {mfa ? <ShieldCheck className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />} {busy ? 'Verificando…' : mfa ? 'Confirmar' : 'Entrar'}
+        <button className="btn-primary auth-btn w-full !py-3 text-[13px] [@media(max-height:820px)]:!py-2.5" disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mfa ? <ShieldCheck className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+          {busy ? 'VERIFICANDO CREDENCIAIS…' : mfa ? 'CONFIRMAR CÓDIGO' : 'ENTRAR NO SISTEMA'}
         </button>
-        {!mfa && (
-          <div className="text-center">
-            <Link to="/esqueci-senha" className="text-sm text-accent hover:underline">
+        <div className="flex items-center justify-between gap-3 pt-1 text-[12px]">
+          {!mfa ? (
+            <Link to="/esqueci-senha" className="text-[#93c5fd] hover:text-white hover:underline">
               Esqueci minha senha
             </Link>
-          </div>
-        )}
+          ) : (
+            <button type="button" className="text-[#93c5fd] hover:text-white hover:underline" onClick={() => (setMfa(false), setCode(''))}>
+              Voltar
+            </button>
+          )}
+          <span
+            className="flex items-center gap-1.5 text-[#6f7ea3]"
+            title="A senha é transformada no seu navegador (PBKDF2-SHA256, 600 mil iterações) antes de ser enviada: o servidor nunca recebe a senha."
+          >
+            <Fingerprint className="h-3.5 w-3.5 text-ok" /> Senha protegida<span className="hidden sm:inline"> no navegador</span>
+          </span>
+        </div>
       </form>
     </AuthCard>
   )
@@ -106,10 +149,11 @@ export default function Login() {
 
 export function ForgotPassword() {
   return (
-    <AuthCard title="Recuperar acesso">
+    <AuthCard title="RECUPERAR ACESSO" subtitle="A redefinição de senha é feita pelo administrador." icon={<KeyRound className="h-4 w-4" />}>
       <div className="space-y-4">
         <Notice>
-          Por segurança, a redefinição de senha é feita pelo administrador do MARX: peça a ele um <b>link de redefinição</b> (válido por 24 horas e de uso único). Ao abrir o link, você define a nova senha.
+          Por segurança, a redefinição de senha é feita pelo administrador do MARX: peça a ele um <b>link de redefinição</b> (válido por 24 horas e de uso único). Ao abrir o link,
+          você define a nova senha.
         </Notice>
         <div className="text-center">
           <Link to="/login" className="text-sm text-accent hover:underline">
@@ -124,14 +168,18 @@ export function ForgotPassword() {
 export function ResetPassword() {
   const [sp] = useSearchParams()
   const token = sp.get('token') ?? ''
-  const info = useQuery({ queryKey: ['reset-info', token], queryFn: () => api<{ email: string; name: string; salt: string; iterations: number }>('/auth/password/reset-info', { body: { token } }), retry: false })
+  const info = useQuery({
+    queryKey: ['reset-info', token],
+    queryFn: () => api<{ email: string; name: string; salt: string; iterations: number }>('/auth/password/reset-info', { body: { token } }),
+    retry: false,
+  })
   const [p1, setP1] = useState('')
   const [p2, setP2] = useState('')
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<unknown>(null)
   return (
-    <AuthCard title="Definir senha">
+    <AuthCard title="DEFINIR SENHA" subtitle="Crie uma senha forte para o seu acesso." icon={<KeyRound className="h-4 w-4" />}>
       {info.error ? (
         <ErrorBox error={info.error} />
       ) : done ? (
@@ -166,14 +214,14 @@ export function ResetPassword() {
               {info.data.name} · <span className="font-mono">{info.data.email}</span>
             </p>
           )}
-          <Field label="Nova senha" hint="Mínimo de 12 caracteres, com letras e números.">
-            <input className="w-full" type="password" autoComplete="new-password" required value={p1} onChange={(e) => setP1(e.target.value)} />
-          </Field>
-          <Field label="Repita a senha">
-            <input className="w-full" type="password" autoComplete="new-password" required value={p2} onChange={(e) => setP2(e.target.value)} />
-          </Field>
+          <AuthField label="Nova senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+            <PasswordInput value={p1} onChange={setP1} autoComplete="new-password" />
+          </AuthField>
+          <AuthField label="Repita a senha" icon={<KeyRound />}>
+            <PasswordInput value={p2} onChange={setP2} autoComplete="new-password" />
+          </AuthField>
           {err ? <ErrorBox error={err} /> : null}
-          <button className="btn-primary w-full" disabled={busy || !info.data}>
+          <button className="btn-primary auth-btn w-full !py-3" disabled={busy || !info.data}>
             {busy ? 'Protegendo a senha…' : 'Salvar senha'}
           </button>
         </form>
@@ -191,7 +239,7 @@ export function FirstSetup() {
   const st = useQuery({ queryKey: ['setup'], queryFn: () => api<{ needed: boolean; token_configured: boolean }>('/setup'), retry: false })
   if (st.data && !st.data.needed)
     return (
-      <AuthCard title="Primeiro acesso">
+      <AuthCard title="PRIMEIRO ACESSO">
         <Notice tone="green">O sistema já está configurado.</Notice>
         <Link to="/login" className="btn-primary mt-4 w-full">
           Ir para o login
@@ -199,10 +247,12 @@ export function FirstSetup() {
       </AuthCard>
     )
   return (
-    <AuthCard title="Primeiro acesso — criar administrador">
+    <AuthCard title="PRIMEIRO ACESSO" subtitle="Crie o administrador inicial do sistema." icon={<ShieldCheck className="h-4 w-4" />}>
       {st.data && !st.data.token_configured && (
         <div className="mb-4">
-          <Notice tone="amber">Defina a variável <b>SETUP_TOKEN</b> no painel da Cloudflare (Settings → Variables) e publique de novo.</Notice>
+          <Notice tone="amber">
+            Defina a variável <b>SETUP_TOKEN</b> no painel da Cloudflare (Settings → Variables) e publique de novo.
+          </Notice>
         </div>
       )}
       <form
@@ -224,23 +274,23 @@ export function FirstSetup() {
           }
         }}
       >
-        <Field label="Código de configuração (SETUP_TOKEN)">
-          <input className="w-full font-mono" type="password" required value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
-        </Field>
-        <Field label="Seu nome">
-          <input className="w-full" required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        </Field>
-        <Field label="E-mail">
-          <input className="w-full" type="email" autoComplete="username" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-        </Field>
-        <Field label="Senha" hint="Mínimo de 12 caracteres, com letras e números.">
-          <input className="w-full" type="password" autoComplete="new-password" required value={f.p1} onChange={(e) => setF({ ...f, p1: e.target.value })} />
-        </Field>
-        <Field label="Repita a senha">
-          <input className="w-full" type="password" autoComplete="new-password" required value={f.p2} onChange={(e) => setF({ ...f, p2: e.target.value })} />
-        </Field>
+        <AuthField label="Código de configuração (SETUP_TOKEN)" icon={<ShieldCheck />}>
+          <input className="auth-input font-mono" type="password" required value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
+        </AuthField>
+        <AuthField label="Seu nome" icon={<User />}>
+          <input className="auth-input" required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        </AuthField>
+        <AuthField label="E-mail" icon={<Mail />}>
+          <input className="auth-input" type="email" autoComplete="username" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+        </AuthField>
+        <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+          <PasswordInput value={f.p1} onChange={(v) => setF({ ...f, p1: v })} autoComplete="new-password" />
+        </AuthField>
+        <AuthField label="Repita a senha" icon={<KeyRound />}>
+          <PasswordInput value={f.p2} onChange={(v) => setF({ ...f, p2: v })} autoComplete="new-password" />
+        </AuthField>
         {err ? <ErrorBox error={err} /> : null}
-        <button className="btn-primary w-full" disabled={busy}>
+        <button className="btn-primary auth-btn w-full !py-3" disabled={busy}>
           {busy ? 'Criando…' : 'Criar administrador'}
         </button>
       </form>
