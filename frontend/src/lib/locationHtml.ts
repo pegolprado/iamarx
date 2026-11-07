@@ -29,6 +29,8 @@ type Input = {
     last: string | null
   }
   radius: number
+  /** abertura do setor em graus (padrão 120) */
+  beam?: number
   by: string
 }
 
@@ -47,6 +49,7 @@ export function locationHtml(d: Input): string {
     towers: d.towers.map((t) => ({ lat: t.lat, lon: t.lon, n: t.n, a: t.address, c: t.city, cells: t.cells.map((c) => ({ id: c.cell, az: c.az, n: c.n })) })),
     path: d.transitions,
     radius: d.radius,
+    beam: d.beam ?? 120,
   }).replace(/</g, '\\u003c')
   const rows = d.events
     .slice()
@@ -87,7 +90,7 @@ var base=L.tileLayer(osm,{maxZoom:19,attribution:'Esri · OpenStreetMap'}).addTo
 function sw(u,id){base.setUrl(u);document.getElementById('b1').className=id==='b1'?'on':'';document.getElementById('b2').className=id==='b2'?'on':''}
 document.getElementById('b1').onclick=function(){sw(osm,'b1')};document.getElementById('b2').onclick=function(){sw(sat,'b2')};
 function dest(la,lo,az,r){var a=az*Math.PI/180;return[la+r*Math.cos(a)/111320,lo+r*Math.sin(a)/(111320*Math.cos(la*Math.PI/180))]}
-function sec(la,lo,az,r){var p=[[la,lo]];for(var i=0;i<=18;i++)p.push(dest(la,lo,az-32.5+65*i/18,r));return p}
+function sec(la,lo,az,r){var b=D.beam||120,p=[[la,lo]];for(var i=0;i<=18;i++)p.push(dest(la,lo,az-b/2+b*i/18,r));return p}
 var mx=1;D.path.forEach(function(t){mx=Math.max(mx,t.n)});
 D.towers.forEach(function(t){t.cells.forEach(function(c){if(c.az!==null)L.polygon(sec(t.lat,t.lon,c.az,D.radius),{color:'#2563eb',weight:1,fillOpacity:.12,interactive:false}).addTo(m)})});
 D.path.forEach(function(t){L.polyline([t.a,t.b],{color:'#dc2626',weight:1.5+2.5*Math.sqrt(t.n/mx),dashArray:'6 6'}).addTo(m)});

@@ -102,7 +102,8 @@ function LocationView({
   const [sel, setSel] = useState<LocEvent | null>(null)
   const [showSectors, setShowSectors] = useState(true)
   const [showPath, setShowPath] = useState(true)
-  const [radius, setRadius] = useState(800)
+  const [radius, setRadius] = useState(1000)
+  const [beam, setBeam] = useState(120)
   const [tower, setTower] = useState<Tower | null>(null)
   const [share, setShare] = useState(false)
 
@@ -151,6 +152,7 @@ function LocationView({
       transitions: tr,
       patterns: pat,
       radius,
+      beam,
       by: me?.name ?? '',
     })
     downloadHtml(html, `MARX_localizacao_${number.replace(/\D/g, '')}_${new Date().toISOString().slice(0, 10)}.html`)
@@ -269,30 +271,39 @@ function LocationView({
               <input type="checkbox" checked={showPath} onChange={(e) => setShowPath(e.target.checked)} /> deslocamentos
             </label>
             <label className="flex items-center gap-2 text-muted">
-              raio
+              distância
               <select value={radius} onChange={(e) => setRadius(+e.target.value)}>
-                {[300, 500, 800, 1200, 2000].map((r) => (
+                {[300, 500, 800, 1000, 1500, 2000, 3000].map((r) => (
                   <option key={r} value={r}>
                     {r} m
                   </option>
                 ))}
               </select>
             </label>
+            <label className="flex items-center gap-2 text-muted">
+              abertura
+              <select value={beam} onChange={(e) => setBeam(+e.target.value)}>
+                {[60, 90, 120, 180].map((r) => (
+                  <option key={r} value={r}>
+                    {r}°
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-            <LocationMap
-              towers={tw}
-              transitions={tr}
-              current={current}
-              showSectors={showSectors}
-              showPath={showPath}
-              radius={radius}
-              tileUrl={settings.data?.map_tile_url}
-              tileAttr={settings.data?.map_attribution}
-              onTower={onTower}
-            />
-            <aside className="card p-4 text-sm">
-              {current ? (
+          <LocationMap
+            towers={tw}
+            transitions={tr}
+            current={current}
+            showSectors={showSectors}
+            showPath={showPath}
+            radius={radius}
+            beam={beam}
+            tileUrl={settings.data?.map_tile_url}
+            tileAttr={settings.data?.map_attribution}
+            onTower={onTower}
+            detail={
+              current ? (
                 <EventDetail e={current} />
               ) : tower ? (
                 <div className="space-y-2">
@@ -311,14 +322,13 @@ function LocationView({
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <p className="text-muted">Toque numa torre ou num evento da lista. Use o ▶ para reproduzir a sequência no mapa.</p>
-              )}
-              <div className="mt-4">
-                <Notice tone="amber">A ERB é a estação (antena), não a posição exata do aparelho. Setores são esquemáticos.</Notice>
-              </div>
-            </aside>
-          </div>
+              ) : null
+            }
+            onCloseDetail={() => {
+              setTower(null)
+              setSel(null)
+            }}
+          />
 
           <section className="card p-4">
             <div className="flex flex-wrap items-end gap-3">

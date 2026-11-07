@@ -1,0 +1,2 @@
+Estações do SMP licenciadas — Anatel, Dados Abertos (https://www.gov.br/anatel/pt-br/dados/dados-abertos).
+Posição informada pelas operadoras; gerado por scripts/build-erbs.mjs.

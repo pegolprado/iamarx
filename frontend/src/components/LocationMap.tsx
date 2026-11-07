@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import L from 'leaflet'
-import { Maximize2, Minimize2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Maximize2, Minimize2, X } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
+import { drawErbs, ERB_OPS, erbSitesIn } from './erbLayer'
 
 export const SECTOR_COLOR = '#2563eb'
 export const PATH_COLOR = '#dc2626'
@@ -41,9 +42,12 @@ export function LocationMap({
   showSectors,
   showPath,
   radius,
+  beam = 120,
   tileUrl = OSM.url,
   tileAttr = OSM.attr,
   onTower,
+  detail,
+  onCloseDetail,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -51,9 +55,14 @@ export function LocationMap({
   showSectors: boolean
   showPath: boolean
   radius: number
+  /** abertura do setor (graus) */
+  beam?: number
   tileUrl?: string
   tileAttr?: string
   onTower?: (t: Tower) => void
+  /** detalhes da torre/evento selecionado, mostrados sobre o mapa */
+  detail?: ReactNode
+  onCloseDetail?: () => void
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -63,10 +72,18 @@ export function LocationMap({
   const cur = useRef<L.LayerGroup | null>(null)
   const [b, setB] = useState<Base>('mapa')
   const [full, setFull] = useState(false)
+  // camada ERBs (antenas de todas as operadoras, base pública da Anatel)
+  const erbs = useRef<L.LayerGroup | null>(null)
+  const erbRenderer = useRef<L.Canvas | null>(null)
+  const [erbOn, setErbOn] = useState(false)
+  const [ops, setOps] = useState<Set<number>>(() => new Set([0, 1, 2, 3]))
+  const [erbMsg, setErbMsg] = useState('')
 
   useEffect(() => {
     if (!box.current || map.current) return
     map.current = L.map(box.current).setView([-23.55, -46.63], 11)
+    erbRenderer.current = L.canvas({ padding: 0.3 })
+    erbs.current = L.layerGroup().addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
     cur.current = L.layerGroup().addTo(map.current)
     return () => {
@@ -96,7 +113,14 @@ export function LocationMap({
       for (const t of towers)
         for (const c of t.cells)
           if (c.az !== null)
-            L.polygon(sector(t.lat, t.lon, c.az, radius), { color: SECTOR_COLOR, weight: 1, opacity: 0.7, fillColor: SECTOR_COLOR, fillOpacity: 0.12, interactive: false }).addTo(g)
+            L.polygon(sector(t.lat, t.lon, c.az, radius, beam), {
+              color: SECTOR_COLOR,
+              weight: 1,
+              opacity: 0.7,
+              fillColor: SECTOR_COLOR,
+              fillOpacity: 0.12,
+              interactive: false,
+            }).addTo(g)
     if (showPath) {
       const maxN = Math.max(1, ...transitions.map((x) => x.n))
       for (const t of transitions)
@@ -108,7 +132,7 @@ export function LocationMap({
       mk.on('click', () => onTower?.(t))
       mk.addTo(g)
     }
-  }, [towers, transitions, showSectors, showPath, radius, onTower])
+  }, [towers, transitions, showSectors, showPath, radius, beam, onTower])
 
   useEffect(() => {
     const m = map.current
@@ -124,10 +148,48 @@ export function LocationMap({
     g.clearLayers()
     if (!current || current.lat === null || current.lon === null) return
     if (current.az !== null)
-      L.polygon(sector(current.lat, current.lon, current.az, radius), { color: CURRENT_COLOR, weight: 2, fillColor: CURRENT_COLOR, fillOpacity: 0.3, interactive: false }).addTo(g)
+      L.polygon(sector(current.lat, current.lon, current.az, radius, beam), {
+        color: CURRENT_COLOR,
+        weight: 2,
+        fillColor: CURRENT_COLOR,
+        fillOpacity: 0.3,
+        interactive: false,
+      }).addTo(g)
     L.circleMarker([current.lat, current.lon], { radius: 16, color: CURRENT_COLOR, weight: 3, fillOpacity: 0, interactive: false, className: 'erb-pulse' }).addTo(g)
     if (!m.getBounds().pad(-0.15).contains([current.lat, current.lon])) m.panTo([current.lat, current.lon], { animate: false })
-  }, [current, radius])
+  }, [current, radius, beam])
+
+  // ERBs da região visível: recarrega ao mover o mapa
+  useEffect(() => {
+    const m = map.current
+    const g = erbs.current
+    if (!m || !g) return
+    if (!erbOn) {
+      g.clearLayers()
+      setErbMsg('')
+      return
+    }
+    let seq = 0
+    const load = async () => {
+      const my = ++seq
+      if (m.getZoom() < 11) {
+        g.clearLayers()
+        setErbMsg('Aproxime o mapa para ver as ERBs')
+        return
+      }
+      setErbMsg('Carregando ERBs…')
+      const sites = await erbSitesIn(m.getBounds().pad(0.15))
+      if (my !== seq || !erbs.current) return
+      drawErbs(g, sites, ops, erbRenderer.current!, m.getZoom())
+      setErbMsg(sites.length ? '' : 'Nenhuma ERB nesta região')
+    }
+    void load()
+    m.on('moveend', load)
+    return () => {
+      seq++
+      m.off('moveend', load)
+    }
+  }, [erbOn, ops])
 
   useEffect(() => {
     const on = () => {
@@ -166,8 +228,47 @@ export function LocationMap({
               {label}
             </button>
           ))}
+          <button
+            className={clsx('border-l border-line-2 px-2.5 py-1.5', erbOn ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')}
+            onClick={() => setErbOn(!erbOn)}
+            aria-pressed={erbOn}
+            title="Antenas de todas as operadoras licenciadas na Anatel"
+          >
+            ERBs
+          </button>
         </div>
       </div>
+      {erbOn && (
+        <div className="absolute top-14 right-3 z-[500] w-[150px] rounded-[7px] border border-line-2 bg-glass px-3 py-2 text-[12px]">
+          {ERB_OPS.map((o) => (
+            <label key={o.key} className="flex cursor-pointer items-center gap-2 py-0.5">
+              <input
+                type="checkbox"
+                checked={ops.has(o.key)}
+                onChange={(e) => {
+                  const n = new Set(ops)
+                  if (e.target.checked) n.add(o.key)
+                  else n.delete(o.key)
+                  setOps(n)
+                }}
+              />
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: o.color }} /> {o.label}
+            </label>
+          ))}
+          {erbMsg && <div className="mt-1 text-[11px] leading-snug text-faint">{erbMsg}</div>}
+          <div className="mt-1 text-[10px] text-faint">Fonte: Anatel</div>
+        </div>
+      )}
+      {detail && (
+        <div className="absolute top-3 left-14 z-[500] max-h-[calc(100%-24px)] w-[min(320px,calc(100%-80px))] overflow-auto rounded-[8px] border border-line-2 bg-glass p-3 text-sm shadow-lg">
+          {onCloseDetail && (
+            <button className="float-right ml-2 rounded p-0.5 text-muted hover:text-text" onClick={onCloseDetail} aria-label="Fechar detalhes">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          {detail}
+        </div>
+      )}
       <div className="absolute bottom-3 left-3 z-[500] rounded-[7px] border border-line bg-glass px-3 py-2 text-[11px] leading-5 text-muted">
         <div className="flex items-center gap-2">
           <span className="font-bold">⚲</span> ERB / antena · nº = total de eventos
