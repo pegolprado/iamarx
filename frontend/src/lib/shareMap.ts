@@ -4,7 +4,12 @@
  * Os pontos do mapa (coordenadas das ERBs, azimutes, contagens e período) são compactados
  * e criptografados no navegador (AES-GCM 256, chave derivada da senha com PBKDF2-SHA256)
  * e vão inteiros no fragmento do link (#…). O fragmento nunca é enviado ao servidor nem
- * aparece em registros de acesso: quem recebe o link precisa da senha para abrir.
+ * aparece em registros de acesso.
+ *
+ * Dois tipos de link:
+ * - com senha ("m1"): quem recebe digita a senha, enviada por outro meio;
+ * - direto ("m2"): a chave aleatória vai no próprio fragmento — abre só clicando. Continua
+ *   criptografado e fora do servidor, mas qualquer pessoa com o link completo consegue abrir.
  */
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate'
 
@@ -21,6 +26,8 @@ export type SitePoint = {
   last: string | null
   name?: string | null
   numbers?: string[]
+  /** células da torre: [célula, azimute, eventos] */
+  cl?: [string, number | null, number][]
 }
 
 export type SharedMap = {
@@ -34,6 +41,11 @@ export type SharedMap = {
   types: string
   numbers: string[]
   points: SitePoint[]
+  /** setor desenhado: distância (m) e abertura (graus) */
+  radius?: number
+  beam?: number
+  /** deslocamentos entre torres: [lat1, lon1, lat2, lon2, vezes] */
+  path?: [number, number, number, number, number][]
 }
 
 const ITER = 250_000
@@ -82,7 +94,9 @@ function pack(m: SharedMap) {
       p.last?.slice(0, 16) ?? null,
       p.name ?? null,
       p.numbers ?? [],
+      p.cl ?? null,
     ]),
+    path: m.path?.map((x) => [Math.round(x[0] * 1e5), Math.round(x[1] * 1e5), Math.round(x[2] * 1e5), Math.round(x[3] * 1e5), x[4]]),
   }
 }
 function unpack(o: any): SharedMap {
@@ -101,7 +115,9 @@ function unpack(o: any): SharedMap {
       last: a[9],
       name: a[10],
       numbers: a[11],
+      cl: a[12] ?? undefined,
     })),
+    path: o.path?.map((x: number[]) => [x[0] / 1e5, x[1] / 1e5, x[2] / 1e5, x[3] / 1e5, x[4]]),
   }
 }
 
@@ -113,6 +129,31 @@ export async function encryptMap(m: SharedMap, password: string): Promise<string
   const plain = deflateSync(strToU8(JSON.stringify(pack(m))), { level: 9 })
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain as BufferSource))
   return `m1.${b64u(salt)}.${b64u(iv)}.${b64uBig(ct)}`
+}
+
+/** Link direto ("m2"): chave aleatória no próprio fragmento — abre sem senha. */
+export async function encryptMapOpen(m: SharedMap): Promise<string> {
+  const raw = crypto.getRandomValues(new Uint8Array(32))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const key = await crypto.subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, ['encrypt'])
+  const plain = deflateSync(strToU8(JSON.stringify(pack(m))), { level: 9 })
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain as BufferSource))
+  return `m2.${b64u(raw)}.${b64u(iv)}.${b64uBig(ct)}`
+}
+
+export const isOpenLink = (fragment: string) => fragment.replace(/^#/, '').startsWith('m2.')
+
+export async function decryptMapOpen(fragment: string): Promise<SharedMap> {
+  const [ver, k, i, c] = fragment.replace(/^#/, '').split('.')
+  if (ver !== 'm2' || !k || !i || !c) throw new Error('Link incompleto ou corrompido. Peça um novo link a quem compartilhou.')
+  const key = await crypto.subtle.importKey('raw', unb64u(k) as BufferSource, 'AES-GCM', false, ['decrypt'])
+  let plain: ArrayBuffer
+  try {
+    plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(i) as BufferSource }, key, unb64u(c) as BufferSource)
+  } catch {
+    throw new Error('Link incompleto ou corrompido. Confira se o link foi copiado inteiro.')
+  }
+  return unpack(JSON.parse(strFromU8(inflateSync(new Uint8Array(plain)))))
 }
 
 export class WrongPassword extends Error {}

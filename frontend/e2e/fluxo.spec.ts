@@ -357,13 +357,13 @@ test('extrato de interceptação com coordenadas: importa, plota as ERBs e compa
   await expect(other.getByRole('alert')).toHaveText('Senha incorreta.')
   await other.fill('input[type=password]', password)
   await other.click('button:has-text("Abrir mapa")')
-  await expect(other.getByText(/3 estações/)).toBeVisible()
-  await expect(other.getByRole('img', { name: 'Mapa das estações (ERBs)' })).toBeVisible()
+  await expect(other.getByText(/3 ERBs/)).toBeVisible()
+  await expect(other.getByRole('img', { name: 'Mapa de localização do alvo' })).toBeVisible()
   await ctx.close()
   expect(errors).toEqual([])
 })
 
-test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato tempo real', async ({ page }) => {
+test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato tempo real', async ({ page, browser }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('dialog', (d) => d.accept())
@@ -422,6 +422,19 @@ test('INVMARX: bilhetagem WhatsApp individual, vínculos entre alvos e extrato t
   await expect(page.locator('[data-stat="Total eventos"]')).toContainText('30', { timeout: 60_000 })
   await expect(page.locator('[data-stat="ERBs no mapa"]')).toContainText('3')
   await expect(page.getByText('RUA TESTE', { exact: false }).first()).toBeVisible()
+
+  // link direto: abre só clicando, sem login e sem senha (e sem o número do alvo)
+  await page.click('button:has-text("Compartilhar link")')
+  await page.click('button:has-text("Gerar link")')
+  const direct = await page.locator('textarea[readonly]').inputValue()
+  expect(direct).toMatch(/\/mapa-compartilhado#m2\./)
+  const ctx2 = await browser.newContext()
+  const viewer = await ctx2.newPage()
+  await viewer.goto(direct)
+  await expect(viewer.getByText(/3 ERBs · 30 eventos/)).toBeVisible()
+  await expect(viewer.getByRole('img', { name: 'Mapa de localização do alvo' })).toBeVisible()
+  await expect(viewer.getByText('5511900000009')).toHaveCount(0)
+  await ctx2.close()
   expect(errors).toEqual([])
 })
 

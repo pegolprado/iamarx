@@ -1,4 +1,4 @@
-import { decryptMap, encryptMap, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
+import { decryptMap, decryptMapOpen, encryptMap, encryptMapOpen, isOpenLink, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
 
 const map: SharedMap = {
   v: 1,
@@ -47,5 +47,16 @@ describe('mapa compartilhado', () => {
     const k = toKml(map)
     expect(k).toContain('<coordinates>-46.732624,-23.6177654,0</coordinates>')
     expect(k.match(/<LineString>/g)).toHaveLength(2)
+  })
+  it('link direto abre sem senha e preserva células e deslocamentos', async () => {
+    const m = { ...map, radius: 1000, beam: 120, path: [[-15.8, -47.9, -15.81, -47.91, 3]] as [number, number, number, number, number][] }
+    m.points = m.points.map((p) => ({ ...p, cl: [['724-11-1', 120, 5]] as [string, number | null, number][] }))
+    const frag = await encryptMapOpen(m)
+    expect(isOpenLink(frag)).toBe(true)
+    const back = await decryptMapOpen(frag)
+    expect(back.points[0].cl).toEqual([['724-11-1', 120, 5]])
+    expect(back.path?.[0][4]).toBe(3)
+    expect(back.beam).toBe(120)
+    await expect(decryptMapOpen(frag.slice(0, -6))).rejects.toThrow(/incompleto/)
   })
 })
