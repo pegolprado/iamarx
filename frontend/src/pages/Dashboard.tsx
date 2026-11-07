@@ -52,13 +52,7 @@ function StateTag({ ready, label, warn }: { ready: boolean; label: string; warn?
 function FeatureModule({ m, o, accent, grid }: { m: ModuleDef; o: OpsSummary; accent?: boolean; grid?: boolean }) {
   const st = moduleState(m.key, o)
   return (
-    <Link
-      to={to(m)}
-      className={clsx(
-        'card card-hover group relative flex min-h-[188px] flex-col overflow-hidden p-5',
-        accent && 'border-accent/30 bg-[linear-gradient(135deg,rgba(0,217,245,0.07),rgba(16,27,38,0.92)_55%)]',
-      )}
-    >
+    <Link to={to(m)} className={clsx('card card-hover group relative flex min-h-[188px] flex-col overflow-hidden p-5', accent && 'card-accent border-accent/30')}>
       {grid && (
         <div
           className="pointer-events-none absolute inset-0 [background-image:radial-gradient(circle_at_78%_30%,rgba(0,214,143,0.1),transparent_45%),linear-gradient(rgba(95,150,180,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(95,150,180,0.06)_1px,transparent_1px)] [background-size:auto,22px_22px,22px_22px]"

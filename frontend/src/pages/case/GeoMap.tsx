@@ -124,7 +124,7 @@ function StationsMap({ tile, attr }: { tile: string; attr: string }) {
               <button
                 key={x.label}
                 aria-pressed={quick === x}
-                className={`rounded-lg px-3 py-1 text-sm ${quick === x ? 'bg-accent text-white' : 'text-muted hover:text-text'}`}
+                className={`rounded-lg px-3 py-1 text-sm ${quick === x ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'}`}
                 onClick={() => setF({ ...f, event_types: x.types.length ? x.types : undefined })}
               >
                 {x.label}

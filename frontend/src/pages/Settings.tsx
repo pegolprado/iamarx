@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '../api/client'
 import { ROLE_LABEL, useAuth } from '../app/auth'
+import { ThemeSwitch } from '../app/layout'
 import { ErrorBox, Field, Notice, PageHeader } from '../components/ui'
 import { assertStrong, deriveKey } from '../lib/passkey'
 import { RULES_VERSION } from '../engine/normalize'
@@ -24,6 +25,13 @@ export default function SettingsPage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
+        <section className="card flex flex-wrap items-center justify-between gap-4 p-6 lg:col-span-2">
+          <div>
+            <h2 className="section-title">Aparência</h2>
+            <p className="mt-1 text-[13px] text-muted">Tema escuro, claro ou automático (acompanha a configuração do seu computador). Vale para este navegador.</p>
+          </div>
+          <ThemeSwitch className="!h-9 [&>button]:!w-10" />
+        </section>
         <ChangePassword onDone={refresh} />
         <Mfa enabled={!!me?.mfa_enabled} onChange={refresh} />
         <section className="card p-6 lg:col-span-2">
@@ -47,7 +55,8 @@ export default function SettingsPage() {
               <div className="md:col-span-2">
                 <dt className="label">Privacidade das análises</dt>
                 <dd className="text-muted">
-                  Os arquivos e resultados são processados somente no seu navegador e ficam na memória desta aba. O servidor não recebe nem grava arquivos, consultas ou relatórios. Sair, fechar a aba, recarregar ou ficar {sys.data.idle_minutes} minutos sem atividade apaga tudo.
+                  Os arquivos e resultados são processados somente no seu navegador e ficam na memória desta aba. O servidor não recebe nem grava arquivos, consultas ou relatórios.
+                  Sair, fechar a aba, recarregar ou ficar {sys.data.idle_minutes} minutos sem atividade apaga tudo.
                 </dd>
               </div>
             </dl>
@@ -90,7 +99,7 @@ function ChangePassword({ onDone }: { onDone: () => void }) {
       <Field label="Senha atual">
         <input type="password" className="w-full" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} required />
       </Field>
-      <Field label="Nova senha" hint="Mínimo de 12 caracteres, com letras e números.">
+      <Field label="Nova senha" hint="Mínimo de 6 caracteres, com letras e números.">
         <input type="password" className="w-full" autoComplete="new-password" value={n1} onChange={(e) => setN1(e.target.value)} required />
       </Field>
       <Field label="Repita a nova senha">
@@ -112,7 +121,11 @@ function Mfa({ enabled, onChange }: { enabled: boolean; onChange: () => void }) 
       <h2 className="section-title flex items-center gap-2 text-muted">
         <ShieldCheck className="h-4 w-4" /> Verificação em duas etapas
       </h2>
-      <p className="text-sm text-muted">{enabled ? 'Ativa. O login exige o código do aplicativo autenticador.' : 'Recomendada para todos os perfis. Use um aplicativo TOTP (Google Authenticator, Microsoft Authenticator, Authy, 1Password).'}</p>
+      <p className="text-sm text-muted">
+        {enabled
+          ? 'Ativa. O login exige o código do aplicativo autenticador.'
+          : 'Recomendada para todos os perfis. Use um aplicativo TOTP (Google Authenticator, Microsoft Authenticator, Authy, 1Password).'}
+      </p>
       {!enabled && !setup && (
         <button
           className="btn-ghost"
@@ -129,9 +142,7 @@ function Mfa({ enabled, onChange }: { enabled: boolean; onChange: () => void }) 
       )}
       {!enabled && setup && (
         <div className="space-y-3">
-          <Notice>
-            No aplicativo, escolha “inserir chave manualmente” e informe a chave abaixo (tipo: baseada em tempo).
-          </Notice>
+          <Notice>No aplicativo, escolha “inserir chave manualmente” e informe a chave abaixo (tipo: baseada em tempo).</Notice>
           <div className="rounded-lg border border-line bg-ink-2 p-3 text-center font-mono text-lg tracking-widest break-all text-white select-all">{setup.secret}</div>
           <details className="text-xs text-faint">
             <summary className="cursor-pointer">URI otpauth (para gerar QR code em ferramenta confiável)</summary>

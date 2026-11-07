@@ -42,7 +42,7 @@ export function PageHeader({ icon, title, subtitle, actions, badge }: { icon?: R
 }
 
 const TONES = {
-  blue: 'text-[#7fe9f8] border-accent/25 bg-accent/[0.07]',
+  blue: 'text-accent-2 border-accent/25 bg-accent/[0.07]',
   teal: 'text-teal border-teal/25 bg-teal/[0.08]',
   amber: 'text-amber border-amber/25 bg-amber/[0.08]',
   red: 'text-danger border-danger/25 bg-danger/[0.08]',
@@ -183,7 +183,7 @@ export function Empty({ title = 'Nada por aqui ainda', children, icon }: { title
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const msg = error instanceof Error ? error.message : String(error)
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/[0.07] px-3.5 py-3 text-[13px] text-[#e7a3a8]" role="alert">
+    <div className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/[0.07] px-3.5 py-3 text-[13px] text-danger" role="alert">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="flex-1">{msg}</div>
       {onRetry && (

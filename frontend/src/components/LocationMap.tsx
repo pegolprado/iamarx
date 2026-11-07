@@ -143,13 +143,13 @@ export function LocationMap({
       <div ref={box} className="h-full w-full" role="img" aria-label="Mapa de localização do alvo" />
       <div className="absolute top-3 right-3 z-[500] flex gap-2">
         <button
-          className="grid h-9 w-9 place-items-center rounded-[7px] border border-line-2 bg-[rgba(8,14,20,0.92)] text-text hover:text-accent"
+          className="grid h-9 w-9 place-items-center rounded-[7px] border border-line-2 bg-glass text-text hover:text-accent"
           onClick={() => (document.fullscreenElement ? document.exitFullscreen() : wrap.current?.requestFullscreen?.())}
           aria-label={full ? 'Sair da tela cheia' : 'Tela cheia'}
         >
           {full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
-        <div className="flex overflow-hidden rounded-[7px] border border-line-2 bg-[rgba(8,14,20,0.92)] text-xs font-medium sm:text-[13px]" role="group" aria-label="Fundo do mapa">
+        <div className="flex overflow-hidden rounded-[7px] border border-line-2 bg-glass text-xs font-medium sm:text-[13px]" role="group" aria-label="Fundo do mapa">
           {(
             [
               ['mapa', 'Mapa'],
@@ -168,7 +168,7 @@ export function LocationMap({
           ))}
         </div>
       </div>
-      <div className="absolute bottom-3 left-3 z-[500] rounded-[7px] border border-line bg-[rgba(8,14,20,0.9)] px-3 py-2 text-[11px] leading-5 text-muted">
+      <div className="absolute bottom-3 left-3 z-[500] rounded-[7px] border border-line bg-glass px-3 py-2 text-[11px] leading-5 text-muted">
         <div className="flex items-center gap-2">
           <span className="font-bold">⚲</span> ERB / antena · nº = total de eventos
         </div>

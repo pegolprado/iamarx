@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/space-grotesk';
 @import '@fontsource/montserrat/600.css';
 @import '@fontsource/montserrat/700.css';
 @import '@fontsource/montserrat/800.css';
@@ -15,7 +16,8 @@
  * números, horários, identificadores e estados.
  */
 @theme {
-  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Space Grotesk Variable', 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-display: 'Montserrat', 'Inter Variable', system-ui, sans-serif;
 
@@ -40,10 +42,73 @@
   --color-violet: #9b8cf0;
   --color-gold: #d9a84e; /* cor da marca (X do logotipo) */
   --color-white: #f3f7fa;
+  --color-glass: rgba(8, 14, 20, 0.9); /* superfícies sobrepostas: cabeçalho, barra lateral, controles sobre mapa/grafo */
 
   --radius-card: 10px;
   --ease-ui: cubic-bezier(0.2, 0, 0, 1);
   --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 12px 32px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* valores que mudam com o tema (escuro é o padrão) */
+:root {
+  --card-bg: rgba(16, 27, 38, 0.9);
+  --card-hover-bg: rgba(20, 36, 49, 0.92);
+  --btn-primary-text: #bff6fd;
+  --btn-primary-hover-text: #e9fdff;
+  --btn-primary-bg: linear-gradient(180deg, rgba(0, 217, 245, 0.2), rgba(0, 217, 245, 0.1));
+  --scroll-thumb: #1c3140;
+  --scroll-thumb-hover: #284558;
+  --map-bg: #0a141d;
+  --popup-bg: #101b26;
+  --bg-glow-1: rgba(0, 120, 160, 0.16);
+  --bg-glow-2: rgba(0, 150, 110, 0.09);
+  --bg-base-1: #050a0f;
+  --bg-base-2: #030609;
+  --bg-grid: rgba(95, 150, 180, 0.045);
+  --bg-scan: rgba(255, 255, 255, 0.012);
+}
+
+/* tema claro: mesmas camadas, invertidas; ciano e verde mais escuros para manter o contraste */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-ink: #e9eef3;
+  --color-ink-2: #f6f8fa;
+  --color-petrol: #e4ebf1;
+  --color-panel: #ffffff;
+  --color-panel-2: #eef3f7;
+  --color-field: #ffffff;
+  --color-line: rgba(30, 70, 100, 0.15);
+  --color-line-2: rgba(30, 70, 100, 0.28);
+  --color-text: #15232f;
+  --color-muted: #4b5e70;
+  --color-faint: #74859a;
+  --color-accent: #0083a3;
+  --color-accent-2: #006f8b;
+  --color-cyan: #0083a3;
+  --color-teal: #0c8178;
+  --color-ok: #08875a;
+  --color-amber: #9c640c;
+  --color-danger: #c23845;
+  --color-violet: #5b4cc4;
+  --color-gold: #9b6e17;
+  --color-white: #0b1721;
+  --color-glass: rgba(255, 255, 255, 0.92);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 28px -20px rgba(20, 50, 80, 0.35);
+  --card-bg: rgba(255, 255, 255, 0.94);
+  --card-hover-bg: #ffffff;
+  --btn-primary-text: #006a85;
+  --btn-primary-hover-text: #004e62;
+  --btn-primary-bg: linear-gradient(180deg, rgba(0, 131, 163, 0.12), rgba(0, 131, 163, 0.06));
+  --scroll-thumb: #c3d0db;
+  --scroll-thumb-hover: #a7b7c5;
+  --map-bg: #e9eef3;
+  --popup-bg: #ffffff;
+  --bg-glow-1: rgba(0, 140, 180, 0.1);
+  --bg-glow-2: rgba(0, 160, 110, 0.06);
+  --bg-base-1: #f1f5f8;
+  --bg-base-2: #e7edf2;
+  --bg-grid: rgba(30, 70, 100, 0.05);
+  --bg-scan: rgba(0, 0, 0, 0);
 }
 
 @layer base {
@@ -58,6 +123,9 @@
   }
   body {
     @apply bg-ink font-sans text-[14px] leading-[1.5] text-text antialiased;
+    transition:
+      background-color 200ms var(--ease-ui),
+      color 200ms var(--ease-ui);
     font-feature-settings: 'cv11', 'ss01';
   }
   ::selection {
@@ -146,20 +214,20 @@
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #1c3140 transparent;
+    scrollbar-color: var(--scroll-thumb) transparent;
   }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1c3140;
+    background: var(--scroll-thumb);
     border: 3px solid transparent;
     background-clip: padding-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #284558;
+    background-color: var(--scroll-thumb-hover);
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -175,7 +243,7 @@
 /* Painel técnico: superfície translúcida sobre o fundo, borda fina e entrada suave. */
 @utility card {
   @apply rounded-[10px] border border-line;
-  background: rgba(16, 27, 38, 0.9);
+  background: var(--card-bg);
   box-shadow: var(--shadow-panel);
   animation: panel-in 260ms var(--ease-ui) backwards;
 }
@@ -188,7 +256,7 @@
     box-shadow 180ms var(--ease-ui);
   &:hover {
     border-color: rgba(0, 217, 245, 0.38);
-    background-color: rgba(20, 36, 49, 0.92);
+    background-color: var(--card-hover-bg);
     transform: translateY(-1px);
     box-shadow:
       0 0 0 1px rgba(0, 217, 245, 0.06),
@@ -215,11 +283,12 @@
 }
 
 @utility btn-primary {
-  @apply btn border border-accent/55 text-[#bff6fd];
-  background: linear-gradient(180deg, rgba(0, 217, 245, 0.2), rgba(0, 217, 245, 0.1));
+  @apply btn border border-accent/55;
+  color: var(--btn-primary-text);
+  background: var(--btn-primary-bg);
   &:hover:not(:disabled) {
     border-color: rgba(0, 217, 245, 0.85);
-    color: #e9fdff;
+    color: var(--btn-primary-hover-text);
     box-shadow:
       0 0 0 3px rgba(0, 217, 245, 0.1),
       0 0 18px -4px rgba(0, 217, 245, 0.45);
@@ -335,14 +404,14 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(1100px 620px at 78% -8%, rgba(0, 120, 160, 0.16), transparent 62%), radial-gradient(900px 600px at -6% 108%, rgba(0, 150, 110, 0.09), transparent 60%),
-    linear-gradient(180deg, #050a0f, #030609 60%);
+    radial-gradient(1100px 620px at 78% -8%, var(--bg-glow-1), transparent 62%), radial-gradient(900px 600px at -6% 108%, var(--bg-glow-2), transparent 60%),
+    linear-gradient(180deg, var(--bg-base-1), var(--bg-base-2) 60%);
 }
 .ops-bg::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(95, 150, 180, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(95, 150, 180, 0.045) 1px, transparent 1px);
+  background-image: linear-gradient(var(--bg-grid) 1px, transparent 1px), linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(ellipse at 60% 30%, #000 20%, transparent 75%);
 }
@@ -350,36 +419,39 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px);
+  background: repeating-linear-gradient(180deg, var(--bg-scan) 0 1px, transparent 1px 3px);
 }
 
 /* mapas: base de ruas escurecida (só a camada de ruas; satélite fica natural) */
 .map-dark {
   filter: invert(1) hue-rotate(185deg) brightness(0.82) contrast(0.92) saturate(0.55);
 }
+:root[data-theme='light'] .map-dark {
+  filter: none;
+}
 
 .leaflet-container {
-  background: #0a141d;
+  background: var(--map-bg);
   font-family: var(--font-sans);
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: #101b26;
-  color: #e7edf3;
-  border: 1px solid rgba(95, 150, 180, 0.32);
+  background: var(--popup-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-line-2);
   border-radius: 8px;
 }
 .leaflet-control-attribution {
-  background: rgba(3, 6, 9, 0.78) !important;
-  color: #9aaaba !important;
+  background: var(--color-glass) !important;
+  color: var(--color-muted) !important;
 }
 .leaflet-control-attribution a {
-  color: #5ae6f8 !important;
+  color: var(--color-accent) !important;
 }
 .leaflet-bar a {
-  background: #101b26 !important;
-  color: #e7edf3 !important;
-  border-color: rgba(95, 150, 180, 0.32) !important;
+  background: var(--popup-bg) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-line-2) !important;
 }
 
 /* número de eventos sobre cada ERB no mapa */
@@ -645,4 +717,21 @@
 td.font-mono,
 td .font-mono {
   white-space: nowrap;
+}
+
+/* textos longos (parágrafos, descrições) em Inter; títulos, menus e rótulos em Space Grotesk */
+p,
+td,
+textarea,
+input,
+select {
+  font-family: var(--font-body);
+}
+
+/* destaque com brilho ciano que respeita o tema */
+.card-accent {
+  background: linear-gradient(135deg, color-mix(in oklab, var(--color-accent) 9%, transparent), var(--card-bg) 55%) !important;
+}
+.icon-well {
+  background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--color-accent) 18%, transparent), var(--color-petrol) 70%);
 }

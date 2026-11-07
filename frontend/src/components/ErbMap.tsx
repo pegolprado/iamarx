@@ -234,14 +234,14 @@ export function ErbMap({
       <div ref={box} className="h-full w-full" role="img" aria-label="Mapa das estações (ERBs)" />
       <div className="absolute top-3 right-3 z-[500] flex gap-2">
         <button
-          className="grid h-9 w-9 place-items-center rounded-[7px] border border-line-2 bg-[rgba(8,14,20,0.92)] text-text hover:text-accent"
+          className="grid h-9 w-9 place-items-center rounded-[7px] border border-line-2 bg-glass text-text hover:text-accent"
           onClick={toggleFull}
           aria-label={full ? 'Sair da tela cheia' : 'Tela cheia'}
           title="Tela cheia"
         >
           {full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
-        <div className="flex overflow-hidden rounded-[7px] border border-line-2 bg-[rgba(8,14,20,0.92)] text-[13px] font-medium" role="group" aria-label="Tipo de mapa">
+        <div className="flex overflow-hidden rounded-[7px] border border-line-2 bg-glass text-[13px] font-medium" role="group" aria-label="Tipo de mapa">
           {BASES.map((b) => (
             <button
               key={b.id}
@@ -254,7 +254,7 @@ export function ErbMap({
           ))}
         </div>
       </div>
-      <div className="absolute bottom-3 left-3 z-[500] max-w-[260px] rounded-[7px] border border-line bg-[rgba(8,14,20,0.9)] px-3 py-2 text-[11px] leading-5 text-muted">
+      <div className="absolute bottom-3 left-3 z-[500] max-w-[260px] rounded-[7px] border border-line bg-glass px-3 py-2 text-[11px] leading-5 text-muted">
         <div className="font-semibold">ERB / antena · nº = total de eventos</div>
         {HEAT.map((h, i) => (
           <div key={h.label} className="flex items-center gap-2">

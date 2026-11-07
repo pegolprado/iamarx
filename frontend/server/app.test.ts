@@ -117,7 +117,7 @@ describe('servidor de login', () => {
     expect(ok.status).toBe(200)
     expect(ok.headers.getSetCookie().join()).toMatch(/marx_session=.*HttpOnly.*Secure|marx_session=.*Secure.*HttpOnly/)
     const me = await c.req('GET', '/api/auth/me')
-    expect(me.body).toMatchObject({ email: 'admin@marx.local', role: 'admin', idle_minutes: 30 })
+    expect(me.body).toMatchObject({ email: 'admin@marx.local', role: 'admin', idle_minutes: 180 })
     expect(me.headers.get('cache-control')).toBe('no-store')
     // requisições forjadas por outro site são bloqueadas
     expect((await c.req('POST', '/api/auth/logout', {}, { 'x-csrf-token': 'x', origin: 'https://site-malicioso.com' })).status).toBe(403)
@@ -155,7 +155,7 @@ describe('servidor de login', () => {
     await setupAdmin()
     const c = await client()
     await c.login('admin@marx.local', 'SenhaForte123')
-    vi.useFakeTimers({ now: Date.now() + 31 * 60_000, toFake: ['Date'] })
+    vi.useFakeTimers({ now: Date.now() + 181 * 60_000, toFake: ['Date'] })
     try {
       expect((await c.req('GET', '/api/auth/me')).status).toBe(401)
     } finally {

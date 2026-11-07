@@ -9,6 +9,7 @@ const LINK = 150 // distância máxima (px) para ligar dois nós
 const VARIANTS = {
   auth: { line: '76, 141, 255', hi: '226, 169, 59', lineA: 0.2, dotA: 0.5, density: 15000, max: 80, hiShare: 0.12, pulses: 4 },
   ops: { line: '60, 150, 185', hi: '0, 214, 143', lineA: 0.1, dotA: 0.32, density: 26000, max: 56, hiShare: 0.1, pulses: 2 },
+  opsLight: { line: '30, 100, 140', hi: '0, 150, 100', lineA: 0.12, dotA: 0.3, density: 26000, max: 56, hiShare: 0.1, pulses: 2 },
 } as const
 
 /**

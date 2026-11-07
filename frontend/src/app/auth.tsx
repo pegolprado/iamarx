@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, ensureCsrf, onApiStatus } from '../api/client'
 import { resetDb } from '../engine/db'
 import { clearSession, getState } from '../engine/session'
-import { isLocked, lockScreen } from './privacy'
+import { isLocked } from './privacy'
 
 export type Me = {
   id: number
@@ -58,11 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const me = q.data ?? null
 
-  const logout = useCallback(async (reason?: string) => {
-    await api('/auth/logout', { method: 'POST' }).catch(() => {})
-    qc.clear()
-    await wipeAndReload(`/login${reason ? `?motivo=${reason}` : ''}`)
-  }, [qc])
+  const logout = useCallback(
+    async (reason?: string) => {
+      await api('/auth/logout', { method: 'POST' }).catch(() => {})
+      qc.clear()
+      await wipeAndReload(`/login${reason ? `?motivo=${reason}` : ''}`)
+    },
+    [qc],
+  )
 
   useEffect(
     () =>
@@ -87,14 +90,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const evs = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll', 'marx:activity']
     evs.forEach((e) => window.addEventListener(e, mark, { passive: true }))
-    const limit = Math.max(1, me.idle_minutes || 30) * 60_000
-    // Bloqueia a tela após alguns minutos parado (sem apagar); apaga tudo ao atingir o limite.
-    const lockAfter = Math.min(5 * 60_000, limit / 2)
+    const limit = Math.max(1, me.idle_minutes || 180) * 60_000
+    // Sem bloqueio automático: ao atingir o limite sem uso, encerra a sessão e apaga tudo.
+    // (O bloqueio de tela continua disponível pelo botão "Bloquear tela".)
     const t = window.setInterval(() => {
       if (getState().busy && !isLocked()) last.current = Date.now()
-      const idle = Date.now() - last.current
-      if (idle > limit) void logout('inatividade')
-      else if (idle > lockAfter && !isLocked() && (getState().files.length || getState().targets.length)) lockScreen()
+      if (Date.now() - last.current > limit) void logout('inatividade')
     }, 5_000)
     // Mantém a sessão do servidor viva enquanto o usuário trabalha (sem enviar dados).
     const ping = window.setInterval(() => {

@@ -209,7 +209,7 @@ export function Register() {
               onChange={(e) => setF({ ...f, email: e.target.value })}
             />
           </AuthField>
-          <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+          <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 6 caracteres, com letras e números.">
             <PasswordInput value={f.p1} onChange={(v) => setF({ ...f, p1: v })} autoComplete="new-password" />
           </AuthField>
           <AuthField label="Repita a senha" icon={<KeyRound />}>
@@ -297,7 +297,7 @@ export function ResetPassword() {
               {info.data.name} · <span className="font-mono">{info.data.email}</span>
             </p>
           )}
-          <AuthField label="Nova senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+          <AuthField label="Nova senha" icon={<KeyRound />} hint="Mínimo de 6 caracteres, com letras e números.">
             <PasswordInput value={p1} onChange={setP1} autoComplete="new-password" />
           </AuthField>
           <AuthField label="Repita a senha" icon={<KeyRound />}>
@@ -366,7 +366,7 @@ export function FirstSetup() {
         <AuthField label="E-mail" icon={<Mail />}>
           <input className="auth-input" type="email" autoComplete="username" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
         </AuthField>
-        <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 12 caracteres, com letras e números.">
+        <AuthField label="Senha" icon={<KeyRound />} hint="Mínimo de 6 caracteres, com letras e números.">
           <PasswordInput value={f.p1} onChange={(v) => setF({ ...f, p1: v })} autoComplete="new-password" />
         </AuthField>
         <AuthField label="Repita a senha" icon={<KeyRound />}>

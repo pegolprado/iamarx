@@ -12,8 +12,8 @@ do documento estão em UTC e são convertidos para o horário de Brasília. Para
 linha do arquivo.
 
 ## Privacidade no dia a dia
-- **Bloquear tela** (menu lateral, ou automático após 5 min parado): esconde tudo e pede a senha para voltar,
-  sem apagar a análise. Se ninguém desbloquear, a análise é apagada ao atingir `IDLE_MINUTES` (padrão 30).
+- **Bloquear tela** (botão no cabeçalho): esconde tudo e pede a senha para voltar,
+  sem apagar a análise. Sem uso, a sessão é encerrada e a análise apagada ao atingir `IDLE_MINUTES` (padrão 180 = 3 horas).
 - **Ocultar números**: mostra os telefones como `(61) 9••••-••32` na tela — útil ao projetar ou compartilhar
   a tela. Exportações sempre trazem o número completo.
 - **Sair e apagar**: encerra a sessão e apaga a análise da memória.

@@ -6,7 +6,7 @@
  */
 import { KEY_RE, newTotpSecret, passwordHash, randomToken, safeEqual, saltFor, type SessionPayload, signSession, totpVerify, verifySession, hmacHex } from './crypto'
 
-export const APP_VERSION = '2.3.0'
+export const APP_VERSION = '2.4.0'
 
 // ---------------------------------------------------------------- tipos mínimos do D1
 
@@ -99,7 +99,7 @@ function cfg(env: Env) {
   if (!env.SECRET_KEY || env.SECRET_KEY.length < 32) throw new HttpError(500, 'Servidor sem SECRET_KEY configurada (mínimo de 32 caracteres).')
   return {
     secret: env.SECRET_KEY,
-    idle: num(env.IDLE_MINUTES, 30),
+    idle: num(env.IDLE_MINUTES, 180),
     session: num(env.SESSION_MINUTES, 480),
     maxAttempts: num(env.LOGIN_MAX_ATTEMPTS, 5),
     lockMinutes: num(env.LOGIN_LOCK_MINUTES, 15),

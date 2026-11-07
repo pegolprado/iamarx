@@ -348,7 +348,7 @@ function Graph({ r }: { r: Result }) {
           <button
             className={clsx(
               'rounded-[6px] border px-2 py-1 text-xs font-medium',
-              layout === 'rede' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-[rgba(8,14,20,0.9)] text-muted hover:text-text',
+              layout === 'rede' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-glass text-muted hover:text-text',
             )}
             onClick={() => setLayout('rede')}
           >
@@ -357,17 +357,17 @@ function Graph({ r }: { r: Result }) {
           <button
             className={clsx(
               'rounded-[6px] border px-2 py-1 text-xs font-medium',
-              layout === 'org' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-[rgba(8,14,20,0.9)] text-muted hover:text-text',
+              layout === 'org' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-glass text-muted hover:text-text',
             )}
             onClick={() => setLayout('org')}
           >
             Organização
           </button>
-          <label className="mt-1 flex items-center gap-1 rounded-[6px] border border-line bg-[rgba(8,14,20,0.9)] px-1.5 py-0.5 text-[10px] text-muted">
+          <label className="mt-1 flex items-center gap-1 rounded-[6px] border border-line bg-glass px-1.5 py-0.5 text-[10px] text-muted">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> todos os contatos
           </label>
         </div>
-        <div className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-[6px] border border-line-2 bg-[rgba(8,14,20,0.92)] px-2 py-1">
+        <div className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-[6px] border border-line-2 bg-glass px-2 py-1">
           <Search className="h-3.5 w-3.5 text-faint" />
           <input
             value={q}
@@ -378,7 +378,7 @@ function Graph({ r }: { r: Result }) {
         </div>
         <GraphControls cy={cy} />
         <div ref={box} className="h-[460px] w-full" role="img" aria-label="Grafo de vínculos entre alvos" />
-        <div className="absolute bottom-2 left-2 flex gap-2 rounded-[6px] border border-line bg-[rgba(8,14,20,0.88)] px-2 py-1 font-mono text-[10px] text-muted">
+        <div className="absolute bottom-2 left-2 flex gap-2 rounded-[6px] border border-line bg-glass px-2 py-1 font-mono text-[10px] text-muted">
           <span>
             <b className="text-accent">●</b> alvo
           </span>

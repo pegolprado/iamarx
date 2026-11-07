@@ -8,9 +8,9 @@ export const PBKDF2_ITERATIONS = 600_000
 
 export function passwordProblems(p: string): string[] {
   const out: string[] = []
-  if (p.length < 12) out.push('mínimo de 12 caracteres')
+  if (p.length < 6) out.push('mínimo de 6 caracteres')
   if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) out.push('use letras e números')
-  if (['senha123456789', 'password12345', '123456789abc'].includes(p.toLowerCase())) out.push('senha muito comum')
+  if (['senha1', 'senha123', 'abc123', '123abc', 'senha123456789', 'password12345', '123456789abc'].includes(p.toLowerCase())) out.push('senha muito comum')
   return out
 }
 

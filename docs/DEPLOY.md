@@ -45,7 +45,7 @@ Limites do plano gratuito, muito acima do uso do MARX: 100 mil requisições de 
    | `SECRET_KEY` | texto aleatório com 48+ caracteres (gere em https://www.random.org/strings ou com `openssl rand -base64 48`) — **nunca troque depois**, ou todas as senhas deixam de funcionar |
    | `SETUP_TOKEN` | um código só seu, 12+ caracteres, usado uma única vez para criar o administrador |
    | `NODE_VERSION` | `22` |
-   | `IDLE_MINUTES` | (opcional) minutos sem uso até apagar a análise — padrão 30 |
+   | `IDLE_MINUTES` | (opcional) minutos sem uso até encerrar a sessão e apagar a análise — padrão 180 (3 horas) |
 
 4. **Save and Deploy**. O primeiro build leva ~3 minutos.
 5. No projeto: **Settings → Bindings → Add → D1 database** → *Variable name* `DB` → banco `marx-usuarios` →

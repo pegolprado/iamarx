@@ -7,7 +7,7 @@
 import { normHeader, stripAccents } from './text'
 
 export const RULES_VERSION = '2026.10-2'
-export const APP_VERSION = '2.3.0'
+export const APP_VERSION = '2.4.0'
 
 // ------------------------------------------------------------------ números
 
@@ -18,7 +18,12 @@ export function normalizeNumber(raw: string | null | undefined): [string | null,
   if (raw === null || raw === undefined) return [null, w]
   let s = String(raw).trim()
   // "11940268614 \n(353210502453550)" / "5511940268614 IMEI: 3532…" (sistemas de interceptação): só o número
-  s = s.split(/\r?\n/)[0].replace(/\s*IMEI\b.*$/i, '').replace(/\s*\(\d{14,17}\)\s*$/, '').trim() || s
+  s =
+    s
+      .split(/\r?\n/)[0]
+      .replace(/\s*IMEI\b.*$/i, '')
+      .replace(/\s*\(\d{14,17}\)\s*$/, '')
+      .trim() || s
   if (!s || EMPTY_NUM.has(s)) return [null, w]
   if (/^\d+\.0$/.test(s)) s = s.slice(0, -2)
   const intl = s.startsWith('+')
@@ -108,7 +113,10 @@ const ISO_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/
 const OFFSET_IN_TEXT = /(?:UTC|GMT)\s*([+-]\d{1,2})(?::?(\d{2}))?/i
 
 function cleanDt(s: string) {
-  return s.trim().replace(/ {2}/g, ' ').replace(/\s+(BRT|BRST|UTC|GMT)([+-]\d.*)?$/i, '')
+  return s
+    .trim()
+    .replace(/ {2}/g, ' ')
+    .replace(/\s+(BRT|BRST|UTC|GMT)([+-]\d.*)?$/i, '')
 }
 
 export function detectFormat(values: string[], candidates: string[]): { format: string | null; rate: number; ambiguous: boolean } {
@@ -143,8 +151,12 @@ function fromExcelSerial(v: string): LocalDT {
 }
 
 export function parseLocalDatetime(
-  dateS: string | null, timeS: string | null, dtS: string | null,
-  dateFmt?: string | null, timeFmt?: string | null, dtFmt?: string | null,
+  dateS: string | null,
+  timeS: string | null,
+  dtS: string | null,
+  dateFmt?: string | null,
+  timeFmt?: string | null,
+  dtFmt?: string | null,
 ): [LocalDT | null, string | null, string | null] {
   let offset: string | null = null
   // "03/11/2026–17:09:44" (traço longo entre data e hora, comum em relatórios de operadoras)
@@ -169,7 +181,13 @@ export function parseLocalDatetime(
     return [null, null, `data/hora não reconhecida: '${dtS}'`]
   }
   // coluna "data" que traz também o horário (ex.: 16/10/2026 09:26:39) e nenhuma coluna de hora
-  if (dateS && dateS.trim() && !(timeS && timeS.trim()) && /\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}/.test(dateS) && !/ 00:00:00$/.test(dateS.trim()))
+  if (
+    dateS &&
+    dateS.trim() &&
+    !(timeS && timeS.trim()) &&
+    /\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}/.test(dateS) &&
+    !/ 00:00:00$/.test(dateS.trim())
+  )
     return parseLocalDatetime(null, null, dateS, null, null, null)
   if (dateS && dateS.trim()) {
     let dRaw = dateS.trim()
@@ -210,7 +228,16 @@ const dtfCache = new Map<string, Intl.DateTimeFormat>()
 export function tzOffsetMs(utcMs: number, tz: string): number {
   let f = dtfCache.get(tz)
   if (!f) {
-    f = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
     dtfCache.set(tz, f)
   }
   const p: Record<string, number> = {}
@@ -286,7 +313,10 @@ const IN = ['recebid', 'entrante', 'entrada', 'incoming', ' mt ', 'terminad', 't
 
 export function classifyDirection(text: string | null): 'out' | 'in' | 'unknown' {
   if (!text) return 'unknown'
-  let t = stripAccents(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  let t = stripAccents(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
   const bare = t
   t = ` ${t} `
   if (OUT.some((k) => t.includes(k))) return 'out'
@@ -309,7 +339,7 @@ export function classifyEvent(typeText: string | null, dirText: string | null, v
   }
   const t = ` ${normHeader(typeText ?? '')} `
   const pick = (base: 'voz' | 'sms') =>
-    base === 'voz' ? ({ out: 'voz_originada', in: 'voz_recebida' } as any)[direction] ?? 'voz' : ({ out: 'sms_enviado', in: 'sms_recebido' } as any)[direction] ?? 'sms'
+    base === 'voz' ? (({ out: 'voz_originada', in: 'voz_recebida' } as any)[direction] ?? 'voz') : (({ out: 'sms_enviado', in: 'sms_recebido' } as any)[direction] ?? 'sms')
   if (!t.trim()) {
     const base = defaultType || 'outro'
     if (base === 'voz' || base === 'sms') return [pick(base), direction, true]
@@ -319,15 +349,33 @@ export function classifyEvent(typeText: string | null, dirText: string | null, v
   if (has(t, [' dados ', ' gprs ', ' data ', ' internet ', ' pacote ', ' conexao ', ' psd ', ' ps '])) return ['dados', 'unknown', true]
   if (has(t, [' desvio ', ' desviad', ' encaminhad', ' forward', ' siga me ', ' redirecionament', ' redirecionad'])) return ['desvio', direction, true]
   if (has(t, [' atualizacao ', ' location update ', ' registro ', ' attach ', ' handover ', ' evento de rede '])) return ['evento_rede', 'unknown', true]
-  if (has(t, [' voz ', ' chamada ', ' chamadas ', ' ligacoes ', ' call ', ' ligacao ', ' originada ', ' recebida ', ' mo ', ' mt ', ' moc ', ' mtc ', ' sainte ', ' entrante '])) return [pick('voz'), direction, true]
+  if (has(t, [' voz ', ' chamada ', ' chamadas ', ' ligacoes ', ' call ', ' ligacao ', ' originada ', ' recebida ', ' mo ', ' mt ', ' moc ', ' mtc ', ' sainte ', ' entrante ']))
+    return [pick('voz'), direction, true]
   return ['outro', direction, false]
 }
 
 // ------------------------------------------------------------------ células
 
 const TECH: Record<string, string> = {
-  '2g': '2G', gsm: '2G', gprs: '2G', edge: '2G', '3g': '3G', umts: '3G', wcdma: '3G', hspa: '3G', utran: '3G',
-  '4g': '4G', lte: '4G', eutran: '4G', 'e utran': '4G', volte: '4G', '5g': '5G', nr: '5G', '5g nr': '5G', nsa: '5G', sa: '5G',
+  '2g': '2G',
+  gsm: '2G',
+  gprs: '2G',
+  edge: '2G',
+  '3g': '3G',
+  umts: '3G',
+  wcdma: '3G',
+  hspa: '3G',
+  utran: '3G',
+  '4g': '4G',
+  lte: '4G',
+  eutran: '4G',
+  'e utran': '4G',
+  volte: '4G',
+  '5g': '5G',
+  nr: '5G',
+  '5g nr': '5G',
+  nsa: '5G',
+  sa: '5G',
 }
 
 export function normalizeTech(raw: string | null | undefined): string | null {
@@ -449,7 +497,19 @@ const OP_PATTERNS: Record<string, RegExp[]> = {
   CLARO: [/\bclaro\b/, /embratel/, /\bnet servi/],
   OI: [/\boi\b s\.?a/, /telemar/, /\boi movel\b/],
 }
-const MNC_HINT: Record<string, string> = { '02': 'TIM', '03': 'TIM', '04': 'TIM', '05': 'CLARO', '06': 'VIVO', '10': 'VIVO', '11': 'VIVO', '23': 'VIVO', '16': 'OI', '24': 'OI', '31': 'OI' }
+const MNC_HINT: Record<string, string> = {
+  '02': 'TIM',
+  '03': 'TIM',
+  '04': 'TIM',
+  '05': 'CLARO',
+  '06': 'VIVO',
+  '10': 'VIVO',
+  '11': 'VIVO',
+  '23': 'VIVO',
+  '16': 'OI',
+  '24': 'OI',
+  '31': 'OI',
+}
 
 export function detectOperator(filename: string, preamble: string[], columns: string[], sampleMnc: string[]) {
   const scores: Record<string, number> = {}

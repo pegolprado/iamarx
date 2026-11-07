@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Network, Settings, ShieldCheck, Users, Wrench, X } from 'lucide-react'
+import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Monitor, Moon, Network, Settings, ShieldCheck, Sun, Users, Wrench, X } from 'lucide-react'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { NetworkBackground } from '../components/auth/NetworkBackground'
@@ -13,6 +13,7 @@ import { useSession } from '../engine/session'
 import { fmtDate, fmtInt } from '../lib/format'
 import { ROLE_LABEL, useAuth } from './auth'
 import { LockOverlay, lockScreen, toggleMask, usePrivacy } from './privacy'
+import { setThemePref, type ThemePref, useAppliedTheme, useThemePref } from './theme'
 import { greeting, SESSION_ID, StatusDot, SystemStatus, useClock, useOps } from './system'
 
 function NavItem({
@@ -98,6 +99,20 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="flex-1">
+        <NavSection label="INVMARX">
+          <NavItem to="/invmarx" end icon={<Boxes />} onClick={onNavigate}>
+            Ferramentas INVMARX
+          </NavItem>
+          <NavItem to="/invmarx/whatsapp" icon={<FileText />} onClick={onNavigate}>
+            Bilhetagem WhatsApp
+          </NavItem>
+          <NavItem to="/invmarx/whatsapp-vinculos" icon={<Network />} onClick={onNavigate}>
+            WhatsApp — vínculos
+          </NavItem>
+          <NavItem to="/invmarx/extrato" icon={<Clock />} onClick={onNavigate}>
+            Extrato Tempo Real
+          </NavItem>
+        </NavSection>
         <NavSection label="Workspace">
           <NavItem to="/" end icon={<GOverview />} onClick={onNavigate}>
             Workspace
@@ -129,20 +144,6 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </NavItem>
           ))}
         </NavSection>
-        <NavSection label="INVMARX">
-          <NavItem to="/invmarx" end icon={<Boxes />} onClick={onNavigate}>
-            Ferramentas INVMARX
-          </NavItem>
-          <NavItem to="/invmarx/whatsapp" icon={<FileText />} onClick={onNavigate}>
-            Bilhetagem WhatsApp
-          </NavItem>
-          <NavItem to="/invmarx/whatsapp-vinculos" icon={<Network />} onClick={onNavigate}>
-            WhatsApp — vínculos
-          </NavItem>
-          <NavItem to="/invmarx/extrato" icon={<Clock />} onClick={onNavigate}>
-            Extrato Tempo Real
-          </NavItem>
-        </NavSection>
         {me?.role === 'admin' && (
           <NavSection label="Administração">
             <NavItem to="/admin/usuarios" icon={<Users />} onClick={onNavigate}>
@@ -172,6 +173,36 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
+/** Escolha de tema: escuro, claro ou automático (segue o sistema). */
+export function ThemeSwitch({ className }: { className?: string }) {
+  const pref = useThemePref()
+  const opts: [ThemePref, string, ReactNode][] = [
+    ['dark', 'Tema escuro', <Moon key="d" className="h-3.5 w-3.5" />],
+    ['light', 'Tema claro', <Sun key="l" className="h-3.5 w-3.5" />],
+    ['auto', 'Automático (segue o sistema)', <Monitor key="a" className="h-3.5 w-3.5" />],
+  ]
+  return (
+    <div className={clsx('flex h-8 items-center rounded-md border border-line bg-panel/70 p-0.5', className)} role="radiogroup" aria-label="Tema da interface">
+      {opts.map(([v, label, icon]) => (
+        <button
+          key={v}
+          role="radio"
+          aria-checked={pref === v}
+          aria-label={label}
+          title={label}
+          onClick={() => setThemePref(v)}
+          className={clsx(
+            'grid h-full w-7 place-items-center rounded-[5px] transition-colors duration-150',
+            pref === v ? 'bg-accent/15 text-accent' : 'text-faint hover:text-text',
+          )}
+        >
+          {icon}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /** Cabeçalho de controle: saudação, relógio, sessão, ações e indicadores reais da estação. */
 function IntelligenceHeader({ onMenu }: { onMenu: () => void }) {
   const { me, logout } = useAuth()
@@ -180,7 +211,7 @@ function IntelligenceHeader({ onMenu }: { onMenu: () => void }) {
   const now = useClock()
   const first = (me?.name ?? '').split(/\s+/)[0]
   return (
-    <header className="sticky top-0 z-[800] border-b border-line bg-[rgba(5,9,13,0.82)] backdrop-blur-md">
+    <header className="sticky top-0 z-[800] border-b border-line bg-glass backdrop-blur-md">
       <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-line bg-panel text-text lg:hidden" onClick={onMenu} aria-label="Abrir menu">
           <Menu className="h-[18px] w-[18px]" />
@@ -201,6 +232,7 @@ function IntelligenceHeader({ onMenu }: { onMenu: () => void }) {
           </span>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
+          <ThemeSwitch className="max-sm:hidden" />
           <button
             onClick={toggleMask}
             aria-pressed={masked}
@@ -247,15 +279,16 @@ export function Shell() {
   const [open, setOpen] = useState(false)
   const loc = useLocation()
   const { locked, masked } = usePrivacy()
+  const theme = useAppliedTheme()
   useEffect(() => setOpen(false), [loc.pathname])
   return (
     <>
       <LockOverlay />
       <div className="ops-bg" aria-hidden="true">
-        <NetworkBackground variant="ops" />
+        <NetworkBackground variant={theme === 'light' ? 'opsLight' : 'ops'} />
       </div>
       <div className={clsx('relative z-[1] flex min-h-screen', locked && 'invisible')} aria-hidden={locked || undefined}>
-        <aside className="sticky top-0 hidden h-screen w-[256px] shrink-0 overflow-y-auto border-r border-line bg-[rgba(8,14,20,0.92)] lg:block">
+        <aside className="sticky top-0 hidden h-screen w-[256px] shrink-0 overflow-y-auto border-r border-line bg-glass lg:block">
           <Sidebar />
         </aside>
         {open && (
@@ -525,7 +558,7 @@ export function CaseLayout() {
         </nav>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-3.5">
-            <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[9px] border border-accent/35 bg-[radial-gradient(circle_at_50%_30%,rgba(0,217,245,0.18),rgba(11,23,33,0.9)_70%)] text-accent shadow-[0_0_24px_-8px_rgba(0,217,245,0.6)] [&>svg]:h-[22px] [&>svg]:w-[22px]">
+            <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[9px] border border-accent/35 icon-well text-accent shadow-[0_0_24px_-8px_rgba(0,217,245,0.6)] [&>svg]:h-[22px] [&>svg]:w-[22px]">
               {group.icon}
             </span>
             <div className="min-w-0">

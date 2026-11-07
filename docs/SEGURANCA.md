@@ -26,7 +26,7 @@
   memória e recarrega a página do zero.
 - **Bloqueio de tela** (manual ou após 5 min parado): esconde tudo e exige a senha, sem apagar; não interrompe a
   contagem para o apagamento por inatividade.
-- **Inatividade** (`IDLE_MINUTES`, padrão 30): mesma limpeza automática.
+- **Inatividade** (`IDLE_MINUTES`, padrão 180 = 3 horas): mesma limpeza automática.
 - **Fechar ou recarregar a aba**: a memória da aba é descartada pelo navegador (há um aviso antes, se houver dados).
 - **Apagar análise** (Visão geral): limpa os dados sem sair.
 
@@ -38,7 +38,7 @@ encerrar sessões).
 ## Autenticação
 - **A senha nunca sai do navegador**: ela é transformada em chave com PBKDF2-SHA256 (600 mil iterações, sal por
   e-mail) e o servidor guarda apenas HMAC-SHA256(SECRET_KEY, chave). Sem a SECRET_KEY, o banco vazado não permite
-  nem testar senhas; com ela, cada tentativa custa 600 mil iterações. Mínimo de 12 caracteres com letras e números.
+  nem testar senhas; com ela, cada tentativa custa 600 mil iterações. Mínimo de 6 caracteres com letras e números.
 - Sessão em cookie `HttpOnly`, `Secure`, `SameSite=Strict`, assinada (HMAC-SHA256), com duração máxima
   (`SESSION_MINUTES`), expiração por inatividade e versão por usuário (encerramento remoto de sessões).
 - Proteção CSRF por *double submit*; limite de tentativas por IP e bloqueio de conta (`LOGIN_MAX_ATTEMPTS`).

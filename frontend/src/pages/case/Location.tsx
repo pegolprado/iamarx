@@ -337,7 +337,7 @@ function LocationView({
                     key={id}
                     aria-pressed={type === id}
                     onClick={() => setType(id)}
-                    className={clsx('rounded-lg px-2.5 py-1 text-xs', type === id ? 'bg-accent text-white' : 'text-muted')}
+                    className={clsx('rounded-lg px-2.5 py-1 text-xs', type === id ? 'bg-accent/15 text-accent' : 'text-muted')}
                   >
                     {label}
                   </button>
@@ -383,7 +383,7 @@ function LocationView({
                   <Square className="h-4 w-4" />
                 </button>
                 {SPEEDS.map((s) => (
-                  <button key={s} onClick={() => setSpeed(s)} className={clsx('rounded px-1.5 text-xs', speed === s ? 'bg-accent text-white' : 'text-muted')}>
+                  <button key={s} onClick={() => setSpeed(s)} className={clsx('rounded px-1.5 text-xs', speed === s ? 'bg-accent/15 text-accent' : 'text-muted')}>
                     {s}×
                   </button>
                 ))}

@@ -45,7 +45,7 @@ export function GraphControls({ cy }: { cy: RefObject<Core | null> }) {
   }
   const btn = 'grid h-8 w-8 place-items-center text-muted transition-colors hover:bg-white/5 hover:text-accent'
   return (
-    <div className="absolute top-3 right-3 z-10 flex flex-col divide-y divide-line overflow-hidden rounded-[7px] border border-line-2 bg-[rgba(8,14,20,0.9)]">
+    <div className="absolute top-3 right-3 z-10 flex flex-col divide-y divide-line overflow-hidden rounded-[7px] border border-line-2 bg-glass">
       <button className={btn} onClick={() => zoom(1.25)} aria-label="Aproximar" title="Aproximar">
         <Plus className="h-4 w-4" />
       </button>
@@ -67,7 +67,7 @@ export function GraphControls({ cy }: { cy: RefObject<Core | null> }) {
 export function GraphLegend({ items, className }: { items: { color: string; label: string; line?: boolean; dashed?: boolean; square?: boolean }[]; className?: string }) {
   return (
     <div
-      className={`absolute z-10 flex flex-wrap gap-x-3.5 gap-y-1 rounded-[7px] border border-line bg-[rgba(8,14,20,0.88)] px-2.5 py-1.5 font-mono text-[10px] text-muted ${className ?? 'top-3 left-3'}`}
+      className={`absolute z-10 flex flex-wrap gap-x-3.5 gap-y-1 rounded-[7px] border border-line bg-glass px-2.5 py-1.5 font-mono text-[10px] text-muted ${className ?? 'top-3 left-3'}`}
     >
       {items.map((i) => (
         <span key={i.label} className="flex items-center gap-1.5">
