@@ -13,6 +13,7 @@ import { useSession } from '../engine/session'
 import { fmtDate, fmtInt } from '../lib/format'
 import { ROLE_LABEL, useAuth } from './auth'
 import { LockOverlay, lockScreen, toggleMask, usePrivacy } from './privacy'
+import { GlobalProgress } from './progress'
 import { setThemePref, type ThemePref, useAppliedTheme, useThemePref } from './theme'
 import { greeting, SESSION_ID, StatusDot, SystemStatus, useClock, useOps } from './system'
 
@@ -284,6 +285,7 @@ export function Shell() {
   return (
     <>
       <LockOverlay />
+      <GlobalProgress />
       <div className="ops-bg" aria-hidden="true">
         <NetworkBackground variant={theme === 'light' ? 'opsLight' : 'ops'} />
       </div>
@@ -527,7 +529,6 @@ export function CaseLayout() {
   const ctx = useCaseCtx()
   useDataVersionSync()
   const { c } = ctx
-  const busy = useSession((s) => s.busy)
   const loc = useLocation()
   const group = navGroup(loc.pathname)
   const { me } = useAuth()
@@ -582,18 +583,6 @@ export function CaseLayout() {
             ))}
           </dl>
         </div>
-        {busy && (
-          <div className="card mt-4 overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
-              <span className="status-dot h-1.5 w-1.5 rounded-full bg-accent" />
-              <span className="text-muted">{busy.label}</span>
-              {busy.progress > 0 && <span className="ml-auto font-mono text-[11px] text-accent">{Math.round(busy.progress * 100)}%</span>}
-            </div>
-            <div className="scan-bar h-[2px] bg-line">
-              <div className="h-full bg-accent/70 transition-all duration-300" style={{ width: `${Math.round((busy.progress || 0) * 100)}%` }} />
-            </div>
-          </div>
-        )}
         {group.sub.length > 1 && (
           <nav className="scroll-x mt-4 flex gap-1 border-b border-line" aria-label={`Telas de ${group.label}`}>
             {group.sub.map(([path, label]) => (

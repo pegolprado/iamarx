@@ -1,4 +1,4 @@
-import { decryptMap, decryptMapOpen, encryptMap, encryptMapOpen, isOpenLink, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
+import { decryptMap, decryptMapOpen, encryptMap, encryptMapOpen, encryptShare, isOpenLink, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
 
 const map: SharedMap = {
   v: 1,
@@ -58,5 +58,29 @@ describe('mapa compartilhado', () => {
     expect(back.path?.[0][4]).toBe(3)
     expect(back.beam).toBe(120)
     await expect(decryptMapOpen(frag.slice(0, -6))).rejects.toThrow(/incompleto/)
+  })
+  it('link curto (m3): horários, deslocamentos por índice, pontos marcados e sem nome de quem enviou', async () => {
+    const m: SharedMap = {
+      ...map,
+      by: 'Fulano de Tal',
+      radius: 1000,
+      beam: 120,
+      points: [map.points[0], { ...map.points[0], lat: -23.6, lon: -46.7 }].map((p, i) => ({
+        ...p,
+        cl: [[`724-11-${i}`, 120, 2]],
+        times: ['2026-10-09 10:29', '2026-10-09 10:31', '2026-10-10 08:00'],
+      })),
+    }
+    m.path = [[m.points[0].lat, m.points[0].lon, m.points[1].lat, m.points[1].lon, 4]]
+    m.marks = [{ lat: -15.8, lon: -47.9, label: 'Residência do alvo', kind: 'casa' }]
+    const frag = await encryptShare(m)
+    expect(frag.startsWith('m3.')).toBe(true)
+    expect(isOpenLink(frag)).toBe(true)
+    const back = await decryptMapOpen(frag)
+    expect(back.by).toBe('')
+    expect(back.points[0].times).toEqual(['2026-10-09 10:29', '2026-10-09 10:31', '2026-10-10 08:00'])
+    expect(back.path?.[0][4]).toBe(4)
+    expect(back.marks).toEqual([{ lat: -15.8, lon: -47.9, label: 'Residência do alvo', kind: 'casa' }])
+    expect(frag.length).toBeLessThan((await encryptMapOpen(m)).length)
   })
 })

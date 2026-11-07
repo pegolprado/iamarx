@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { CloudUpload, FileText, FolderOpen, Info, Search, ShieldCheck } from 'lucide-react'
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { nextPaint, setProgress } from '../../app/progress'
 
 export function ToolTitle({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
   return (
@@ -86,12 +87,28 @@ export function Dropzone({
   max: number
   files: File[]
   onFiles: (f: File[]) => void
-  onRun: () => void
+  onRun: () => unknown
   runLabel: string
   busy?: string | null
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
+  const [starting, setStarting] = useState(false)
+  // indicador global enquanto a análise é criada
+  useEffect(() => {
+    setProgress(busy ?? (starting ? 'Preparando a análise…' : null))
+    if (busy) setStarting(false)
+  }, [busy, starting])
+  useEffect(() => () => setProgress(null), [])
+  const start = async () => {
+    setStarting(true)
+    await nextPaint()
+    try {
+      await onRun()
+    } finally {
+      setStarting(false)
+    }
+  }
   const add = (list: FileList | null) => {
     if (!list?.length) return
     const all = [...files, ...[...list].filter((f) => !files.some((x) => x.name === f.name && x.size === f.size))]
@@ -138,9 +155,14 @@ export function Dropzone({
           ))}
         </ul>
       )}
-      <button className="btn-primary mt-4 w-full" disabled={!files.length || !!busy} onClick={onRun}>
-        {busy ?? runLabel}
+      <button className="btn-primary mt-4 w-full" disabled={!files.length || !!busy || starting} onClick={start}>
+        {busy ?? (starting ? 'Preparando…' : runLabel)}
       </button>
+      {(busy || starting) && (
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-accent/15">
+          <div className="progress-indeterminate h-full w-1/3 rounded-full bg-accent" />
+        </div>
+      )}
       {PRIVACY}
     </Panel>
   )

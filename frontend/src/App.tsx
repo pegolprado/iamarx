@@ -59,6 +59,7 @@ export default function App() {
           <Route path="/redefinir-senha" element={<ResetPassword />} />
           <Route path="/primeiro-acesso" element={<FirstSetup />} />
           <Route path="/mapa-compartilhado" element={<SharedMapPage />} />
+          <Route path="/m" element={<SharedMapPage />} />
           <Route
             element={
               <RequireAuth>

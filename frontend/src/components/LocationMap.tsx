@@ -5,6 +5,21 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
 import { drawErbs, ERB_OPS, erbSitesIn } from './erbLayer'
+import type { MapMark } from '../lib/shareMap'
+
+export const MARK_STYLE: Record<MapMark['kind'], { color: string; label: string; glyph: string }> = {
+  casa: { color: '#16a34a', label: 'Residência', glyph: '⌂' },
+  trabalho: { color: '#ea580c', label: 'Trabalho', glyph: '▣' },
+  outro: { color: '#7c3aed', label: 'Ponto', glyph: '●' },
+}
+
+const markIcon = (k: MapMark) =>
+  L.divIcon({
+    className: 'erb-tower',
+    html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${MARK_STYLE[k.kind].color};border:2px solid #fff;box-shadow:0 2px 6px #0006;display:grid;place-items:center"><span style="transform:rotate(45deg);color:#fff;font:700 15px/1 system-ui">${MARK_STYLE[k.kind].glyph}</span></div></div>`,
+    iconSize: [30, 36],
+    iconAnchor: [15, 34],
+  })
 
 export const SECTOR_COLOR = '#2563eb'
 export const PATH_COLOR = '#dc2626'
@@ -48,6 +63,11 @@ export function LocationMap({
   onTower,
   detail,
   onCloseDetail,
+  erbLayer = true,
+  marks,
+  onMapClick,
+  onMark,
+  picking,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -63,6 +83,14 @@ export function LocationMap({
   /** detalhes da torre/evento selecionado, mostrados sobre o mapa */
   detail?: ReactNode
   onCloseDetail?: () => void
+  /** mostra o botão da camada ERBs (antenas de todas as operadoras) */
+  erbLayer?: boolean
+  /** pontos marcados à mão (ex.: residência do alvo) */
+  marks?: MapMark[]
+  onMapClick?: (lat: number, lon: number) => void
+  onMark?: (i: number) => void
+  /** modo "clique no mapa para marcar" */
+  picking?: boolean
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -159,6 +187,31 @@ export function LocationMap({
     if (!m.getBounds().pad(-0.15).contains([current.lat, current.lon])) m.panTo([current.lat, current.lon], { animate: false })
   }, [current, radius, beam])
 
+  // pontos marcados à mão
+  const markLayer = useRef<L.LayerGroup | null>(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    markLayer.current ??= L.layerGroup().addTo(m)
+    const g = markLayer.current
+    g.clearLayers()
+    ;(marks ?? []).forEach((k, i) => {
+      const mk = L.marker([k.lat, k.lon], { icon: markIcon(k), zIndexOffset: 1000 })
+      mk.bindTooltip(`${MARK_STYLE[k.kind].label}: ${k.label}`, { direction: 'top', offset: [0, -30] })
+      mk.on('click', () => onMark?.(i))
+      mk.addTo(g)
+    })
+  }, [marks, onMark])
+  useEffect(() => {
+    const m = map.current
+    if (!m || !onMapClick) return
+    const h = (e: L.LeafletMouseEvent) => onMapClick(e.latlng.lat, e.latlng.lng)
+    m.on('click', h)
+    return () => {
+      m.off('click', h)
+    }
+  }, [onMapClick])
+
   // ERBs da região visível: recarrega ao mover o mapa
   useEffect(() => {
     const m = map.current
@@ -202,7 +255,12 @@ export function LocationMap({
 
   return (
     <div ref={wrap} className={clsx('relative overflow-hidden rounded-2xl border border-line bg-ink', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
-      <div ref={box} className="h-full w-full" role="img" aria-label="Mapa de localização do alvo" />
+      <div
+        ref={box}
+        className={clsx('h-full w-full', picking && '[&_.leaflet-container]:!cursor-crosshair !cursor-crosshair')}
+        role="img"
+        aria-label="Mapa de localização do alvo"
+      />
       <div className="absolute top-3 right-3 z-[500] flex gap-2">
         <button
           className="grid h-9 w-9 place-items-center rounded-[7px] border border-line-2 bg-glass text-text hover:text-accent"
@@ -228,14 +286,16 @@ export function LocationMap({
               {label}
             </button>
           ))}
-          <button
-            className={clsx('border-l border-line-2 px-2.5 py-1.5', erbOn ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')}
-            onClick={() => setErbOn(!erbOn)}
-            aria-pressed={erbOn}
-            title="Antenas de todas as operadoras licenciadas na Anatel"
-          >
-            ERBs
-          </button>
+          {erbLayer && (
+            <button
+              className={clsx('border-l border-line-2 px-2.5 py-1.5', erbOn ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')}
+              onClick={() => setErbOn(!erbOn)}
+              aria-pressed={erbOn}
+              title="Antenas de todas as operadoras licenciadas na Anatel"
+            >
+              ERBs
+            </button>
+          )}
         </div>
       </div>
       {erbOn && (
@@ -260,7 +320,7 @@ export function LocationMap({
         </div>
       )}
       {detail && (
-        <div className="absolute top-3 left-14 z-[500] max-h-[calc(100%-24px)] w-[min(320px,calc(100%-80px))] overflow-auto rounded-[8px] border border-line-2 bg-glass p-3 text-sm shadow-lg">
+        <div className="absolute top-3 left-14 z-[600] max-h-[calc(100%-24px)] w-[min(320px,calc(100%-80px))] overflow-auto rounded-[8px] border border-line-2 bg-glass p-3 text-sm shadow-lg">
           {onCloseDetail && (
             <button className="float-right ml-2 rounded p-0.5 text-muted hover:text-text" onClick={onCloseDetail} aria-label="Fechar detalhes">
               <X className="h-4 w-4" />

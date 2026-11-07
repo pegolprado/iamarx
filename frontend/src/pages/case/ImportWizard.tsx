@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Play, RefreshCw, Wand2, XCircle } 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { nextPaint, setProgress } from '../../app/progress'
 import { analyze as analyzeFile, cancelImport, createImport, preview as previewImport, runImport, saveDraft, saveProfile } from '../../engine/importer'
 import { useSession } from '../../engine/session'
 import { apath, useCase } from '../../app/layout'
@@ -43,6 +44,8 @@ export default function ImportWizard() {
   const analyze = async (r = read, k = kind) => {
     setAnalyzing(true)
     setErr(null)
+    setProgress('Lendo o arquivo e identificando o layout…')
+    await nextPaint()
     try {
       let a: any = await analyzeFile(+fileId!, k as any, r)
       // tipo escolhido não confere com o conteúdo (ex.: extrato de eventos marcado como cadastro de ERB)
@@ -71,6 +74,7 @@ export default function ImportWizard() {
     } catch (e) {
       setErr(e)
     } finally {
+      setProgress(null)
       setAnalyzing(false)
     }
   }
@@ -82,6 +86,8 @@ export default function ImportWizard() {
   const validate = async () => {
     setErr(null)
     setPreview(null)
+    setProgress('Validando as linhas (pré-visualização)…')
+    await nextPaint()
     const options = { ...opts, read }
     try {
       let id = importId
@@ -94,12 +100,17 @@ export default function ImportWizard() {
       setPreview(await previewImport(id))
     } catch (e) {
       setErr(e)
+    } finally {
+      setProgress(null)
     }
   }
   const run = async () => {
     setErr(null)
     try {
       setStep(5)
+      setProgress('Iniciando o processamento…')
+      await nextPaint()
+      setProgress(null)
       await runImport(importId!)
       toast.success('Processamento concluído')
     } catch (e) {

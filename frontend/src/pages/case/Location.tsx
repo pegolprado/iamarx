@@ -26,7 +26,7 @@ import {
 import { useSession } from '../../engine/session'
 import { EVENT_TYPE_LABEL, fmtDate, fmtInt, fmtNumber } from '../../lib/format'
 import { downloadHtml, locationHtml } from '../../lib/locationHtml'
-import { encryptMap, encryptMapOpen, randomPassword, type SitePoint, toKml } from '../../lib/shareMap'
+import { encryptShare, shareUrl, type SitePoint, toKml } from '../../lib/shareMap'
 
 const br = (ts: string | null | undefined) => (ts ? `${ts.slice(8, 10)}/${ts.slice(5, 7)}/${ts.slice(0, 4)} ${ts.slice(11, 19)}` : '—')
 const pct = (n: number) => `${n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
@@ -158,6 +158,17 @@ function LocationView({
     downloadHtml(html, `MARX_localizacao_${number.replace(/\D/g, '')}_${new Date().toISOString().slice(0, 10)}.html`)
     toast.success('Relatório HTML gerado (abre em qualquer navegador).')
   }
+  // dias e horários de cada torre (vão no link compartilhado)
+  const timesByTower = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const e of events) {
+      if (e.lat === null || e.lon === null) continue
+      const k = `${e.lat.toFixed(5)},${e.lon.toFixed(5)}`
+      if (!m.has(k)) m.set(k, [])
+      m.get(k)!.push(e.ts.slice(0, 16))
+    }
+    return m
+  }, [events])
   const sites: SitePoint[] = tw.map((t) => ({
     lat: t.lat,
     lon: t.lon,
@@ -448,7 +459,7 @@ function LocationView({
       ) : (
         <Patterns pat={pat} />
       )}
-      {share && <ShareLocation sites={sites} number={number} path={tr} radius={radius} beam={beam} onClose={() => setShare(false)} />}
+      {share && <ShareLocation sites={sites} path={tr} radius={radius} beam={beam} times={timesByTower} onClose={() => setShare(false)} />}
     </div>
   )
 }
@@ -575,28 +586,25 @@ function Patterns({ pat }: { pat: ReturnType<typeof locationPatterns> }) {
 
 function ShareLocation({
   sites,
-  number,
   path,
   radius,
   beam,
+  times,
   onClose,
 }: {
   sites: SitePoint[]
-  number: string
   path: { a: [number, number]; b: [number, number]; n: number }[]
   radius: number
   beam: number
+  /** horários dos eventos por torre (chave lat,lon com 5 casas) */
+  times: Map<string, string[]>
   onClose: () => void
 }) {
-  const { me } = useAuth()
-  void number
-  const [mode, setMode] = useState<'direto' | 'senha'>('direto')
   const [days, setDays] = useState(7)
-  const [password, setPassword] = useState(randomPassword)
+  const [withTimes, setWithTimes] = useState(true)
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const gen = async () => {
-    if (mode === 'senha' && password.length < 8) return toast.error('Use uma senha com pelo menos 8 caracteres.')
     setBusy(true)
     try {
       const firsts = sites
@@ -607,57 +615,35 @@ function ShareLocation({
         .map((s) => s.last)
         .filter(Boolean)
         .sort() as string[]
-      const m = {
-        v: 1 as const,
+      const frag = await encryptShare({
+        v: 1,
         title: 'Mapa de localização (ERBs)',
-        by: me?.name ?? '',
-        at: new Date().toISOString(),
+        by: '',
+        at: '',
         exp: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
-        period: [firsts[0] ?? null, lasts[lasts.length - 1] ?? null] as [string | null, string | null],
+        period: [firsts[0] ?? null, lasts[lasts.length - 1] ?? null],
         types: 'todos os eventos',
-        // o número do alvo não vai no link: só as estações, contagens e período
+        // o número do alvo e o nome de quem envia não vão no link
         numbers: [],
-        points: sites,
+        points: sites.map((s) => ({ ...s, times: withTimes ? times.get(`${s.lat.toFixed(5)},${s.lon.toFixed(5)}`) : undefined })),
         radius,
         beam,
         path: path.map((t) => [t.a[0], t.a[1], t.b[0], t.b[1], t.n] as [number, number, number, number, number]),
-      }
-      const frag = mode === 'direto' ? await encryptMapOpen(m) : await encryptMap(m, password)
-      setLink(`${location.origin}/mapa-compartilhado#${frag}`)
+      })
+      setLink(shareUrl(frag))
     } finally {
       setBusy(false)
     }
   }
-  const shareNative = () => navigator.share?.({ title: 'Mapa de localização — MARX', url: link }).catch(() => {})
+  const shareNative = () => navigator.share?.({ title: 'Mapa de localização', url: link }).catch(() => {})
   return (
     <Modal open title="Compartilhar mapa por link" onClose={onClose}>
       <div className="space-y-4 text-sm">
-        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Tipo de link">
-          {(
-            [
-              ['direto', 'Link direto', 'Abre só clicando, no computador ou no celular.'],
-              ['senha', 'Link com senha', 'Quem recebe precisa digitar a senha enviada por outro meio.'],
-            ] as const
-          ).map(([v, t, d]) => (
-            <button
-              key={v}
-              role="radio"
-              aria-checked={mode === v}
-              onClick={() => (setMode(v), setLink(''))}
-              className={`rounded-[8px] border p-3 text-left transition-colors ${mode === v ? 'border-accent/60 bg-accent/10' : 'border-line hover:border-line-2'}`}
-            >
-              <div className="font-semibold text-white">{t}</div>
-              <div className="mt-0.5 text-[12px] text-muted">{d}</div>
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          {mode === 'senha' && (
-            <label className="block min-w-48 flex-1">
-              <span className="label">Senha</span>
-              <input className="w-full font-mono" value={password} onChange={(e) => (setPassword(e.target.value), setLink(''))} />
-            </label>
-          )}
+        <p className="text-muted">
+          O link abre direto, só clicando, no computador ou no celular — sem login e sem senha. Quem abrir pode marcar pontos (ex.: residência do alvo) e devolver um link
+          atualizado.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
           <label className="block">
             <span className="label">Validade</span>
             <select value={days} onChange={(e) => (setDays(+e.target.value), setLink(''))}>
@@ -667,11 +653,13 @@ function ShareLocation({
               <option value={0}>sem prazo</option>
             </select>
           </label>
+          <label className="flex items-center gap-2 pb-2">
+            <input type="checkbox" checked={withTimes} onChange={(e) => (setWithTimes(e.target.checked), setLink(''))} /> incluir dias e horários de cada ERB
+          </label>
         </div>
-        <Notice tone={mode === 'direto' ? 'amber' : 'teal'}>
-          {mode === 'direto'
-            ? 'O mapa vai criptografado dentro do próprio link e nada é gravado em servidor, mas qualquer pessoa que tiver o link completo consegue abrir. Envie só para quem deve ver.'
-            : 'O mapa vai criptografado dentro do link e nada é gravado em servidor. Envie a senha por outro meio (ligação, mensagem separada).'}
+        <Notice tone="amber">
+          O mapa vai criptografado dentro do próprio link e nada é gravado em servidor. Não leva o número do alvo nem o seu nome, mas qualquer pessoa com o link completo consegue
+          abrir: envie só para a equipe da investigação.
         </Notice>
         {!link ? (
           <button className="btn-primary" onClick={gen} disabled={busy || !sites.length}>
@@ -680,15 +668,11 @@ function ShareLocation({
         ) : (
           <>
             <textarea readOnly className="w-full font-mono text-[11px]" rows={3} value={link} onFocus={(e) => e.currentTarget.select()} />
+            <div className="text-[11.5px] text-faint">{fmtInt(link.length)} caracteres</div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={() => navigator.clipboard.writeText(link).then(() => toast.success('Link copiado'))}>
                 Copiar link
               </button>
-              {mode === 'senha' && (
-                <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(password).then(() => toast.success('Senha copiada'))}>
-                  Copiar senha
-                </button>
-              )}
               <a className="btn-ghost" href={`https://wa.me/?text=${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer">
                 Enviar pelo WhatsApp
               </a>

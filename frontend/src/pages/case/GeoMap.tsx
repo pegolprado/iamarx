@@ -3,10 +3,9 @@ import L from 'leaflet'
 import { Download, Map as MapIcon, Upload, Pause, Play, Share2, SkipBack, SkipForward } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useAuth } from '../../app/auth'
 import { type AzMode, baseLayer, ErbMap, groupSites, STREETS } from '../../components/ErbMap'
 import { useSession } from '../../engine/session'
-import { encryptMap, randomPassword, type SitePoint, toKml } from '../../lib/shareMap'
+import { encryptShare, shareUrl, type SitePoint, toKml } from '../../lib/shareMap'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { cellSequence, geoPoints, registryMapPoints } from '../../engine/analytics'
@@ -263,38 +262,32 @@ const EXPIRY: [string, number | null][] = [
   ['sem validade', null],
 ]
 
-/** Gera o link do mapa: dados criptografados no próprio link, abertos só com a senha. */
+/** Gera o link do mapa: dados criptografados no próprio link, que abre só clicando. */
 function ShareMapModal({ points, filter, onClose }: { points: SitePoint[]; filter: any; onClose: () => void }) {
-  const { me } = useAuth()
   const st = useSession((s) => s.meta)
   const [title, setTitle] = useState(`Mapa de ERBs — ${st.title}`)
-  const [password, setPassword] = useState(randomPassword)
   const [days, setDays] = useState<number | null>(7)
   const [withNumbers, setWithNumbers] = useState(false)
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const types = (filter.event_types ?? []).length ? (filter.event_types as string[]).map((t) => EVENT_TYPE_LABEL[t] ?? t).join(', ') : 'todos os eventos'
   const gen = async () => {
-    if (password.length < 8) return toast.error('Use uma senha com pelo menos 8 caracteres.')
     setBusy(true)
     try {
       const firsts = points.map((p) => p.first).filter(Boolean) as string[]
       const lasts = points.map((p) => p.last).filter(Boolean) as string[]
-      const frag = await encryptMap(
-        {
-          v: 1,
-          title: title.trim() || 'Mapa de ERBs',
-          by: me?.name ?? '',
-          at: new Date().toISOString(),
-          exp: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
-          period: [firsts.sort()[0] ?? null, lasts.sort().slice(-1)[0] ?? null],
-          types,
-          numbers: withNumbers ? [...new Set(points.flatMap((p) => p.numbers ?? []))] : [],
-          points: points.map((p) => ({ ...p, numbers: withNumbers ? p.numbers : [] })),
-        },
-        password,
-      )
-      setLink(`${location.origin}/mapa-compartilhado#${frag}`)
+      const frag = await encryptShare({
+        v: 1,
+        title: title.trim() || 'Mapa de ERBs',
+        by: '',
+        at: '',
+        exp: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
+        period: [firsts.sort()[0] ?? null, lasts.sort().slice(-1)[0] ?? null],
+        types,
+        numbers: withNumbers ? [...new Set(points.flatMap((p) => p.numbers ?? []))] : [],
+        points: points.map((p) => ({ ...p, numbers: withNumbers ? p.numbers : [] })),
+      })
+      setLink(shareUrl(frag))
     } finally {
       setBusy(false)
     }
@@ -311,15 +304,12 @@ function ShareMapModal({ points, filter, onClose }: { points: SitePoint[]; filte
     <Modal open title="Compartilhar mapa" onClose={onClose} wide>
       <div className="space-y-4 text-sm">
         <Notice tone="teal">
-          O mapa vai <b>criptografado dentro do próprio link</b> (AES-256): nada é gravado no MARX nem em outro servidor. Quem receber precisa do link <b>e</b> da senha — envie a
-          senha por outro meio.
+          O mapa vai <b>criptografado dentro do próprio link</b>: nada é gravado no MARX nem em outro servidor. O link abre só clicando, no computador ou no celular — envie só para
+          a equipe da investigação.
         </Notice>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Título" className="sm:col-span-2">
             <input className="w-full" value={title} maxLength={140} onChange={(e) => setTitle(e.target.value)} />
-          </Field>
-          <Field label="Senha do link" hint="gerada automaticamente; pode trocar (mínimo 8 caracteres)">
-            <input className="w-full font-mono" value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
           <Field label="Validade">
             <select className="w-full" value={String(days)} onChange={(e) => setDays(e.target.value === 'null' ? null : +e.target.value)}>
@@ -337,7 +327,7 @@ function ShareMapModal({ points, filter, onClose }: { points: SitePoint[]; filte
         </label>
         <p className="text-xs text-faint">
           Conteúdo: {fmtInt(points.length)} estações · {types}. A validade é verificada ao abrir; como o link não fica guardado em lugar nenhum, ele não pode ser “desligado” depois
-          — escolha a validade e a senha com cuidado.
+          — escolha a validade com cuidado.
         </p>
         {!link ? (
           <div className="flex justify-end gap-2">
@@ -355,9 +345,6 @@ function ShareMapModal({ points, filter, onClose }: { points: SitePoint[]; filte
             </Field>
             {link.length > 60000 && <Notice tone="amber">Link muito longo: alguns aplicativos de mensagem podem cortá-lo. Filtre o período/tipos ou envie o arquivo KML.</Notice>}
             <div className="flex flex-wrap justify-end gap-2">
-              <button className="btn-ghost" onClick={() => copy(password, 'Senha')}>
-                Copiar senha
-              </button>
               <button className="btn-primary" onClick={() => copy(link, 'Link')}>
                 Copiar link
               </button>
