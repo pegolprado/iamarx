@@ -21,7 +21,7 @@ export const SATELLITE = {
  * (nunca a página nem os dados). `onFail` é chamado se várias imagens falharem seguidas.
  */
 export function baseLayer(url: string, attribution: string, onFail?: () => void): L.TileLayer {
-  const t = L.tileLayer(url, { attribution, maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin' } as L.TileLayerOptions)
+  const t = L.tileLayer(url, { attribution, maxZoom: 19, maxNativeZoom: 18, referrerPolicy: 'strict-origin-when-cross-origin' } as L.TileLayerOptions)
   let errors = 0
   t.on('tileload', () => (errors = 0))
   t.on('tileerror', () => {

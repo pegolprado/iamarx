@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, FileText, MapPin, Network } from 'lucide-react'
+import { ChevronRight, Clock, FileText, Map as MapIcon, MapPin, Network } from 'lucide-react'
 import { MarxLogo } from '../../components/brand'
 import { Link } from 'react-router-dom'
 import { Notice } from '../../components/ui'
@@ -24,6 +24,13 @@ export const INVMARX_TOOLS = [
     icon: <Clock />,
     tone: 'text-accent border-line bg-panel-2',
     text: 'Planilha da operadora (Vigia / relatório de localização — Vivo, TIM, Claro): ERBs no mapa com azimute, deslocamentos, playback, provável residência e trabalho.',
+  },
+  {
+    to: '/invmarx/mapas-erb',
+    title: 'Mapas ERB',
+    icon: <MapIcon />,
+    tone: 'text-violet border-line bg-panel-2',
+    text: 'Plote antenas (com azimute, distância e abertura) e lugares colando dados do extrato em vários formatos; cada alteração gera um link único para a equipe abrir só clicando.',
   },
   {
     to: '/analise/localizacao',

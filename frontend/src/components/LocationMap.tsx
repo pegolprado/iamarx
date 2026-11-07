@@ -5,21 +5,56 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
 import { drawErbs, ERB_OPS, erbSitesIn } from './erbLayer'
-import type { MapMark } from '../lib/shareMap'
+import type { MapMark, MarkColor, MarkKind } from '../lib/shareMap'
 
-export const MARK_STYLE: Record<MapMark['kind'], { color: string; label: string; glyph: string }> = {
-  casa: { color: '#16a34a', label: 'Residência', glyph: '⌂' },
-  trabalho: { color: '#ea580c', label: 'Trabalho', glyph: '▣' },
-  outro: { color: '#7c3aed', label: 'Ponto', glyph: '●' },
+/** Cores disponíveis para pontos e antenas marcados à mão. */
+export const MARK_COLOR_HEX: Record<MarkColor, { hex: string; label: string }> = {
+  indigo: { hex: '#4f46e5', label: 'Índigo' },
+  azul: { hex: '#2563eb', label: 'Azul' },
+  verde: { hex: '#16a34a', label: 'Verde' },
+  vermelho: { hex: '#dc2626', label: 'Vermelho' },
+  laranja: { hex: '#ea580c', label: 'Laranja' },
+  roxo: { hex: '#7c3aed', label: 'Roxo' },
+  rosa: { hex: '#db2777', label: 'Rosa' },
+  cinza: { hex: '#4b5563', label: 'Cinza' },
+  amarelo: { hex: '#ca8a04', label: 'Amarelo' },
+  ciano: { hex: '#0891b2', label: 'Ciano' },
 }
 
-const markIcon = (k: MapMark) =>
-  L.divIcon({
+/** Ícones dos pontos (rótulo, glifo e cor padrão). */
+export const MARK_STYLE: Record<MarkKind, { color: MarkColor; label: string; glyph: string }> = {
+  casa: { color: 'verde', label: 'Residência', glyph: '⌂' },
+  trabalho: { color: 'laranja', label: 'Trabalho', glyph: '▣' },
+  alvo: { color: 'vermelho', label: 'Alvo', glyph: '◎' },
+  pessoa: { color: 'azul', label: 'Pessoa', glyph: '☺' },
+  veiculo: { color: 'cinza', label: 'Veículo', glyph: '⛟' },
+  local: { color: 'roxo', label: 'Local', glyph: '★' },
+  outro: { color: 'roxo', label: 'Ponto', glyph: '●' },
+  erb: { color: 'indigo', label: 'ERB', glyph: '' },
+}
+export const markHex = (k: MapMark) => MARK_COLOR_HEX[k.color ?? MARK_STYLE[k.kind].color].hex
+
+const TOWER_SVG = (c: string) =>
+  `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/></svg>`
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+const markIcon = (k: MapMark) => {
+  const c = markHex(k)
+  if (k.kind === 'erb')
+    return L.divIcon({
+      className: 'erb-tower',
+      html: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff)">${TOWER_SVG(c)}<span style="margin-top:-2px;background:${c};color:#fff;border-radius:4px;padding:0 4px;font:700 10px/14px ui-monospace,monospace;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc(k.label)}</span></div>`,
+      iconSize: [44, 44],
+      iconAnchor: [22, 26],
+    })
+  return L.divIcon({
     className: 'erb-tower',
-    html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${MARK_STYLE[k.kind].color};border:2px solid #fff;box-shadow:0 2px 6px #0006;display:grid;place-items:center"><span style="transform:rotate(45deg);color:#fff;font:700 15px/1 system-ui">${MARK_STYLE[k.kind].glyph}</span></div></div>`,
+    html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${c};border:2px solid #fff;box-shadow:0 2px 6px #0006;display:grid;place-items:center"><span style="transform:rotate(45deg);color:#fff;font:700 15px/1 system-ui">${MARK_STYLE[k.kind].glyph}</span></div></div>`,
     iconSize: [30, 36],
     iconAnchor: [15, 34],
   })
+}
 
 export const SECTOR_COLOR = '#2563eb'
 export const PATH_COLOR = '#dc2626'
@@ -68,6 +103,7 @@ export function LocationMap({
   onMapClick,
   onMark,
   picking,
+  onContext,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -91,6 +127,8 @@ export function LocationMap({
   onMark?: (i: number) => void
   /** modo "clique no mapa para marcar" */
   picking?: boolean
+  /** botão direito / toque longo no mapa */
+  onContext?: (lat: number, lon: number) => void
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -109,7 +147,7 @@ export function LocationMap({
 
   useEffect(() => {
     if (!box.current || map.current) return
-    map.current = L.map(box.current).setView([-23.55, -46.63], 11)
+    map.current = L.map(box.current, { maxZoom: 19, tapHold: true } as L.MapOptions).setView([-15.78, -47.93], 4)
     erbRenderer.current = L.canvas({ padding: 0.3 })
     erbs.current = L.layerGroup().addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
@@ -167,6 +205,15 @@ export function LocationMap({
     if (!m || !towers.length) return
     m.fitBounds(L.latLngBounds(towers.map((t) => [t.lat, t.lon] as [number, number])), { padding: [30, 30], maxZoom: 15, animate: false })
   }, [towers])
+  // sem torres da análise: enquadra os pontos marcados na primeira vez que aparecem
+  const fittedMarks = useRef(false)
+  useEffect(() => {
+    const m = map.current
+    const vis = (marks ?? []).filter((k) => !k.hidden)
+    if (!m || towers.length || !vis.length || fittedMarks.current) return
+    fittedMarks.current = true
+    m.fitBounds(L.latLngBounds(vis.map((k) => [k.lat, k.lon] as [number, number])), { padding: [40, 40], maxZoom: 15, animate: false })
+  }, [marks, towers.length])
 
   // evento atual (seleção ou reprodução)
   useEffect(() => {
@@ -196,12 +243,40 @@ export function LocationMap({
     const g = markLayer.current
     g.clearLayers()
     ;(marks ?? []).forEach((k, i) => {
+      if (k.hidden) return
+      const c = markHex(k)
+      if (k.kind === 'erb' && k.az !== null && k.az !== undefined)
+        L.polygon(sector(k.lat, k.lon, k.az, k.dist || radius, k.beam || beam), { color: c, weight: 1.5, opacity: 0.9, fillColor: c, fillOpacity: 0.18, interactive: false }).addTo(
+          g,
+        )
       const mk = L.marker([k.lat, k.lon], { icon: markIcon(k), zIndexOffset: 1000 })
-      mk.bindTooltip(`${MARK_STYLE[k.kind].label}: ${k.label}`, { direction: 'top', offset: [0, -30] })
+      mk.bindTooltip(k.kind === 'erb' ? `${k.label}${k.az !== null && k.az !== undefined ? ` · azimute ${k.az}°` : ''}` : `${MARK_STYLE[k.kind].label}: ${k.label}`, {
+        direction: 'top',
+        offset: [0, -30],
+      })
       mk.on('click', () => onMark?.(i))
       mk.addTo(g)
     })
-  }, [marks, onMark])
+  }, [marks, onMark, radius, beam])
+  useEffect(() => {
+    const m = map.current
+    if (!m || !onContext) return
+    const h = (e: L.LeafletMouseEvent) => {
+      e.originalEvent?.preventDefault?.()
+      onContext(e.latlng.lat, e.latlng.lng)
+    }
+    m.on('contextmenu', h)
+    return () => {
+      m.off('contextmenu', h)
+    }
+  }, [onContext])
+  // no modo de marcação o duplo clique não aproxima (evita "sumir" o mapa)
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (picking) m.doubleClickZoom.disable()
+    else m.doubleClickZoom.enable()
+  }, [picking])
   useEffect(() => {
     const m = map.current
     if (!m || !onMapClick) return
@@ -254,7 +329,7 @@ export function LocationMap({
   }, [])
 
   return (
-    <div ref={wrap} className={clsx('relative overflow-hidden rounded-2xl border border-line bg-ink', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
+    <div ref={wrap} className={clsx('relative overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
       <div
         ref={box}
         className={clsx('h-full w-full', picking && '[&_.leaflet-container]:!cursor-crosshair !cursor-crosshair')}

@@ -113,6 +113,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem to="/invmarx/extrato" icon={<Clock />} onClick={onNavigate}>
             Extrato Tempo Real
           </NavItem>
+          <NavItem to="/invmarx/mapas-erb" icon={<GMap />} onClick={onNavigate}>
+            Mapas ERB
+          </NavItem>
         </NavSection>
         <NavSection label="Workspace">
           <NavItem to="/" end icon={<GOverview />} onClick={onNavigate}>

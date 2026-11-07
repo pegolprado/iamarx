@@ -26,6 +26,7 @@ import {
 import { useSession } from '../../engine/session'
 import { EVENT_TYPE_LABEL, fmtDate, fmtInt, fmtNumber } from '../../lib/format'
 import { downloadHtml, locationHtml } from '../../lib/locationHtml'
+import { TimesByDay } from '../MapasErb'
 import { encryptShare, shareUrl, type SitePoint, toKml } from '../../lib/shareMap'
 
 const br = (ts: string | null | undefined) => (ts ? `${ts.slice(8, 10)}/${ts.slice(5, 7)}/${ts.slice(0, 4)} ${ts.slice(11, 19)}` : '—')
@@ -333,6 +334,10 @@ function LocationView({
                       ))}
                     </tbody>
                   </table>
+                  {(() => {
+                    const t = timesByTower.get(`${tower.lat.toFixed(5)},${tower.lon.toFixed(5)}`)
+                    return t?.length ? <TimesByDay times={[...t].sort()} /> : null
+                  })()}
                 </div>
               ) : null
             }

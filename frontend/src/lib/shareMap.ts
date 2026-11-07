@@ -33,7 +33,22 @@ export type SitePoint = {
 }
 
 /** Ponto marcado à mão no mapa (ex.: residência do alvo). */
-export type MapMark = { lat: number; lon: number; label: string; kind: 'casa' | 'trabalho' | 'outro' }
+export const MARK_KINDS = ['casa', 'trabalho', 'outro', 'erb', 'alvo', 'veiculo', 'pessoa', 'local'] as const
+export const MARK_COLORS = ['indigo', 'azul', 'verde', 'vermelho', 'laranja', 'roxo', 'rosa', 'cinza', 'amarelo', 'ciano'] as const
+export type MarkKind = (typeof MARK_KINDS)[number]
+export type MarkColor = (typeof MARK_COLORS)[number]
+export type MapMark = {
+  lat: number
+  lon: number
+  label: string
+  kind: MarkKind
+  /** antena (ERB): azimute, distância (m) e abertura/margem (graus) do setor */
+  az?: number | null
+  dist?: number
+  beam?: number
+  color?: MarkColor
+  hidden?: boolean
+}
 
 export type SharedMap = {
   v: 1
@@ -185,7 +200,6 @@ function unpackTimes(s: string) {
     .filter(Boolean)
     .map((x, i) => fromMin((acc = i ? acc + parseInt(x, 36) : parseInt(x, 36))))
 }
-const KINDS = ['casa', 'trabalho', 'outro'] as const
 
 function packV3(m: SharedMap) {
   const key = (la: number, lo: number) => `${Math.round(la * 1e5)},${Math.round(lo * 1e5)}`
@@ -209,7 +223,22 @@ function packV3(m: SharedMap) {
   if (m.period[0]) o.pf = m.period[0].slice(0, 16)
   if (m.period[1]) o.pl = m.period[1].slice(0, 16)
   if (m.path?.length) o.w = m.path.map(([a, b, c, d, n]) => [idx.get(key(a, b)) ?? -1, idx.get(key(c, d)) ?? -1, n]).filter((x) => x[0] >= 0 && x[1] >= 0)
-  if (m.marks?.length) o.k = m.marks.map((k) => [Math.round(k.lat * 1e5), Math.round(k.lon * 1e5), k.label, KINDS.indexOf(k.kind)])
+  if (m.marks?.length)
+    o.k = m.marks.map((k) => {
+      const a: any[] = [
+        Math.round(k.lat * 1e5),
+        Math.round(k.lon * 1e5),
+        k.label,
+        MARK_KINDS.indexOf(k.kind),
+        k.color ? MARK_COLORS.indexOf(k.color) : -1,
+        k.az ?? -1,
+        k.dist ?? 0,
+        k.beam ?? 0,
+        k.hidden ? 1 : 0,
+      ]
+      while (a.length > 4 && (a[a.length - 1] === 0 || a[a.length - 1] === -1)) a.pop() // campos vazios no fim não vão no link
+      return a
+    })
   return o
 }
 
@@ -246,16 +275,30 @@ function unpackV3(o: any): SharedMap {
     radius: o.r,
     beam: o.b,
     path: (o.w ?? []).map(([i, j, n]: number[]) => [points[i].lat, points[i].lon, points[j].lat, points[j].lon, n]),
-    marks: (o.k ?? []).map((k: any[]) => ({ lat: k[0] / 1e5, lon: k[1] / 1e5, label: k[2], kind: KINDS[k[3]] ?? 'outro' })),
+    marks: (o.k ?? []).map((k: any[]) => {
+      const mk: MapMark = { lat: k[0] / 1e5, lon: k[1] / 1e5, label: k[2], kind: MARK_KINDS[k[3]] ?? 'outro' }
+      if (k[4] !== undefined && k[4] >= 0) mk.color = MARK_COLORS[k[4]]
+      if (k[5] !== undefined && k[5] >= 0) mk.az = k[5]
+      if (k[6]) mk.dist = k[6]
+      if (k[7]) mk.beam = k[7]
+      if (k[8]) mk.hidden = true
+      return mk
+    }),
   }
 }
 
-/** Link curto e direto ("m3"): abre só clicando; chave aleatória no fragmento, nada vai ao servidor. */
+/**
+ * Link curto e direto ("m3"): abre só clicando; nada vai ao servidor.
+ * A chave e o vetor são derivados do próprio conteúdo (SHA-256): a mesma análise gera sempre o
+ * mesmo link, qualquer alteração gera outro, e um link alterado à mão não abre (falha na
+ * verificação do AES-GCM) — o link identifica e protege a integridade da análise.
+ */
 export async function encryptShare(m: SharedMap): Promise<string> {
-  const raw = crypto.getRandomValues(new Uint8Array(16))
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const key = await crypto.subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, ['encrypt'])
   const plain = deflateSync(strToU8(JSON.stringify(packV3(m))), { level: 9 })
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', plain as BufferSource))
+  const raw = h.slice(0, 16)
+  const iv = h.slice(16, 28)
+  const key = await crypto.subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, ['encrypt'])
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain as BufferSource))
   return `m3.${b64u(raw)}.${b64u(iv)}.${b64uBig(ct)}`
 }
@@ -287,7 +330,7 @@ function dest(lat: number, lon: number, az: number, m: number): [number, number]
   return [lat + (m * Math.cos(a)) / 111320, lon + (m * Math.sin(a)) / (111320 * Math.cos((lat * Math.PI) / 180))]
 }
 
-export function toKml(m: Pick<SharedMap, 'title' | 'points'>, azLen = 400) {
+export function toKml(m: Pick<SharedMap, 'title' | 'points' | 'marks'>, azLen = 400) {
   const pm = m.points
     .map((p) => {
       const desc = `Eventos: ${p.events} (voz ${p.voice}, SMS ${p.sms}, dados ${p.data})\nAzimute(s): ${p.az.join(', ') || '—'}\nCélulas: ${p.cells.join(', ')}\nPrimeiro: ${p.first ?? '—'}\nÚltimo: ${p.last ?? '—'}`
@@ -300,11 +343,26 @@ export function toKml(m: Pick<SharedMap, 'title' | 'points'>, azLen = 400) {
       return `<Placemark><name>${esc(p.name || String(p.events))}</name><description>${esc(desc)}</description><styleUrl>#erb</styleUrl><Point><coordinates>${p.lon},${p.lat},0</coordinates></Point></Placemark>${lines}`
     })
     .join('\n')
+  const mk = (m.marks ?? [])
+    .filter((k) => !k.hidden)
+    .map((k) => {
+      const line =
+        k.az !== null && k.az !== undefined
+          ? (() => {
+              const [la, lo] = dest(k.lat, k.lon, k.az, k.dist || azLen)
+              return `<Placemark><name>Azimute ${k.az}°</name><styleUrl>#az</styleUrl><LineString><coordinates>${k.lon},${k.lat},0 ${lo.toFixed(6)},${la.toFixed(6)},0</coordinates></LineString></Placemark>`
+            })()
+          : ''
+      return `<Placemark><name>${esc(k.label)}</name><description>${esc(k.kind === 'erb' ? 'ERB marcada à mão' : 'Ponto marcado à mão')}</description><styleUrl>#${k.kind === 'erb' ? 'erb' : 'pt'}</styleUrl><Point><coordinates>${k.lon},${k.lat},0</coordinates></Point></Placemark>${line}`
+    })
+    .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(m.title)}</name>
 <description>Coordenadas das estações (antenas), não da localização do aparelho. Gerado pelo MARX.</description>
 <Style id="erb"><IconStyle><color>ff2f6ee5</color><scale>1.1</scale></IconStyle></Style>
 <Style id="az"><LineStyle><color>ff4d48e5</color><width>3</width></LineStyle></Style>
+<Style id="pt"><IconStyle><color>ff3aa316</color><scale>1.1</scale></IconStyle></Style>
 ${pm}
+${mk}
 </Document></kml>`
 }

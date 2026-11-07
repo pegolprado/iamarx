@@ -6,7 +6,7 @@ import { Loading } from './components/ui'
 import Login, { FirstSetup, ForgotPassword, Register, ResetPassword } from './pages/Login'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const SharedMapPage = lazy(() => import('./pages/SharedMap'))
+const SharedMapPage = lazy(() => import('./pages/MapasErb'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 const AdminUsers = lazy(() => import('./pages/admin/Users'))
@@ -38,6 +38,7 @@ const InvmarxHub = lazy(() => import('./pages/invmarx/Hub'))
 const InvWaBilling = lazy(() => import('./pages/invmarx/WaBilling'))
 const InvWaLinks = lazy(() => import('./pages/invmarx/WaLinks'))
 const InvExtrato = lazy(() => import('./pages/invmarx/Extrato'))
+const InvMapasErb = lazy(() => import('./pages/invmarx/MapasErbTool'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="invmarx/whatsapp" element={<InvWaBilling />} />
             <Route path="invmarx/whatsapp-vinculos" element={<InvWaLinks />} />
             <Route path="invmarx/extrato" element={<InvExtrato />} />
+            <Route path="invmarx/mapas-erb" element={<InvMapasErb />} />
             <Route path="analise" element={<CaseLayout />}>
               <Route index element={<Overview />} />
               <Route path="alvos" element={<Targets />} />
