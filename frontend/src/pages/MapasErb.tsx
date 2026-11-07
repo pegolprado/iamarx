@@ -1,9 +1,11 @@
 import clsx from 'clsx'
-import { Download, Eye, EyeOff, Info, Lock, MapPin, Pencil, Plus, RadioTower, Share2, Trash2 } from 'lucide-react'
+import { Download, Eye, EyeOff, FileSpreadsheet, Info, Lock, MapPin, Pencil, Plus, RadioTower, Share2, Trash2 } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { BrandLockup } from '../components/brand'
-import { LocationMap, MARK_COLOR_HEX, MARK_STYLE, markHex } from '../components/LocationMap'
+import { LocationMap, MARK_COLOR_HEX, MARK_ICON_SVG, MARK_STYLE, markHex } from '../components/LocationMap'
+import { exportSheet, importSheet } from '../lib/erbSheet'
+import { nextPaint, setProgress } from '../app/progress'
 import { Modal, Notice } from '../components/ui'
 import type { Tower } from '../engine/location'
 import { parseCoord, parseInput, type ParsedItem } from '../lib/coords'
@@ -72,6 +74,29 @@ export function TimesByDay({ times }: { times: string[] }) {
         ))}
       </ul>
     </div>
+  )
+}
+
+/** Ícone colorido do ponto (o mesmo desenho do mapa). */
+function MarkGlyph({ kind, color, size = 22 }: { kind: MarkKind; color: string; size?: number }) {
+  return (
+    <span
+      className="grid shrink-0 place-items-center rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.35)] ring-2 ring-white/90"
+      style={{ width: size, height: size, background: `linear-gradient(160deg, ${color}cc, ${color})` }}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width={size * 0.62}
+        height={size * 0.62}
+        fill="none"
+        stroke="#fff"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        color="#fff"
+        dangerouslySetInnerHTML={{ __html: MARK_ICON_SVG[kind] }}
+      />
+    </span>
   )
 }
 
@@ -169,28 +194,51 @@ function MarkForm({ draft, onSave, onDelete, onClose }: { draft: Draft; onSave: 
         )}
         <div className="grid grid-cols-2 gap-2">
           {!isErb && (
-            <label className="block">
+            <div className="col-span-2">
               <span className="label">Ícone</span>
-              <select className="w-full" value={m.kind} onChange={(e) => set({ kind: e.target.value as MarkKind })}>
-                {MARK_KINDS.filter((k) => k !== 'erb').map((k) => (
-                  <option key={k} value={k}>
-                    {MARK_STYLE[k].glyph} {MARK_STYLE[k].label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+                {MARK_KINDS.filter((k) => k !== 'erb').map((k) => {
+                  const c = MARK_COLOR_HEX[m.color && m.kind === k ? m.color : MARK_STYLE[k].color].hex
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => set({ kind: k, color: m.color && m.color !== MARK_STYLE[m.kind].color ? m.color : MARK_STYLE[k].color })}
+                      className={clsx(
+                        'flex flex-col items-center gap-1 rounded-[8px] border px-1 py-1.5 text-[11px]',
+                        m.kind === k ? 'border-accent/70 bg-accent/10 text-white' : 'border-line text-muted hover:border-line-2',
+                      )}
+                      aria-pressed={m.kind === k}
+                    >
+                      <MarkGlyph kind={k} color={c} size={26} />
+                      {MARK_STYLE[k].label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
-          <label className={clsx('block', isErb && 'col-span-2')}>
+          <label className="col-span-2 block">
             <span className="label">Cor</span>
             <div className="flex items-center gap-2">
-              <span className="h-5 w-5 shrink-0 rounded" style={{ background: markHex(m) }} />
-              <select className="w-full" value={m.color ?? MARK_STYLE[m.kind].color} onChange={(e) => set({ color: e.target.value as MarkColor })}>
+              <MarkGlyph kind={m.kind} color={markHex(m)} size={30} />
+              <div className="flex flex-wrap gap-1.5">
                 {MARK_COLORS.map((c) => (
-                  <option key={c} value={c}>
-                    {MARK_COLOR_HEX[c].label}
-                  </option>
+                  <button
+                    key={c}
+                    type="button"
+                    title={MARK_COLOR_HEX[c].label}
+                    aria-label={`Cor ${MARK_COLOR_HEX[c].label}`}
+                    aria-pressed={(m.color ?? MARK_STYLE[m.kind].color) === c}
+                    onClick={() => set({ color: c as MarkColor })}
+                    className={clsx(
+                      'h-7 w-7 rounded-full ring-offset-2 ring-offset-panel transition',
+                      (m.color ?? MARK_STYLE[m.kind].color) === c ? 'ring-2 ring-white' : 'hover:scale-110',
+                    )}
+                    style={{ background: MARK_COLOR_HEX[c].hex }}
+                  />
                 ))}
-              </select>
+              </div>
             </div>
           </label>
         </div>
@@ -256,7 +304,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
  * `standalone`: página pública do link (/m) — o endereço é atualizado a cada alteração.
  */
 export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | null; standalone: boolean }) {
-  const base = initial ?? EMPTY
+  const [base, setBase] = useState<SharedMap>(initial ?? EMPTY)
+  const sheetInput = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState(base.title)
   const [marks, setMarks] = useState<MapMark[]>(base.marks ?? [])
   const [showAnalysis, setShowAnalysis] = useState(true)
@@ -278,7 +327,12 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
   const beam = base.beam ?? DEF_BEAM
 
   // link único: recalculado a cada alteração (mesmo conteúdo → mesmo link)
-  const current = useMemo<SharedMap>(() => ({ ...base, title: title.trim() || 'Mapas ERB', marks }), [base, title, marks])
+  const [withTimes, setWithTimes] = useState(true)
+  const hasTimes = base.points.some((p) => p.times?.length)
+  const current = useMemo<SharedMap>(
+    () => ({ ...base, points: withTimes ? base.points : base.points.map((p) => ({ ...p, times: undefined })), title: title.trim() || 'Mapas ERB', marks }),
+    [base, title, marks, withTimes],
+  )
   useEffect(() => {
     let alive = true
     const t = setTimeout(async () => {
@@ -426,6 +480,13 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
               WhatsApp
             </a>
           )}
+          <button
+            className="btn-ghost h-8"
+            onClick={() => exportSheet(current, radius, `${(title || 'Mapas_ERB').replace(/[^\w.-]+/g, '_').slice(0, 60)}.xlsx`)}
+            title="Planilha no modelo eventos_da_operação"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Excel
+          </button>
           <button className="btn-ghost h-8" onClick={kml}>
             <Download className="h-4 w-4" /> KML
           </button>
@@ -446,6 +507,43 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
         <button className="btn-primary h-[38px] !px-3" onClick={doImport} aria-label="Converter e importar">
           <Plus className="h-4 w-4" />
         </button>
+        <button className="btn-ghost h-[38px]" onClick={() => sheetInput.current?.click()} title="Planilha com colunas Latitude, Longitude, Azimute, Célula, Data do evento…">
+          <FileSpreadsheet className="h-4 w-4" /> <span className="max-sm:hidden">Importar planilha</span>
+        </button>
+        <input
+          ref={sheetInput}
+          type="file"
+          accept=".xlsx,.csv,.txt"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            setProgress('Lendo a planilha…')
+            await nextPaint()
+            try {
+              const r = await importSheet(f)
+              if (!r.points.length && !r.marks.length) return toast.error('Nenhuma linha com latitude e longitude válidas.')
+              const all = [...base.points, ...r.points]
+              const times = all.flatMap((p) => p.times ?? []).sort()
+              setBase({
+                ...base,
+                points: all,
+                radius: base.radius ?? r.radius ?? undefined,
+                period: times.length ? [times[0], times[times.length - 1]] : base.period,
+              })
+              if (r.marks.length) setMarks([...marks, ...r.marks])
+              if (title === 'Mapas ERB') setTitle(f.name.replace(/\.[^.]+$/, ''))
+              toast.success(`${fmtInt(r.rows)} linhas lidas: ${fmtInt(r.points.length)} ERBs${r.marks.length ? ` e ${r.marks.length} pontos` : ''}.`, {
+                description: r.skipped ? `${r.skipped} linhas sem coordenadas válidas foram ignoradas.` : undefined,
+              })
+            } catch (x: any) {
+              toast.error(x?.message ?? 'Não foi possível ler a planilha.')
+            } finally {
+              setProgress(null)
+            }
+          }}
+        />
       </div>
 
       {picking && (
@@ -467,7 +565,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
           radius={radius}
           beam={beam}
           onTower={(t) => setSel(t as any)}
-          erbLayer={false}
+          erbLayer={!standalone}
           marks={marks}
           picking={!!picking}
           onMapClick={onMapClick}
@@ -527,7 +625,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
                     </button>
                   </td>
                   <td className="text-text" colSpan={4}>
-                    ERBs da análise compartilhada ({fmtInt(base.points.length)}) — toque numa torre para ver dias e horários
+                    ERBs da análise / planilha ({fmtInt(base.points.length)}) — toque numa torre para ver dias e horários
                   </td>
                 </tr>
               )}
@@ -544,9 +642,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
                   </td>
                   <td>
                     <span className="flex items-center gap-2">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] text-white" style={{ background: markHex(m) }}>
-                        {m.kind === 'erb' ? <RadioTower className="h-3 w-3" /> : MARK_STYLE[m.kind].glyph}
-                      </span>
+                      <MarkGlyph kind={m.kind} color={markHex(m)} />
                       <span className="text-white">{m.label}</span>
                     </span>
                   </td>
@@ -583,6 +679,14 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
             <span className="ml-auto font-mono text-[11px] font-normal text-faint">{fmtInt(link.length)} caracteres</span>
           </div>
           <textarea readOnly className="w-full font-mono text-[11px]" rows={2} value={link} onFocus={(e) => e.currentTarget.select()} />
+          {hasTimes && (
+            <label className="flex items-center gap-2 text-[12.5px] text-muted">
+              <input type="checkbox" checked={withTimes} onChange={(e) => setWithTimes(e.target.checked)} /> incluir dias e horários de cada ERB no link
+            </label>
+          )}
+          {link.length > 60000 && (
+            <Notice tone="amber">Link muito longo: alguns aplicativos de mensagem podem cortá-lo. Desmarque os dias e horários ou envie a planilha Excel/KML.</Notice>
+          )}
           <p className="text-[12px] text-faint">
             O link muda a cada alteração e abre exatamente esta análise — sem login e sem senha. Nada fica gravado em servidor: envie só para a equipe da investigação.
           </p>

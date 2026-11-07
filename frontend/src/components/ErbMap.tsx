@@ -228,7 +228,7 @@ export function ErbMap({
   const toggleFull = () => (document.fullscreenElement ? document.exitFullscreen() : wrap.current?.requestFullscreen?.())
 
   return (
-    <div ref={wrap} className={clsx('relative overflow-hidden rounded-2xl border border-line bg-ink', full ? 'h-screen' : height)}>
+    <div ref={wrap} className={clsx('relative isolate overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]', full ? 'h-screen' : height)}>
       <div ref={box} className="h-full w-full" role="img" aria-label="Mapa das estações (ERBs)" />
       <div className="absolute top-3 right-3 z-[500] flex gap-2">
         <button

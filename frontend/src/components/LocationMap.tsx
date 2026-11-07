@@ -34,26 +34,37 @@ export const MARK_STYLE: Record<MarkKind, { color: MarkColor; label: string; gly
 }
 export const markHex = (k: MapMark) => MARK_COLOR_HEX[k.color ?? MARK_STYLE[k.kind].color].hex
 
-const TOWER_SVG = (c: string) =>
-  `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/></svg>`
-
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+/** Desenho (traço) de cada tipo de ponto, no padrão 24×24. */
+export const MARK_ICON_SVG: Record<MarkKind, string> = {
+  casa: '<path d="M3 11 12 3.5 21 11"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/>',
+  trabalho: '<rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5v2"/><path d="M3.5 12.5h17"/>',
+  alvo: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
+  pessoa: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.6-3.8 3.4-6 7-6s6.4 2.2 7 6"/>',
+  veiculo:
+    '<path d="M4 15.5 5.6 10a2 2 0 0 1 1.9-1.4h9a2 2 0 0 1 1.9 1.4l1.6 5.5v3h-3v-1.6H7v1.6H4z"/><circle cx="8" cy="15.5" r="1" fill="currentColor"/><circle cx="16" cy="15.5" r="1" fill="currentColor"/>',
+  local: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  outro: '<path d="M6 21V4"/><path d="M6 4.5h11l-2.5 4 2.5 4H6"/>',
+  erb: '<path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/>',
+}
+
+/** Alfinete colorido com degradê, contorno branco e o ícone do tipo dentro. */
+export function pinSvg(kind: MarkKind, c: string, size = 38) {
+  const id = `g${c.slice(1)}`
+  return `<svg width="${size}" height="${Math.round(size * 1.25)}" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".82"/><stop offset="1" stop-color="${c}"/></linearGradient></defs><ellipse cx="20" cy="47" rx="7" ry="2.2" fill="#000" opacity=".25"/><path d="M20 46S5 30.5 5 19A15 15 0 0 1 35 19C35 30.5 20 46 20 46z" fill="url(#${id})" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="19" r="10.5" fill="#fff"/><g transform="translate(11.6 10.6) scale(.7)" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" color="${c}">${MARK_ICON_SVG[kind]}</g></svg>`
+}
 
 const markIcon = (k: MapMark) => {
   const c = markHex(k)
   if (k.kind === 'erb')
     return L.divIcon({
       className: 'erb-tower',
-      html: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff)">${TOWER_SVG(c)}<span style="margin-top:-2px;background:${c};color:#fff;border-radius:4px;padding:0 4px;font:700 10px/14px ui-monospace,monospace;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc(k.label)}</span></div>`,
-      iconSize: [44, 44],
-      iconAnchor: [22, 26],
+      html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff 0 18%,${c} 60%);border:2px solid #fff;box-shadow:0 2px 6px #0005;display:grid;place-items:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${MARK_ICON_SVG.erb}</svg></div><span style="margin-top:2px;background:${c};color:#fff;border-radius:4px;padding:0 5px;font:700 10px/15px ui-monospace,monospace;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 3px #0004">${esc(k.label)}</span></div>`,
+      iconSize: [44, 50],
+      iconAnchor: [22, 16],
     })
-  return L.divIcon({
-    className: 'erb-tower',
-    html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${c};border:2px solid #fff;box-shadow:0 2px 6px #0006;display:grid;place-items:center"><span style="transform:rotate(45deg);color:#fff;font:700 15px/1 system-ui">${MARK_STYLE[k.kind].glyph}</span></div></div>`,
-    iconSize: [30, 36],
-    iconAnchor: [15, 34],
-  })
+  return L.divIcon({ className: 'erb-tower', html: pinSvg(k.kind, c), iconSize: [38, 48], iconAnchor: [19, 46] })
 }
 
 export const SECTOR_COLOR = '#2563eb'
@@ -329,7 +340,7 @@ export function LocationMap({
   }, [])
 
   return (
-    <div ref={wrap} className={clsx('relative overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
+    <div ref={wrap} className={clsx('relative isolate overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
       <div
         ref={box}
         className={clsx('h-full w-full', picking && '[&_.leaflet-container]:!cursor-crosshair !cursor-crosshair')}
