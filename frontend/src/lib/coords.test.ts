@@ -47,4 +47,8 @@ describe('coordenadas', () => {
     expect(r.items).toHaveLength(2)
     expect(r.failed).toEqual(['linha qualquer'])
   })
+  it('nome antes das coordenadas', () => {
+    expect(parseLine('GABRIEL - 5799 - 08h59|-23.60215|-46.90688|240')).toMatchObject({ name: 'GABRIEL - 5799 - 08h59', az: 240 })
+    expect(parseLine('250 -26.25623 -49.2562')!.name).toBeUndefined()
+  })
 })

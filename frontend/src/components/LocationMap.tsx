@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import L from 'leaflet'
-import { Maximize2, Minimize2, X } from 'lucide-react'
+import { Layers, Maximize2, Minimize2, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
@@ -60,9 +60,9 @@ const markIcon = (k: MapMark) => {
   if (k.kind === 'erb')
     return L.divIcon({
       className: 'erb-tower',
-      html: `<div style="display:flex;flex-direction:column;align-items:center"><div style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff 0 18%,${c} 60%);border:2px solid #fff;box-shadow:0 2px 6px #0005;display:grid;place-items:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${MARK_ICON_SVG.erb}</svg></div><span style="margin-top:2px;background:${c};color:#fff;border-radius:4px;padding:0 5px;font:700 10px/15px ui-monospace,monospace;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 3px #0004">${esc(k.label)}</span></div>`,
-      iconSize: [44, 50],
-      iconAnchor: [22, 16],
+      html: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${c}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff)">${MARK_ICON_SVG.erb}</svg>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
     })
   return L.divIcon({ className: 'erb-tower', html: pinSvg(k.kind, c), iconSize: [38, 48], iconAnchor: [19, 46] })
 }
@@ -115,6 +115,8 @@ export function LocationMap({
   onMark,
   picking,
   onContext,
+  layout = 'default',
+  focus,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -140,6 +142,10 @@ export function LocationMap({
   picking?: boolean
   /** botão direito / toque longo no mapa */
   onContext?: (lat: number, lon: number) => void
+  /** "app": mapa em tela cheia, com o botão de camadas sob o zoom (site Mapas ERB) */
+  layout?: 'default' | 'app'
+  /** centraliza o mapa neste ponto (muda `key` para repetir) */
+  focus?: { lat: number; lon: number; key: number } | null
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -155,6 +161,8 @@ export function LocationMap({
   const [erbOn, setErbOn] = useState(false)
   const [ops, setOps] = useState<Set<number>>(() => new Set([0, 1, 2, 3]))
   const [erbMsg, setErbMsg] = useState('')
+  const [layersOpen, setLayersOpen] = useState(false)
+  const app = layout === 'app'
 
   useEffect(() => {
     if (!box.current || map.current) return
@@ -245,6 +253,10 @@ export function LocationMap({
     if (!m.getBounds().pad(-0.15).contains([current.lat, current.lon])) m.panTo([current.lat, current.lon], { animate: false })
   }, [current, radius, beam])
 
+  useEffect(() => {
+    if (focus && map.current) map.current.setView([focus.lat, focus.lon], Math.max(map.current.getZoom(), 15), { animate: false })
+  }, [focus])
+
   // pontos marcados à mão
   const markLayer = useRef<L.LayerGroup | null>(null)
   useEffect(() => {
@@ -256,15 +268,15 @@ export function LocationMap({
     ;(marks ?? []).forEach((k, i) => {
       if (k.hidden) return
       const c = markHex(k)
-      if (k.kind === 'erb' && k.az !== null && k.az !== undefined)
-        L.polygon(sector(k.lat, k.lon, k.az, k.dist || radius, k.beam || beam), { color: c, weight: 1.5, opacity: 0.9, fillColor: c, fillOpacity: 0.18, interactive: false }).addTo(
-          g,
-        )
+      if (k.kind === 'erb' && k.az !== null && k.az !== undefined) {
+        const dist = k.dist || radius
+        // setor (estimativa de cobertura) + linha vermelha do azimute até o alcance
+        L.polygon(sector(k.lat, k.lon, k.az, dist, k.beam || beam), { color: c, weight: 1.2, opacity: 0.85, fillColor: c, fillOpacity: 0.16, interactive: false }).addTo(g)
+        L.polyline([[k.lat, k.lon], dest(k.lat, k.lon, k.az, dist)], { color: '#ef4444', weight: 2.2, opacity: 0.95, interactive: false }).addTo(g)
+      }
       const mk = L.marker([k.lat, k.lon], { icon: markIcon(k), zIndexOffset: 1000 })
-      mk.bindTooltip(k.kind === 'erb' ? `${k.label}${k.az !== null && k.az !== undefined ? ` · azimute ${k.az}°` : ''}` : `${MARK_STYLE[k.kind].label}: ${k.label}`, {
-        direction: 'top',
-        offset: [0, -30],
-      })
+      if (k.kind === 'erb') mk.bindTooltip(esc(k.label), { permanent: true, direction: 'right', offset: [10, 0], className: 'erb-label' })
+      else mk.bindTooltip(`${MARK_STYLE[k.kind].label}: ${esc(k.label)}`, { direction: 'top', offset: [0, -30] })
       mk.on('click', () => onMark?.(i))
       mk.addTo(g)
     })
@@ -339,6 +351,93 @@ export function LocationMap({
     return () => document.removeEventListener('fullscreenchange', on)
   }, [])
 
+  const opsList = (
+    <>
+      {ERB_OPS.map((o) => (
+        <label key={o.key} className="flex cursor-pointer items-center gap-2 py-0.5">
+          <input
+            type="checkbox"
+            checked={ops.has(o.key)}
+            onChange={(e) => {
+              const n = new Set(ops)
+              if (e.target.checked) n.add(o.key)
+              else n.delete(o.key)
+              setOps(n)
+            }}
+          />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: o.color }} /> {o.label}
+        </label>
+      ))}
+      {erbMsg && <div className="mt-1 text-[11px] leading-snug text-faint">{erbMsg}</div>}
+      <div className="mt-1 text-[10px] text-faint">Fonte: Anatel (licenciamento)</div>
+    </>
+  )
+  const detailBox = detail && (
+    <div
+      className={clsx(
+        'absolute top-3 z-[600] max-h-[calc(100%-24px)] w-[min(320px,calc(100%-80px))] overflow-auto rounded-[8px] border border-line-2 bg-glass p-3 text-sm shadow-lg',
+        app ? 'left-[60px]' : 'left-14',
+      )}
+    >
+      {onCloseDetail && (
+        <button className="float-right ml-2 rounded p-0.5 text-muted hover:text-text" onClick={onCloseDetail} aria-label="Fechar detalhes">
+          <X className="h-4 w-4" />
+        </button>
+      )}
+      {detail}
+    </div>
+  )
+  const BASE_OPTS = [
+    ['mapa', 'Mapa'],
+    ['mapa2', 'Mapa 2'],
+    ['satelite', 'Satélite'],
+  ] as const
+
+  if (app)
+    return (
+      <div ref={wrap} className="relative isolate h-full w-full bg-[var(--map-bg)]">
+        <div
+          ref={box}
+          className={clsx('h-full w-full', picking && '[&_.leaflet-container]:!cursor-crosshair !cursor-crosshair')}
+          role="img"
+          aria-label="Mapa de localização do alvo"
+        />
+        <div className="absolute top-[84px] left-[10px] z-[500]">
+          <button
+            className={clsx(
+              'grid h-[40px] w-[40px] place-items-center rounded-[6px] border-2 border-black/20 bg-[#fff] text-gray-800 shadow-sm hover:bg-gray-50',
+              layersOpen && '!border-blue-500 text-blue-600',
+            )}
+            onClick={() => setLayersOpen(!layersOpen)}
+            aria-label="Camadas do mapa"
+            aria-expanded={layersOpen}
+          >
+            <Layers className="h-5 w-5" />
+          </button>
+          {layersOpen && (
+            <div className="absolute top-0 left-[48px] w-[210px] rounded-[10px] border border-gray-200 bg-[#fff] p-3 text-[13px] text-gray-800 shadow-xl">
+              <div className="mb-1 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">Mapa de fundo</div>
+              {BASE_OPTS.map(([id, label]) => (
+                <label key={id} className="flex cursor-pointer items-center gap-2 py-1">
+                  <input type="radio" name="base" checked={b === id} onChange={() => setB(id)} /> {label}
+                </label>
+              ))}
+              {erbLayer && (
+                <>
+                  <div className="mt-2 mb-1 border-t border-gray-200 pt-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">Antenas (Anatel)</div>
+                  <label className="flex cursor-pointer items-center gap-2 py-1 font-medium">
+                    <input type="checkbox" checked={erbOn} onChange={(e) => setErbOn(e.target.checked)} aria-label="ERBs" /> Mostrar ERBs das operadoras
+                  </label>
+                  {erbOn && <div className="pl-1 text-[12.5px]">{opsList}</div>}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {detailBox}
+      </div>
+    )
+
   return (
     <div ref={wrap} className={clsx('relative isolate overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]', full ? 'h-screen' : 'h-[58vh] min-h-[380px]')}>
       <div
@@ -384,37 +483,8 @@ export function LocationMap({
           )}
         </div>
       </div>
-      {erbOn && (
-        <div className="absolute top-14 right-3 z-[500] w-[150px] rounded-[7px] border border-line-2 bg-glass px-3 py-2 text-[12px]">
-          {ERB_OPS.map((o) => (
-            <label key={o.key} className="flex cursor-pointer items-center gap-2 py-0.5">
-              <input
-                type="checkbox"
-                checked={ops.has(o.key)}
-                onChange={(e) => {
-                  const n = new Set(ops)
-                  if (e.target.checked) n.add(o.key)
-                  else n.delete(o.key)
-                  setOps(n)
-                }}
-              />
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: o.color }} /> {o.label}
-            </label>
-          ))}
-          {erbMsg && <div className="mt-1 text-[11px] leading-snug text-faint">{erbMsg}</div>}
-          <div className="mt-1 text-[10px] text-faint">Fonte: Anatel</div>
-        </div>
-      )}
-      {detail && (
-        <div className="absolute top-3 left-14 z-[600] max-h-[calc(100%-24px)] w-[min(320px,calc(100%-80px))] overflow-auto rounded-[8px] border border-line-2 bg-glass p-3 text-sm shadow-lg">
-          {onCloseDetail && (
-            <button className="float-right ml-2 rounded p-0.5 text-muted hover:text-text" onClick={onCloseDetail} aria-label="Fechar detalhes">
-              <X className="h-4 w-4" />
-            </button>
-          )}
-          {detail}
-        </div>
-      )}
+      {erbOn && <div className="absolute top-14 right-3 z-[500] w-[150px] rounded-[7px] border border-line-2 bg-glass px-3 py-2 text-[12px]">{opsList}</div>}
+      {detailBox}
       <div className="absolute bottom-3 left-3 z-[500] rounded-[7px] border border-line bg-glass px-3 py-2 text-[11px] leading-5 text-muted">
         <div className="flex items-center gap-2">
           <span className="font-bold">⚲</span> ERB / antena · nº = total de eventos

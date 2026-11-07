@@ -1,8 +1,7 @@
 import clsx from 'clsx'
-import { Download, Eye, EyeOff, FileSpreadsheet, Info, Lock, MapPin, Pencil, Plus, RadioTower, Share2, Trash2 } from 'lucide-react'
+import { Download, Eye, EyeOff, FileSpreadsheet, Info, MapPin, Pencil, Plus, RadioTower, Share2, Trash2 } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BrandLockup } from '../components/brand'
 import { LocationMap, MARK_COLOR_HEX, MARK_ICON_SVG, MARK_STYLE, markHex } from '../components/LocationMap'
 import { exportSheet, importSheet } from '../lib/erbSheet'
 import { nextPaint, setProgress } from '../app/progress'
@@ -10,23 +9,9 @@ import { Modal, Notice } from '../components/ui'
 import type { Tower } from '../engine/location'
 import { parseCoord, parseInput, type ParsedItem } from '../lib/coords'
 import { fmtDateTime, fmtInt } from '../lib/format'
-import {
-  decryptMap,
-  decryptMapOpen,
-  encryptShare,
-  isOpenLink,
-  MARK_COLORS,
-  MARK_KINDS,
-  type MapMark,
-  type MarkColor,
-  type MarkKind,
-  type SharedMap,
-  shareUrl,
-  toKml,
-  WrongPassword,
-} from '../lib/shareMap'
+import { decryptMapOpen, encryptShare, MARK_COLORS, MARK_KINDS, type MapMark, type MarkColor, type MarkKind, type SharedMap, shareUrl, toKml } from '../lib/shareMap'
 
-const EMPTY: SharedMap = { v: 1, title: 'Mapas ERB', by: '', at: '', exp: null, period: [null, null], types: '', numbers: [], points: [] }
+export const EMPTY: SharedMap = { v: 1, title: 'Mapas ERB', by: '', at: '', exp: null, period: [null, null], types: '', numbers: [], points: [] }
 const DEF_DIST = 1000
 const DEF_BEAM = 120
 
@@ -78,7 +63,7 @@ export function TimesByDay({ times }: { times: string[] }) {
 }
 
 /** Ícone colorido do ponto (o mesmo desenho do mapa). */
-function MarkGlyph({ kind, color, size = 22 }: { kind: MarkKind; color: string; size?: number }) {
+export function MarkGlyph({ kind, color, size = 22 }: { kind: MarkKind; color: string; size?: number }) {
   return (
     <span
       className="grid shrink-0 place-items-center rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.35)] ring-2 ring-white/90"
@@ -102,7 +87,7 @@ function MarkGlyph({ kind, color, size = 22 }: { kind: MarkKind; color: string; 
 
 type Draft = { mark: MapMark; index: number | null; latText: string; lonText: string }
 
-function newDraft(lat: number | null, lon: number | null, kind: MarkKind, n: number): Draft {
+export function newDraft(lat: number | null, lon: number | null, kind: MarkKind, n: number): Draft {
   const mark: MapMark =
     kind === 'erb'
       ? { lat: lat ?? 0, lon: lon ?? 0, label: `ERB ${n}`, kind: 'erb', az: null, dist: DEF_DIST, beam: DEF_BEAM }
@@ -303,7 +288,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
  * Mapas ERB: editor de lugares e antenas com setores, importação de extratos e links únicos.
  * `standalone`: página pública do link (/m) — o endereço é atualizado a cada alteração.
  */
-export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | null; standalone: boolean }) {
+/** Estado e ações de um mapa do Mapas ERB (usado na plataforma e no site público). */
+export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
   const [base, setBase] = useState<SharedMap>(initial ?? EMPTY)
   const sheetInput = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState(base.title)
@@ -339,13 +325,13 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
       const f = await encryptShare(current)
       if (!alive) return
       setFrag(f)
-      if (standalone) history.replaceState(null, '', `/m#${f}`)
+      if (urlPath !== null) history.replaceState(null, '', `${urlPath}#${f}`)
     }, 250)
     return () => {
       alive = false
       clearTimeout(t)
     }
-  }, [current, standalone])
+  }, [current, urlPath])
   const link = frag ? shareUrl(frag) : ''
 
   const onMapClick = useCallback(
@@ -369,7 +355,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
     const txt = input.trim()
     if (!txt) return
     // link do próprio MARX: traz tudo
-    const own = txt.match(/#(m[23]\.[\w.-]+)/)
+    const own = txt.match(/#((?:m[23]|z[01])\.[\w.-]+)/)
     if (own) {
       try {
         const m = await decryptMapOpen(own[1])
@@ -421,6 +407,191 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
   const totalEvents = base.points.reduce((n, p) => n + p.events, 0)
   const addBtn = useRef<HTMLDivElement>(null)
 
+  const importSheetFile = async (f: File) => {
+    setProgress('Lendo a planilha…')
+    await nextPaint()
+    try {
+      const r = await importSheet(f)
+      if (!r.points.length && !r.marks.length) return toast.error('Nenhuma linha com latitude e longitude válidas.')
+      const all = [...base.points, ...r.points]
+      const times = all.flatMap((p) => p.times ?? []).sort()
+      setBase({ ...base, points: all, radius: base.radius ?? r.radius ?? undefined, period: times.length ? [times[0], times[times.length - 1]] : base.period })
+      if (r.marks.length) setMarks([...marks, ...r.marks])
+      if (title === 'Mapas ERB' || title === 'MARX Mapas ERB') setTitle(f.name.replace(/\.[^.]+$/, ''))
+      toast.success(`${fmtInt(r.rows)} linhas lidas: ${fmtInt(r.points.length)} ERBs${r.marks.length ? ` e ${r.marks.length} pontos` : ''}.`, {
+        description: r.skipped ? `${r.skipped} linhas sem coordenadas válidas foram ignoradas.` : undefined,
+      })
+    } catch (x: any) {
+      toast.error(x?.message ?? 'Não foi possível ler a planilha.')
+    } finally {
+      setProgress(null)
+    }
+  }
+  return {
+    base,
+    setBase,
+    sheetInput,
+    title,
+    setTitle,
+    marks,
+    setMarks,
+    showAnalysis,
+    setShowAnalysis,
+    sel,
+    setSel,
+    picking,
+    setPicking,
+    draft,
+    setDraft,
+    input,
+    setInput,
+    parsed,
+    setParsed,
+    frag,
+    help,
+    setHelp,
+    filter,
+    setFilter,
+    addMenu,
+    setAddMenu,
+    towers,
+    path,
+    radius,
+    beam,
+    withTimes,
+    setWithTimes,
+    hasTimes,
+    current,
+    link,
+    onMapClick,
+    onContext,
+    onMark,
+    save,
+    doImport,
+    insertParsed,
+    kml,
+    copy,
+    list,
+    totalEvents,
+    addBtn,
+    importSheetFile,
+  }
+}
+
+export type ErbDoc = ReturnType<typeof useErbDoc>
+
+/** Janelas do Mapas ERB: prévia da importação, formulário de ponto e ajuda. */
+export function ErbDocModals({ d }: { d: ErbDoc }) {
+  const { parsed, setParsed, insertParsed, draft, setDraft, save, marks, setMarks, help, setHelp } = d
+  return (
+    <>
+      {parsed && (
+        <Modal open title={`Importar — ${parsed.items.length} item(ns) reconhecido(s)`} onClose={() => setParsed(null)} wide>
+          <div className="space-y-3 text-sm">
+            <div className="max-h-80 overflow-auto rounded-[8px] border border-line">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Nome</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th className="text-right">Azimute</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.items.map((p, i) => (
+                    <tr key={i}>
+                      <td>{p.az !== null ? 'ERB' : 'Lugar'}</td>
+                      <td>{p.name ?? '—'}</td>
+                      <td className="font-mono">{p.lat.toFixed(6)}</td>
+                      <td className="font-mono">{p.lon.toFixed(6)}</td>
+                      <td className="text-right font-mono">{p.az ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {parsed.failed.length > 0 && (
+              <Notice tone="amber" title={`${parsed.failed.length} linha(s) não reconhecida(s)`}>
+                <span className="font-mono text-[11.5px]">{parsed.failed.slice(0, 5).join(' · ')}</span>
+              </Notice>
+            )}
+            <div className="flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setParsed(null)}>
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={insertParsed}>
+                Inserir no mapa
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {draft && (
+        <MarkForm
+          key={`${draft.index}-${draft.mark.lat}-${draft.mark.lon}`}
+          draft={draft}
+          onSave={save}
+          onClose={() => setDraft(null)}
+          onDelete={
+            draft.index !== null
+              ? () => {
+                  setMarks(marks.filter((_, j) => j !== draft.index))
+                  setDraft(null)
+                }
+              : undefined
+          }
+        />
+      )}
+      {help && <HelpModal onClose={() => setHelp(false)} />}
+    </>
+  )
+}
+
+export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | null; standalone: boolean }) {
+  const d = useErbDoc(initial, standalone ? '/m' : null)
+  const {
+    base,
+    sheetInput,
+    title,
+    setTitle,
+    marks,
+    setMarks,
+    showAnalysis,
+    setShowAnalysis,
+    sel,
+    setSel,
+    picking,
+    setPicking,
+    setDraft,
+    input,
+    setInput,
+    filter,
+    setFilter,
+    addMenu,
+    setAddMenu,
+    towers,
+    path,
+    radius,
+    beam,
+    withTimes,
+    setWithTimes,
+    hasTimes,
+    current,
+    link,
+    onMapClick,
+    onContext,
+    onMark,
+    doImport,
+    kml,
+    copy,
+    list,
+    totalEvents,
+    addBtn,
+    setHelp,
+    importSheetFile,
+  } = d
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -515,33 +686,10 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
           type="file"
           accept=".xlsx,.csv,.txt"
           className="hidden"
-          onChange={async (e) => {
+          onChange={(e) => {
             const f = e.target.files?.[0]
             e.target.value = ''
-            if (!f) return
-            setProgress('Lendo a planilha…')
-            await nextPaint()
-            try {
-              const r = await importSheet(f)
-              if (!r.points.length && !r.marks.length) return toast.error('Nenhuma linha com latitude e longitude válidas.')
-              const all = [...base.points, ...r.points]
-              const times = all.flatMap((p) => p.times ?? []).sort()
-              setBase({
-                ...base,
-                points: all,
-                radius: base.radius ?? r.radius ?? undefined,
-                period: times.length ? [times[0], times[times.length - 1]] : base.period,
-              })
-              if (r.marks.length) setMarks([...marks, ...r.marks])
-              if (title === 'Mapas ERB') setTitle(f.name.replace(/\.[^.]+$/, ''))
-              toast.success(`${fmtInt(r.rows)} linhas lidas: ${fmtInt(r.points.length)} ERBs${r.marks.length ? ` e ${r.marks.length} pontos` : ''}.`, {
-                description: r.skipped ? `${r.skipped} linhas sem coordenadas válidas foram ignoradas.` : undefined,
-              })
-            } catch (x: any) {
-              toast.error(x?.message ?? 'Não foi possível ler a planilha.')
-            } finally {
-              setProgress(null)
-            }
+            if (f) void importSheetFile(f)
           }}
         />
       </div>
@@ -693,147 +841,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
         </section>
       )}
 
-      {parsed && (
-        <Modal open title={`Importar — ${parsed.items.length} item(ns) reconhecido(s)`} onClose={() => setParsed(null)} wide>
-          <div className="space-y-3 text-sm">
-            <div className="max-h-80 overflow-auto rounded-[8px] border border-line">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Nome</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th className="text-right">Azimute</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsed.items.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.az !== null ? 'ERB' : 'Lugar'}</td>
-                      <td>{p.name ?? '—'}</td>
-                      <td className="font-mono">{p.lat.toFixed(6)}</td>
-                      <td className="font-mono">{p.lon.toFixed(6)}</td>
-                      <td className="text-right font-mono">{p.az ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {parsed.failed.length > 0 && (
-              <Notice tone="amber" title={`${parsed.failed.length} linha(s) não reconhecida(s)`}>
-                <span className="font-mono text-[11.5px]">{parsed.failed.slice(0, 5).join(' · ')}</span>
-              </Notice>
-            )}
-            <div className="flex justify-end gap-2">
-              <button className="btn-ghost" onClick={() => setParsed(null)}>
-                Cancelar
-              </button>
-              <button className="btn-primary" onClick={insertParsed}>
-                Inserir no mapa
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-      {draft && (
-        <MarkForm
-          key={`${draft.index}-${draft.mark.lat}-${draft.mark.lon}`}
-          draft={draft}
-          onSave={save}
-          onClose={() => setDraft(null)}
-          onDelete={
-            draft.index !== null
-              ? () => {
-                  setMarks(marks.filter((_, j) => j !== draft.index))
-                  setDraft(null)
-                }
-              : undefined
-          }
-        />
-      )}
-      {help && <HelpModal onClose={() => setHelp(false)} />}
-    </div>
-  )
-}
-
-/**
- * Página pública do link (/m e /mapa-compartilhado): abre a análise criptografada no próprio
- * endereço (#…) — direto (m2/m3) ou com senha (m1, links antigos). Sem dados: Mapas ERB em branco.
- */
-export default function MapasErbPage() {
-  const frag = location.hash.slice(1)
-  const open_ = !frag || isOpenLink(frag)
-  const [map, setMap] = useState<SharedMap | null>(frag ? null : EMPTY)
-  const [err, setErr] = useState('')
-  const [busy, setBusy] = useState(!!frag && open_)
-  const [password, setPassword] = useState('')
-  const accept = (m: SharedMap) => {
-    if (m.exp && Date.parse(m.exp) < Date.now()) {
-      setErr(`Este link expirou em ${fmtDateTime(m.exp.slice(0, 19).replace('T', ' '))}. Peça um novo a quem compartilhou.`)
-      return
-    }
-    setMap(m)
-  }
-  useEffect(() => {
-    if (!frag || !open_) return
-    decryptMapOpen(frag)
-      .then(accept)
-      .catch((x) => setErr(x?.message ?? 'Não foi possível abrir o mapa.'))
-      .finally(() => setBusy(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const openPw = async (e: FormEvent) => {
-    e.preventDefault()
-    setErr('')
-    setBusy(true)
-    try {
-      accept(await decryptMap(frag, password))
-    } catch (x: any) {
-      setErr(x instanceof WrongPassword ? 'Senha incorreta.' : (x?.message ?? 'Não foi possível abrir o mapa.'))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="min-h-[100dvh] px-3 py-3 sm:px-6 sm:py-4">
-      <header className="mx-auto mb-3 flex max-w-[1600px] items-center gap-3 border-b border-line pb-3">
-        <BrandLockup compact />
-        <span className="ml-1 border-l border-line pl-3 text-[13px] text-muted">Mapas ERB</span>
-      </header>
-      <main className="mx-auto max-w-[1600px]">
-        {map ? (
-          <ErbMapsEditor initial={map} standalone />
-        ) : err && open_ ? (
-          <Notice tone="amber">{err}</Notice>
-        ) : open_ || busy ? (
-          <p className="py-10 text-center text-sm text-muted">Abrindo o mapa…</p>
-        ) : (
-          <form onSubmit={openPw} className="card mx-auto mt-6 max-w-md space-y-4 p-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <Lock className="h-4 w-4 text-teal" /> Mapa protegido por senha
-            </div>
-            <p className="text-sm text-muted">Digite a senha recebida de quem compartilhou. O mapa é aberto apenas neste navegador; nada é enviado ou gravado.</p>
-            <input
-              type="password"
-              autoFocus
-              className="w-full font-mono"
-              placeholder="XXXX-XXXX-XXXX"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="off"
-            />
-            {err && (
-              <p role="alert" className="text-sm text-danger">
-                {err}
-              </p>
-            )}
-            <button className="btn-primary w-full" disabled={busy || !password}>
-              {busy ? 'Abrindo…' : 'Abrir mapa'}
-            </button>
-          </form>
-        )}
-      </main>
+      <ErbDocModals d={d} />
     </div>
   )
 }

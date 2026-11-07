@@ -95,7 +95,18 @@ export function parseLine(line: string): ParsedItem | null {
       }
     }
   }
-  return { lat, lon, az }
+  // nome: texto (com letras) antes da primeira coordenada, ex.: "GABRIEL - 5799 - 08h59|-23.6|-46.9|240"
+  const first = toks[Math.min(a.i, b.i)]
+  const at = line.indexOf(first)
+  const lead =
+    at > 0
+      ? line
+          .slice(0, at)
+          .replace(/[|;\t,\s]+$/, '')
+          .trim()
+      : ''
+  const name = /\p{L}/u.test(lead) && lead.length <= 80 ? lead : undefined
+  return { lat, lon, az, ...(name ? { name } : {}) }
 }
 
 /** Link do Mapas/PCSC: ?t=e&d=<base64> com "nome&@tipo&@lat&@lon&@az&@abertura&@distância&$…". */

@@ -1,4 +1,4 @@
-import { decryptMap, decryptMapOpen, encryptMap, encryptMapOpen, encryptShare, isOpenLink, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
+import { decryptMap, decryptMapOpen, encryptMap, encryptMapOpen, encryptShare, encryptShareM3, isOpenLink, randomPassword, type SharedMap, toKml, WrongPassword } from './shareMap'
 
 const map: SharedMap = {
   v: 1,
@@ -74,7 +74,7 @@ describe('mapa compartilhado', () => {
     m.path = [[m.points[0].lat, m.points[0].lon, m.points[1].lat, m.points[1].lon, 4]]
     m.marks = [{ lat: -15.8, lon: -47.9, label: 'Residência do alvo', kind: 'casa' }]
     const frag = await encryptShare(m)
-    expect(frag.startsWith('m3.')).toBe(true)
+    expect(/^z[01]\./.test(frag)).toBe(true)
     expect(isOpenLink(frag)).toBe(true)
     const back = await decryptMapOpen(frag)
     expect(back.by).toBe('')
@@ -82,5 +82,23 @@ describe('mapa compartilhado', () => {
     expect(back.path?.[0][4]).toBe(4)
     expect(back.marks).toEqual([{ lat: -15.8, lon: -47.9, label: 'Residência do alvo', kind: 'casa' }])
     expect(frag.length).toBeLessThan((await encryptMapOpen(m)).length)
+  })
+  it('link curto z1: pequeno, igual para o mesmo mapa, recusa alteração; m3 antigo continua abrindo', async () => {
+    const m: SharedMap = {
+      ...map,
+      title: 'Mapa de localização (ERBs)',
+      period: [null, null],
+      points: [],
+      marks: [{ lat: -23.60215, lon: -46.90688, label: 'GABRIEL - 5799 - 08h59', kind: 'erb', az: 240, dist: 1000, beam: 120 }],
+    }
+    const a = await encryptShare(m)
+    expect(a).toBe(await encryptShare(m))
+    expect(a.length).toBeLessThan(110)
+    expect((await decryptMapOpen(a)).marks?.[0]).toMatchObject({ label: 'GABRIEL - 5799 - 08h59', az: 240 })
+    const at = 6
+    const bad = a.slice(0, at) + (a[at] === 'A' ? 'B' : 'A') + a.slice(at + 1)
+    await expect(decryptMapOpen(bad)).rejects.toThrow(/corrompido/)
+    const old = await encryptShareM3(m)
+    expect((await decryptMapOpen(old)).marks?.[0].label).toBe('GABRIEL - 5799 - 08h59')
   })
 })

@@ -6,7 +6,7 @@ import { Loading } from './components/ui'
 import Login, { FirstSetup, ForgotPassword, Register, ResetPassword } from './pages/Login'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const SharedMapPage = lazy(() => import('./pages/MapasErb'))
+const SharedMapPage = lazy(() => import('./pages/ErbApp'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 const AdminUsers = lazy(() => import('./pages/admin/Users'))
@@ -61,6 +61,7 @@ export default function App() {
           <Route path="/primeiro-acesso" element={<FirstSetup />} />
           <Route path="/mapa-compartilhado" element={<SharedMapPage />} />
           <Route path="/m" element={<SharedMapPage />} />
+          <Route path="/erb" element={<SharedMapPage />} />
           <Route
             element={
               <RequireAuth>

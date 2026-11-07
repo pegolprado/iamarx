@@ -163,9 +163,10 @@ export async function encryptMapOpen(m: SharedMap): Promise<string> {
   return `m2.${b64u(raw)}.${b64u(iv)}.${b64uBig(ct)}`
 }
 
-export const isOpenLink = (fragment: string) => /^#?m[23]\./.test(fragment)
+export const isOpenLink = (fragment: string) => /^#?(m[23]|z[01])\./.test(fragment)
 
 export async function decryptMapOpen(fragment: string): Promise<SharedMap> {
+  if (/^#?z[01]\./.test(fragment)) return decodeZ1(fragment)
   const [ver, k, i, c] = fragment.replace(/^#/, '').split('.')
   if ((ver !== 'm2' && ver !== 'm3') || !k || !i || !c) throw new Error('Link incompleto ou corrompido. Peça um novo link a quem compartilhou.')
   const key = await crypto.subtle.importKey('raw', unb64u(k) as BufferSource, 'AES-GCM', false, ['decrypt'])
@@ -204,18 +205,18 @@ function unpackTimes(s: string) {
 function packV3(m: SharedMap) {
   const key = (la: number, lo: number) => `${Math.round(la * 1e5)},${Math.round(lo * 1e5)}`
   const idx = new Map(m.points.map((p, i) => [key(p.lat, p.lon), i]))
-  const o: any = {
-    x: m.exp ? Math.round(Date.parse(m.exp) / MIN) : 0,
-    p: m.points.map((p) => [
+  const o: any = {}
+  if (m.exp) o.x = Math.round(Date.parse(m.exp) / MIN)
+  if (m.points.length)
+    o.p = m.points.map((p) => [
       Math.round(p.lat * 1e5),
       Math.round(p.lon * 1e5),
       p.events,
       p.name || 0,
       p.cl ?? p.az.map((a, j) => [p.cells[j] ?? '', a, 0]),
       p.times?.length ? packTimes(p.times) : 0,
-    ]),
-  }
-  if (m.title && m.title !== 'Mapa de localização (ERBs)') o.t = m.title
+    ])
+  if (m.title && !['Mapa de localização (ERBs)', 'Mapas ERB', 'MARX Mapas ERB'].includes(m.title)) o.t = m.title
   if (m.radius) o.r = m.radius
   if (m.beam) o.b = m.beam
   if (m.types && m.types !== 'todos os eventos') o.y = m.types
@@ -232,8 +233,9 @@ function packV3(m: SharedMap) {
         MARK_KINDS.indexOf(k.kind),
         k.color ? MARK_COLORS.indexOf(k.color) : -1,
         k.az ?? -1,
-        k.dist ?? 0,
-        k.beam ?? 0,
+        // 1000 m e 120° são o padrão e não vão no link
+        k.dist && k.dist !== 1000 ? k.dist : 0,
+        k.beam && k.beam !== 120 ? k.beam : 0,
         k.hidden ? 1 : 0,
       ]
       while (a.length > 4 && (a[a.length - 1] === 0 || a[a.length - 1] === -1)) a.pop() // campos vazios no fim não vão no link
@@ -243,7 +245,7 @@ function packV3(m: SharedMap) {
 }
 
 function unpackV3(o: any): SharedMap {
-  const points: SitePoint[] = o.p.map((a: any[]) => {
+  const points: SitePoint[] = (o.p ?? []).map((a: any[]) => {
     const cl = (a[4] || []) as [string, number | null, number][]
     const times = a[5] ? unpackTimes(a[5]) : undefined
     return {
@@ -264,7 +266,7 @@ function unpackV3(o: any): SharedMap {
   })
   return {
     v: 1,
-    title: o.t ?? 'Mapa de localização (ERBs)',
+    title: o.t ?? (o.p ? 'Mapa de localização (ERBs)' : 'Mapas ERB'),
     by: '',
     at: '',
     exp: o.x ? new Date(o.x * MIN).toISOString() : null,
@@ -288,12 +290,45 @@ function unpackV3(o: any): SharedMap {
 }
 
 /**
- * Link curto e direto ("m3"): abre só clicando; nada vai ao servidor.
+ * Link curto ("z1"): conteúdo compactado + 8 caracteres de verificação (SHA-256). Abre só
+ * clicando; nada vai ao servidor. Mesmo mapa = mesmo link; link alterado à mão não abre.
+ * (Com a chave dentro do próprio link a criptografia não protegia nada a mais e só o alongava.)
+ */
+export async function encryptShare(m: SharedMap): Promise<string> {
+  const raw = strToU8(JSON.stringify(packV3(m)))
+  const z = deflateSync(raw, { level: 9 })
+  // mapas pequenos ficam menores sem compactar ("z0")
+  const [ver, body] = z.length < raw.length ? ['z1', z] : ['z0', raw]
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', body as BufferSource))
+  return `${ver}.${b64uBig(body)}.${b64u(h.slice(0, 6))}`
+}
+
+async function decodeZ1(fragment: string): Promise<SharedMap> {
+  const [ver, d, c] = fragment.replace(/^#/, '').split('.')
+  const bad = () => new Error('Link incompleto ou corrompido. Confira se o link foi copiado inteiro.')
+  if (!d || !c) throw bad()
+  let plain: Uint8Array
+  try {
+    plain = unb64u(d)
+  } catch {
+    throw bad()
+  }
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', plain as BufferSource))
+  if (b64u(h.slice(0, 6)) !== c) throw bad()
+  try {
+    return unpackV3(JSON.parse(strFromU8(ver === 'z0' ? plain : inflateSync(plain))))
+  } catch {
+    throw bad()
+  }
+}
+
+/**
+ * Link "m3" (versão anterior, ainda aceita na abertura): AES-GCM com chave derivada do conteúdo.
  * A chave e o vetor são derivados do próprio conteúdo (SHA-256): a mesma análise gera sempre o
  * mesmo link, qualquer alteração gera outro, e um link alterado à mão não abre (falha na
  * verificação do AES-GCM) — o link identifica e protege a integridade da análise.
  */
-export async function encryptShare(m: SharedMap): Promise<string> {
+export async function encryptShareM3(m: SharedMap): Promise<string> {
   const plain = deflateSync(strToU8(JSON.stringify(packV3(m))), { level: 9 })
   const h = new Uint8Array(await crypto.subtle.digest('SHA-256', plain as BufferSource))
   const raw = h.slice(0, 16)
@@ -304,7 +339,8 @@ export async function encryptShare(m: SharedMap): Promise<string> {
 }
 
 /** Endereço público do link curto. */
-export const shareUrl = (frag: string) => `${location.origin}/m#${frag}`
+export const isErbHost = () => typeof location !== 'undefined' && /^erb\./i.test(location.hostname)
+export const shareUrl = (frag: string) => (isErbHost() ? `${location.origin}/#${frag}` : `${location.origin}/m#${frag}`)
 
 export class WrongPassword extends Error {}
 

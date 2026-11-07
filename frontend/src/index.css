@@ -753,3 +753,17 @@ select {
 .leaflet-container {
   isolation: isolate;
 }
+
+/* etiqueta da ERB marcada (nome ao lado da antena) */
+.leaflet-tooltip.erb-label {
+  background: #fff;
+  color: #111827;
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font: 600 12px/1.4 'Inter Variable', system-ui, sans-serif;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.leaflet-tooltip.erb-label::before {
+  display: none;
+}

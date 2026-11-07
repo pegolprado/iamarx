@@ -72,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onApiStatus((status, path) => {
         const publicPage =
           ['/login', '/cadastro', '/esqueci-senha', '/redefinir-senha', '/primeiro-acesso', '/mapa-compartilhado'].some((p) => location.pathname.startsWith(p)) ||
-          location.pathname === '/m'
+          location.pathname === '/m' ||
+          location.pathname === '/erb'
         if (status === 401 && !publicPage && !path.startsWith('/auth/login') && !path.startsWith('/auth/mfa')) {
           qc.setQueryData(['me'], null)
           if (getState().files.length || getState().targets.length) void wipeAndReload('/login?motivo=expirada')
