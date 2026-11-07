@@ -8,6 +8,7 @@ import { ExportButtons } from '../../components/Export'
 import { type EventFilter, FilterBar } from '../../components/FilterBar'
 import { Findings } from '../../components/Findings'
 import { date, int, IP_PAIR_COLS, num, nums } from '../../components/columns'
+import { FOCUS_STYLES, GRAPH_BG, GRAPH_COLORS as GC, GraphControls, GraphLegend, hoverFocus, reducedMotion } from '../../components/graph'
 import { type ResultColumn, ResultTable } from '../../components/ResultTable'
 import { Badge, Criteria, DrillLink, ErrorBox, Field, Loading, Notice, PageHeader, Tabs } from '../../components/ui'
 import { linkGraph } from '../../engine/analytics'
@@ -436,26 +437,54 @@ function GraphPanel({ f }: { f: EventFilter }) {
           style: {
             width: 'data(size)',
             height: 'data(size)',
-            'background-color': '#5d6780',
+            'background-color': GC.contact,
             label: 'data(label)',
-            color: '#c9d2e3',
-            'font-size': 9,
+            color: GC.label,
+            'font-family': 'JetBrains Mono, monospace',
+            'font-size': 8.5,
             'text-wrap': 'wrap',
             'text-valign': 'bottom',
+            'text-background-color': '#05090d',
+            'text-background-opacity': 0.7,
+            'text-background-padding': '1.5px',
             'text-margin-y': 4,
             'border-width': 2,
-            'border-color': '#161b2e',
-          },
+            'border-color': GC.ring,
+            'transition-property': 'opacity, background-color, border-color',
+            'transition-duration': 160,
+          } as any,
         },
-        { selector: 'node[kind = "target"]', style: { 'background-color': '#4c8dff', 'font-size': 11, 'font-weight': 'bold', color: '#ffffff' } },
-        { selector: 'node[kind = "common"]', style: { 'background-color': '#c27f10' } },
-        { selector: 'edge', style: { width: 'data(w)', 'line-color': '#34405f', 'curve-style': 'haystack', opacity: 0.85 } },
-        { selector: 'edge[recip = 1]', style: { 'line-color': '#0f9e8e' } },
-        { selector: ':selected', style: { 'border-color': '#ffffff', 'line-color': '#ffffff', 'border-width': 3 } },
+        {
+          selector: 'node[kind = "target"]',
+          style: {
+            'background-color': GC.target,
+            'font-size': 10.5,
+            'font-weight': 'bold',
+            color: '#e7edf3',
+            'underlay-color': GC.target,
+            'underlay-opacity': 0.16,
+            'underlay-padding': 7,
+            'underlay-shape': 'ellipse',
+          } as any,
+        },
+        { selector: 'node[kind = "common"]', style: { 'background-color': GC.common } },
+        { selector: 'edge', style: { width: 'data(w)', 'line-color': GC.edge, 'curve-style': 'haystack', opacity: 0.8 } },
+        { selector: 'edge[recip = 1]', style: { 'line-color': GC.reciprocal, opacity: 0.55 } },
+        { selector: ':selected', style: { 'border-color': '#e7edf3', 'line-color': '#e7edf3', 'border-width': 3, opacity: 1 } },
+        ...FOCUS_STYLES,
       ],
-      layout: { name: 'cose', animate: false, nodeRepulsion: () => 9000, idealEdgeLength: () => 90, padding: 30 } as any,
+      layout: {
+        name: 'cose',
+        animate: reducedMotion() ? false : 'end',
+        animationDuration: 650,
+        animationEasing: 'ease-out-cubic',
+        nodeRepulsion: () => 9000,
+        idealEdgeLength: () => 90,
+        padding: 30,
+      } as any,
       wheelSensitivity: 0.3,
     })
+    hoverFocus(cy.current)
     cy.current.on('tap', 'node', (ev) => setSel({ type: 'node', ...ev.target.data('raw') }))
     cy.current.on('tap', 'edge', (ev) => setSel({ type: 'edge', ...ev.target.data('raw') }))
     cy.current.on('dbltap', 'node', (ev) => setCenter(ev.target.id()))
@@ -467,7 +496,7 @@ function GraphPanel({ f }: { f: EventFilter }) {
   const exportPng = async () => {
     if (!cy.current) return
     const a = document.createElement('a')
-    a.href = cy.current.png({ bg: '#0b0f1a', full: true, scale: 2 })
+    a.href = cy.current.png({ bg: '#05090d', full: true, scale: 2 })
     a.download = 'MARX-grafo-de-vinculos.png'
     a.click()
   }
@@ -475,10 +504,10 @@ function GraphPanel({ f }: { f: EventFilter }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-mono text-base font-bold text-white">Rede de contatos</h2>
+          <h2 className="text-[15px] font-semibold text-white">Rede de contatos</h2>
           <p className="mt-0.5 max-w-4xl text-xs text-muted">
-            Azul: alvos; âmbar: contatos em comum a dois ou mais alvos; verde-água: comunicação nos dois sentidos; espessura proporcional à quantidade de eventos. Clique duas vezes
-            num nó para centralizar.
+            Ciano: alvos; âmbar: contatos em comum a dois ou mais alvos; verde: comunicação nos dois sentidos; espessura proporcional à quantidade de eventos. Passe o mouse para
+            destacar a vizinhança; clique duas vezes num nó para centralizar.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -539,73 +568,86 @@ function GraphPanel({ f }: { f: EventFilter }) {
         <ErrorBox error={q.error} />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-          <div className="card relative overflow-hidden">
-            <div ref={box} className="h-[560px] w-full" role="img" aria-label="Grafo de contatos" />
+          <div className={`card relative overflow-hidden ${GRAPH_BG}`}>
+            <div ref={box} className="h-[600px] w-full" role="img" aria-label="Grafo de contatos" />
+            <GraphLegend
+              items={[
+                { color: GC.target, label: 'alvo' },
+                { color: GC.common, label: 'em comum' },
+                { color: GC.contact, label: 'contato' },
+                { color: GC.reciprocal, label: 'recíproca', line: true },
+                { color: GC.edge, label: 'unidirecional', line: true },
+              ]}
+            />
+            <GraphControls cy={cy} />
             <div className="absolute bottom-3 left-3 flex gap-2 text-[11px] text-muted">
               <Badge tone="blue">{q.data.nodes.length} números</Badge>
               <Badge>{q.data.edges.length} conexões</Badge>
               {q.data.truncated && <Badge tone="amber">limitado às conexões mais fortes</Badge>}
             </div>
           </div>
-          <aside className="card p-4 text-sm">
-            {!sel ? (
-              <p className="text-muted">Selecione um nó ou uma conexão para ver os detalhes e abrir os registros que a sustentam.</p>
-            ) : sel.type === 'node' ? (
-              <div className="space-y-2">
-                <div className="font-mono text-lg text-white">{fmtNumber(sel.id)}</div>
-                {sel.label && <div className="text-teal">{sel.label}</div>}
-                <div>
-                  {sel.is_target ? (
-                    <Badge tone="blue">alvo</Badge>
-                  ) : sel.common_to_targets > 1 ? (
-                    <Badge tone="amber">em comum a {sel.common_to_targets} alvos</Badge>
-                  ) : (
-                    <Badge>contato</Badge>
-                  )}
+          <aside className="card overflow-hidden text-sm">
+            <div className="panel-head">Detalhes da seleção</div>
+            <div className="p-4">
+              {!sel ? (
+                <p className="text-muted">Selecione um nó ou uma conexão para ver os detalhes e abrir os registros que a sustentam.</p>
+              ) : sel.type === 'node' ? (
+                <div className="space-y-2">
+                  <div className="font-mono text-lg text-white">{fmtNumber(sel.id)}</div>
+                  {sel.label && <div className="text-teal">{sel.label}</div>}
+                  <div>
+                    {sel.is_target ? (
+                      <Badge tone="blue">alvo</Badge>
+                    ) : sel.common_to_targets > 1 ? (
+                      <Badge tone="amber">em comum a {sel.common_to_targets} alvos</Badge>
+                    ) : (
+                      <Badge>contato</Badge>
+                    )}
+                  </div>
+                  <div className="text-muted">
+                    {sel.degree} conexões · {sel.events} eventos
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button className="btn-ghost !py-1 text-xs" onClick={() => setCenter(sel.id)}>
+                      Centralizar / expandir
+                    </button>
+                    <DrillLink caseId={c.id} filter={{ ...f, numbers: [sel.id] }} className="btn-ghost !py-1 text-xs">
+                      Abrir registros
+                    </DrillLink>
+                  </div>
                 </div>
-                <div className="text-muted">
-                  {sel.degree} conexões · {sel.events} eventos
-                </div>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button className="btn-ghost !py-1 text-xs" onClick={() => setCenter(sel.id)}>
-                    Centralizar / expandir
-                  </button>
-                  <DrillLink caseId={c.id} filter={{ ...f, numbers: [sel.id] }} className="btn-ghost !py-1 text-xs">
-                    Abrir registros
+              ) : (
+                <div className="space-y-2">
+                  <div className="font-mono text-white">
+                    {fmtNumber(sel.n1)} ⟷ {fmtNumber(sel.n2)}
+                  </div>
+                  {sel.reciprocal ? <Badge tone="teal">recíproca</Badge> : <Badge>unidirecional</Badge>}
+                  <dl className="grid grid-cols-2 gap-1 text-xs">
+                    <dt className="text-muted">Eventos</dt>
+                    <dd>{sel.events}</dd>
+                    <dt className="text-muted">Dias distintos</dt>
+                    <dd>{sel.days}</dd>
+                    <dt className="text-muted">{fmtNumber(sel.n1)} → </dt>
+                    <dd>{sel.n1_to_n2}</dd>
+                    <dt className="text-muted">{fmtNumber(sel.n2)} → </dt>
+                    <dd>{sel.n2_to_n1}</dd>
+                    <dt className="text-muted">Duração (voz)</dt>
+                    <dd>{fmtDuration(sel.call_seconds)}</dd>
+                    <dt className="text-muted">Primeiro</dt>
+                    <dd>{fmtDateTime(sel.first_event)}</dd>
+                    <dt className="text-muted">Último</dt>
+                    <dd>{fmtDateTime(sel.last_event)}</dd>
+                    <dt className="text-muted">Arquivos</dt>
+                    <dd>{sel.file_ids.map((x: number) => `#${x}`).join(', ')}</dd>
+                  </dl>
+                  <DrillLink caseId={c.id} filter={{ ...f, targets: [sel.n1, sel.n2], others: [sel.n1, sel.n2] }} className="btn-ghost !py-1 text-xs">
+                    Abrir registros da conexão
                   </DrillLink>
                 </div>
+              )}
+              <div className="mt-6">
+                <Notice tone="amber">Conexões representam registros documentados de comunicação; não provam vínculo pessoal ou associação.</Notice>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="font-mono text-white">
-                  {fmtNumber(sel.n1)} ⟷ {fmtNumber(sel.n2)}
-                </div>
-                {sel.reciprocal ? <Badge tone="teal">recíproca</Badge> : <Badge>unidirecional</Badge>}
-                <dl className="grid grid-cols-2 gap-1 text-xs">
-                  <dt className="text-muted">Eventos</dt>
-                  <dd>{sel.events}</dd>
-                  <dt className="text-muted">Dias distintos</dt>
-                  <dd>{sel.days}</dd>
-                  <dt className="text-muted">{fmtNumber(sel.n1)} → </dt>
-                  <dd>{sel.n1_to_n2}</dd>
-                  <dt className="text-muted">{fmtNumber(sel.n2)} → </dt>
-                  <dd>{sel.n2_to_n1}</dd>
-                  <dt className="text-muted">Duração (voz)</dt>
-                  <dd>{fmtDuration(sel.call_seconds)}</dd>
-                  <dt className="text-muted">Primeiro</dt>
-                  <dd>{fmtDateTime(sel.first_event)}</dd>
-                  <dt className="text-muted">Último</dt>
-                  <dd>{fmtDateTime(sel.last_event)}</dd>
-                  <dt className="text-muted">Arquivos</dt>
-                  <dd>{sel.file_ids.map((x: number) => `#${x}`).join(', ')}</dd>
-                </dl>
-                <DrillLink caseId={c.id} filter={{ ...f, targets: [sel.n1, sel.n2], others: [sel.n1, sel.n2] }} className="btn-ghost !py-1 text-xs">
-                  Abrir registros da conexão
-                </DrillLink>
-              </div>
-            )}
-            <div className="mt-6">
-              <Notice tone="amber">Conexões representam registros documentados de comunicação; não provam vínculo pessoal ou associação.</Notice>
             </div>
           </aside>
         </div>

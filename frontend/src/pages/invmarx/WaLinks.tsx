@@ -3,6 +3,7 @@ import cytoscape, { type Core } from 'cytoscape'
 import { Clock, Download, FolderOpen, Globe2, Network, Search, Target, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { GRAPH_BG, GRAPH_COLORS as GC, GraphControls, hoverFocus, reducedMotion } from '../../components/graph'
 import { Badge, Notice } from '../../components/ui'
 import { type BFile, links, localTs } from '../../engine/waBilling'
 import { loadWaFiles } from '../../engine/waFiles'
@@ -274,27 +275,50 @@ function Graph({ r }: { r: Result }) {
           selector: 'node',
           style: {
             label: 'data(label)',
-            'font-size': 9,
-            color: '#1f2937',
+            'font-size': 8.5,
+            'font-family': 'JetBrains Mono, monospace',
+            color: GC.label,
             'text-valign': 'bottom',
+            'text-background-color': '#05090d',
+            'text-background-opacity': 0.7,
+            'text-background-padding': '1.5px',
             'text-margin-y': 3,
-            width: 22,
-            height: 22,
+            width: 20,
+            height: 20,
             'border-width': 2,
-            'border-color': '#fff',
+            'border-color': GC.ring,
           },
         },
-        { selector: 'node[kind = "alvo"]', style: { 'background-color': '#dc2626', width: 32, height: 32, 'font-weight': 'bold', 'font-size': 11 } },
-        { selector: 'node[kind = "comum"]', style: { 'background-color': '#f59e0b', shape: 'round-rectangle' } },
-        { selector: 'node[kind = "contato"]', style: { 'background-color': '#16a34a' } },
-        { selector: 'edge', style: { width: 1, 'line-color': '#94a3b8', 'line-style': 'dashed', 'curve-style': 'straight', opacity: 0.7 } },
-        { selector: 'edge[kind = "direto"]', style: { width: 3, 'line-color': '#dc2626', 'line-style': 'solid', opacity: 1 } },
-        { selector: '.hl', style: { 'border-color': '#2563eb', 'border-width': 4 } },
+        {
+          selector: 'node[kind = "alvo"]',
+          style: {
+            'background-color': GC.target,
+            width: 32,
+            height: 32,
+            'font-weight': 'bold',
+            'font-size': 10.5,
+            color: '#e7edf3',
+            'underlay-color': GC.target,
+            'underlay-opacity': 0.16,
+            'underlay-padding': 7,
+            'underlay-shape': 'ellipse',
+          } as any,
+        },
+        { selector: 'node[kind = "comum"]', style: { 'background-color': GC.common, shape: 'round-rectangle' } },
+        { selector: 'node[kind = "contato"]', style: { 'background-color': GC.contactAlt } },
+        { selector: 'edge', style: { width: 1, 'line-color': GC.edge, 'line-style': 'dashed', 'curve-style': 'straight', opacity: 0.8 } },
+        { selector: 'edge[kind = "direto"]', style: { width: 3, 'line-color': GC.direct, 'line-style': 'solid', opacity: 1 } },
+        { selector: '.hl', style: { 'border-color': '#00d9f5', 'border-width': 4 } },
         { selector: '.dim', style: { opacity: 0.15 } },
+        { selector: '.faded', style: { opacity: 0.14 } },
       ],
-      layout: layout === 'org' ? { name: 'preset', padding: 30 } : ({ name: 'cose', animate: false, nodeRepulsion: () => 8000, padding: 30 } as any),
+      layout:
+        layout === 'org'
+          ? { name: 'preset', padding: 30 }
+          : ({ name: 'cose', animate: reducedMotion() ? false : 'end', animationDuration: 650, nodeRepulsion: () => 8000, padding: 30 } as any),
       wheelSensitivity: 0.3,
     })
+    hoverFocus(cy.current)
     cy.current.on('tap', 'node', (ev) => {
       const n = ev.target
       cy.current!.elements().addClass('dim')
@@ -319,49 +343,53 @@ function Graph({ r }: { r: Result }) {
   return (
     <div>
       <h3 className="mb-2 text-sm font-semibold text-amber">🔗 Alvos com interlocutores em comum</h3>
-      <div className="relative overflow-hidden rounded-xl border border-line bg-slate-100">
+      <div className={`relative overflow-hidden rounded-[10px] border border-line ${GRAPH_BG}`}>
         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
           <button
-            className={clsx('rounded px-2 py-1 text-xs font-semibold', layout === 'rede' ? 'bg-blue-700 text-white' : 'bg-blue-500 text-white')}
+            className={clsx(
+              'rounded-[6px] border px-2 py-1 text-xs font-medium',
+              layout === 'rede' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-[rgba(8,14,20,0.9)] text-muted hover:text-text',
+            )}
             onClick={() => setLayout('rede')}
           >
             Rede
           </button>
           <button
-            className={clsx('rounded px-2 py-1 text-xs font-semibold', layout === 'org' ? 'bg-blue-700 text-white' : 'bg-blue-500 text-white')}
+            className={clsx(
+              'rounded-[6px] border px-2 py-1 text-xs font-medium',
+              layout === 'org' ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line bg-[rgba(8,14,20,0.9)] text-muted hover:text-text',
+            )}
             onClick={() => setLayout('org')}
           >
             Organização
           </button>
-          <label className="mt-1 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
+          <label className="mt-1 flex items-center gap-1 rounded-[6px] border border-line bg-[rgba(8,14,20,0.9)] px-1.5 py-0.5 text-[10px] text-muted">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> todos os contatos
           </label>
         </div>
-        <div className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded bg-white px-2 py-1 shadow">
-          <Search className="h-3.5 w-3.5 text-gray-500" />
+        <div className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-[6px] border border-line-2 bg-[rgba(8,14,20,0.92)] px-2 py-1">
+          <Search className="h-3.5 w-3.5 text-faint" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Pesquisar no grafo…"
-            className="w-36 border-0 !bg-transparent p-0 text-xs text-gray-800 outline-none"
+            className="w-36 border-0 !bg-transparent p-0 text-xs text-text outline-none !shadow-none"
           />
         </div>
-        <button className="absolute top-2 right-2 z-10 rounded bg-blue-500 px-2 py-1 text-xs font-semibold text-white" onClick={() => cy.current?.fit(undefined, 30)}>
-          Centralizar
-        </button>
+        <GraphControls cy={cy} />
         <div ref={box} className="h-[460px] w-full" role="img" aria-label="Grafo de vínculos entre alvos" />
-        <div className="absolute bottom-2 left-2 flex gap-2 rounded bg-white/90 px-2 py-1 text-[10px] text-gray-700">
+        <div className="absolute bottom-2 left-2 flex gap-2 rounded-[6px] border border-line bg-[rgba(8,14,20,0.88)] px-2 py-1 font-mono text-[10px] text-muted">
           <span>
-            <b className="text-red-600">●</b> alvo
+            <b className="text-accent">●</b> alvo
           </span>
           <span>
-            <b className="text-amber-500">■</b> interlocutor em comum
+            <b className="text-amber">■</b> interlocutor em comum
           </span>
           <span>
-            <b className="text-green-600">●</b> contato
+            <b className="text-ok">●</b> contato
           </span>
           <span>
-            <b className="text-red-600">━</b> contato direto
+            <b className="text-danger">━</b> contato direto
           </span>
         </div>
       </div>

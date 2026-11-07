@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useCase } from '../../app/layout'
+import { GIngest } from '../../components/glyphs'
 import { Badge, Empty, Field, Notice, PageHeader } from '../../components/ui'
 import { q as sql } from '../../engine/db'
 import { addFiles, removeFile } from '../../engine/importer'
@@ -105,7 +106,7 @@ export default function Files() {
       />
       {canWrite && (
         <div
-          className={`card mb-6 border-dashed p-6 ${drag ? 'border-accent bg-accent/5' : ''}`}
+          className={`card mb-6 overflow-hidden transition-[border-color,box-shadow] duration-200 ${drag ? '!border-accent shadow-[0_0_0_3px_rgba(0,217,245,0.12),0_0_40px_-12px_rgba(0,217,245,0.6)]' : ''}`}
           onDragOver={(e) => {
             e.preventDefault()
             setDrag(true)
@@ -117,35 +118,64 @@ export default function Files() {
             send(e.dataTransfer.files)
           }}
         >
-          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-            <Field label="Tipo de documento">
-              <select className="w-full" value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="cdr">Bilhetagem / extrato de registros (CDR, ERB por evento)</option>
-                <option value="erb_registry">Cadastro técnico de ERB (células e coordenadas)</option>
-                <option value="access_log">Log de acesso (IP): Google, Meta, Apple, provedores…</option>
-                <option value="other">Documento complementar</option>
-              </select>
-            </Field>
-            {kind === 'access_log' ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Conta do alvo (se não vier no arquivo)">
-                  <input className="w-full" value={account} placeholder="e-mail, usuário ou telefone" onChange={(e) => setAccount(e.target.value)} />
-                </Field>
-                <Field label="Serviço (opcional)">
-                  <input className="w-full" value={service} placeholder="detectar (Google, Instagram…)" onChange={(e) => setService(e.target.value)} />
-                </Field>
-              </div>
-            ) : (
-              <Field label="Operadora informada (opcional)">
-                <select className="w-full" value={operator} onChange={(e) => setOperator(e.target.value)}>
-                  <option value="">detectar / informar depois</option>
-                  {['TIM', 'VIVO', 'CLARO', 'OI', 'ALGAR', 'OUTRA'].map((o) => (
-                    <option key={o}>{o}</option>
-                  ))}
+          <div className="panel-head">
+            Entrada de dados
+            <span className="ml-auto flex items-center gap-1.5 normal-case">
+              <ShieldCheck className="h-3.5 w-3.5 text-ok" /> leitura local · SHA-256 calculado na entrada
+            </span>
+          </div>
+          <div className="grid lg:grid-cols-[1.15fr_1fr]">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => input.current?.click()}
+              className={`group relative m-4 flex flex-col items-center justify-center gap-3 rounded-[10px] border border-dashed px-6 py-9 text-center transition-colors duration-200 disabled:opacity-60 ${drag ? 'border-accent bg-accent/[0.06]' : 'border-line-2 bg-[radial-gradient(circle_at_50%_20%,rgba(0,217,245,0.07),transparent_65%)] hover:border-accent/60'}`}
+            >
+              <span
+                className={`grid h-14 w-14 place-items-center rounded-full border border-accent/35 bg-petrol text-accent shadow-[0_0_30px_-10px_rgba(0,217,245,0.9)] ${busy ? 'status-dot' : ''}`}
+              >
+                <GIngest className="h-7 w-7" />
+              </span>
+              <span className="text-[14.5px] font-semibold text-white">
+                {busy ? 'Lendo arquivos…' : drag ? 'Solte para carregar' : 'Arraste os arquivos ou clique para selecionar'}
+              </span>
+              <span className="flex max-w-md flex-wrap justify-center gap-1">
+                {['CSV', 'TXT', 'XLS', 'XLSX', 'XML', 'JSON', 'HTML', 'PDF + OCR', 'ZIP', 'WhatsApp Records'].map((x) => (
+                  <span key={x} className="rounded-[4px] border border-line bg-petrol px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                    {x}
+                  </span>
+                ))}
+              </span>
+              <span className="text-[11.5px] text-faint">Seleção múltipla · formato e operadora identificados · duplicidades detectadas pelo SHA-256</span>
+            </button>
+            <div className="space-y-4 border-line p-4 lg:border-l lg:p-5">
+              <Field label="Tipo de documento">
+                <select className="w-full" value={kind} onChange={(e) => setKind(e.target.value)}>
+                  <option value="cdr">Bilhetagem / extrato de registros (CDR, ERB por evento)</option>
+                  <option value="erb_registry">Cadastro técnico de ERB (células e coordenadas)</option>
+                  <option value="access_log">Log de acesso (IP): Google, Meta, Apple, provedores…</option>
+                  <option value="other">Documento complementar</option>
                 </select>
               </Field>
-            )}
-            <div>
+              {kind === 'access_log' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Conta do alvo (se não vier no arquivo)">
+                    <input className="w-full" value={account} placeholder="e-mail, usuário ou telefone" onChange={(e) => setAccount(e.target.value)} />
+                  </Field>
+                  <Field label="Serviço (opcional)">
+                    <input className="w-full" value={service} placeholder="detectar (Google, Instagram…)" onChange={(e) => setService(e.target.value)} />
+                  </Field>
+                </div>
+              ) : (
+                <Field label="Operadora informada (opcional)">
+                  <select className="w-full" value={operator} onChange={(e) => setOperator(e.target.value)}>
+                    <option value="">detectar / informar depois</option>
+                    {['TIM', 'VIVO', 'CLARO', 'OI', 'ALGAR', 'OUTRA'].map((o) => (
+                      <option key={o}>{o}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               <input
                 ref={input}
                 type="file"
@@ -157,12 +187,33 @@ export default function Files() {
               <button className="btn-primary w-full" disabled={busy} onClick={() => input.current?.click()}>
                 <Upload className="h-4 w-4" /> {busy ? 'Lendo…' : 'Selecionar arquivos'}
               </button>
+              <p className="text-[11.5px] leading-relaxed text-faint">
+                TXT delimitado ou de largura fixa, PDF de texto ou digitalizado (OCR) e WhatsApp Records da Meta (records.html ou o ZIP recebido), reconhecido automaticamente.
+                Depois de carregar, cada arquivo passa pelo assistente: pré-visualização, mapeamento, validação e confirmação antes de importar.
+              </p>
             </div>
           </div>
-          <p className="mt-3 text-center text-xs text-faint">
-            ou arraste os arquivos para cá · CSV, TXT (delimitado ou largura fixa), XLS, XLSX, XML, JSON, HTML, PDF (texto ou digitalizado, com OCR), ZIP e WhatsApp Records da Meta
-            (records.html ou o ZIP recebido), reconhecido automaticamente
-          </p>
+        </div>
+      )}
+      {files.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line sm:grid-cols-4">
+          {(
+            [
+              ['Arquivos', files.length, ''],
+              ['Processados', files.filter((f) => f.status === 'processado').length, 'text-ok'],
+              ['Aguardando importação', files.filter((f) => f.status === 'recebido').length, 'text-accent'],
+              [
+                'Duplicados / com erro',
+                files.filter((f) => f.meta?.duplicate_of || f.meta?.error || f.status === 'rejeitado' || f.status === 'nao_suportado').length,
+                'text-amber',
+              ],
+            ] as const
+          ).map(([k, v, tone]) => (
+            <div key={k} className="bg-panel px-4 py-3">
+              <div className="font-mono text-[10px] tracking-[0.06em] text-faint uppercase">{k}</div>
+              <div className={`mt-1 font-mono text-[20px] tabular-nums ${v ? tone || 'text-white' : 'text-faint'}`}>{fmtInt(v)}</div>
+            </div>
+          ))}
         </div>
       )}
       {files.length === 0 ? (

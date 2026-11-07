@@ -1,16 +1,41 @@
-import { Activity, AlertTriangle, FileSearch, FileText, FolderKanban, GitMerge, MessageCircle, Network, PhoneCall, RadioTower, Sparkles, Upload } from 'lucide-react'
+import { AlertTriangle, FileSearch, GitMerge, PhoneCall, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { GComms, GCore, GGraph, GIngest, GReport, GShield, GSignal, GTarget, GTower } from '../components/glyphs'
 import type { Tone } from '../components/ui'
 
 /** Módulos da tela inicial (cartões grandes) — `path` relativo à análise quando `inCase`. */
-export type ModuleDef = { key: string; title: string; description: string; icon: ReactNode; path: string; inCase: boolean; tone: Tone }
+export type ModuleDef = {
+  key: string
+  title: string
+  description: string
+  /** descrição curta (painéis compactos) */
+  short: string
+  /** grupo funcional na central de operações */
+  group: ModuleGroup
+  icon: ReactNode
+  path: string
+  inCase: boolean
+  tone: Tone
+}
+
+export const MODULE_GROUPS = [
+  'Intelligence Analysis',
+  'Data Acquisition',
+  'Communication Intelligence',
+  'GEOINT / Location Intelligence',
+  'Reporting & Monitoring',
+  'Security & Privacy',
+] as const
+export type ModuleGroup = (typeof MODULE_GROUPS)[number]
 
 export const MODULES: ModuleDef[] = [
   {
     key: 'cases',
     title: 'Análise Atual',
     description: 'Identificação, alvos, período autorizado e escopo da análise aberta nesta aba (nada é salvo).',
-    icon: <FolderKanban />,
+    short: 'Identificação, alvos e período da operação aberta.',
+    group: 'Intelligence Analysis',
+    icon: <GTarget />,
     path: '',
     inCase: true,
     tone: 'blue',
@@ -19,7 +44,9 @@ export const MODULES: ModuleDef[] = [
     key: 'import',
     title: 'Importação Inteligente',
     description: 'Carregue planilhas, PDFs (com OCR), ZIP ou WhatsApp Records: layout, operadora, fusos, validação e duplicidades tratados automaticamente.',
-    icon: <Upload />,
+    short: 'Planilhas, PDF com OCR, ZIP e WhatsApp Records, validados na entrada.',
+    group: 'Data Acquisition',
+    icon: <GIngest />,
     path: 'arquivos',
     inCase: true,
     tone: 'blue',
@@ -28,7 +55,9 @@ export const MODULES: ModuleDef[] = [
     key: 'full',
     title: 'Análise Completa',
     description: 'Importou, está pronto: todas as análises de uma só vez, com os principais achados e relatório único em PDF ou Excel.',
-    icon: <Sparkles />,
+    short: 'Todas as análises de uma vez: achados, vínculos e relatório único.',
+    group: 'Intelligence Analysis',
+    icon: <GCore />,
     path: 'completa',
     inCase: true,
     tone: 'violet',
@@ -37,7 +66,9 @@ export const MODULES: ModuleDef[] = [
     key: 'cdr',
     title: 'Bilhetagem e Padrões',
     description: 'Chamadas, SMS e dados, contatos frequentes, comparação de períodos, horários de pico, dias atípicos, lacunas e linha do tempo.',
-    icon: <PhoneCall />,
+    short: 'Chamadas, SMS e dados: frequência, picos, lacunas e linha do tempo.',
+    group: 'Communication Intelligence',
+    icon: <GSignal />,
     path: 'eventos',
     inCase: true,
     tone: 'blue',
@@ -46,7 +77,9 @@ export const MODULES: ModuleDef[] = [
     key: 'links',
     title: 'Análise de Vínculos',
     description: 'Rede de contatos, reciprocidade, contatos em comum, contato direto, coincidências, células em comum e cruzamento entre operadoras — tudo junto.',
-    icon: <Network />,
+    short: 'Rede de contatos, reciprocidade e coincidências entre alvos.',
+    group: 'Intelligence Analysis',
+    icon: <GGraph />,
     path: 'vinculos',
     inCase: true,
     tone: 'teal',
@@ -56,7 +89,9 @@ export const MODULES: ModuleDef[] = [
     title: 'WhatsApp e IPs',
     description:
       'Relatórios da Meta (mensagens, chamadas, dados cadastrais, agenda e grupos) e logs de acesso do Google e outros provedores, com correlação de IPs entre contas e serviços.',
-    icon: <MessageCircle />,
+    short: 'Registros da Meta, agenda, grupos e correlação de IPs.',
+    group: 'Communication Intelligence',
+    icon: <GComms />,
     path: 'whatsapp',
     inCase: true,
     tone: 'green',
@@ -64,8 +99,11 @@ export const MODULES: ModuleDef[] = [
   {
     key: 'erb',
     title: 'Localização do Alvo (ERB)',
-    description: 'Carregue o extrato ou o relatório de localização: torres no mapa com setores e deslocamentos, reprodução dos eventos, provável residência e trabalho, ERBs mais frequentes e relatório em HTML.',
-    icon: <RadioTower />,
+    description:
+      'Carregue o extrato ou o relatório de localização: torres no mapa com setores e deslocamentos, reprodução dos eventos, provável residência e trabalho, ERBs mais frequentes e relatório em HTML.',
+    short: 'ERBs no mapa, deslocamentos, provável residência e trabalho.',
+    group: 'GEOINT / Location Intelligence',
+    icon: <GTower />,
     path: 'localizacao',
     inCase: true,
     tone: 'amber',
@@ -74,7 +112,9 @@ export const MODULES: ModuleDef[] = [
     key: 'reports',
     title: 'Alertas e Relatórios',
     description: 'Alertas automáticos para revisão e relatórios técnicos em PDF, Excel e CSV com critérios, hashes e rastreabilidade.',
-    icon: <FileText />,
+    short: 'Alertas para revisão e exportação em PDF, Excel e CSV.',
+    group: 'Reporting & Monitoring',
+    icon: <GReport />,
     path: 'relatorios',
     inCase: true,
     tone: 'blue',
@@ -83,7 +123,9 @@ export const MODULES: ModuleDef[] = [
     key: 'audit',
     title: 'Privacidade e Segurança',
     description: 'Processamento local, nenhum dado gravado, sessão individual e apagamento automático ao sair.',
-    icon: <Activity />,
+    short: 'Processamento local e apagamento ao sair.',
+    group: 'Security & Privacy',
+    icon: <GShield />,
     path: '/configuracoes',
     inCase: false,
     tone: 'red',
@@ -194,7 +236,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
       },
       {
         title: 'Localização do alvo (ERB)',
-        description: 'Carregou o extrato com ERBs (bilhetagem, interceptação ou relatório de localização da operadora) e o mapa já mostra onde o alvo esteve, com os padrões de rotina.',
+        description:
+          'Carregou o extrato com ERBs (bilhetagem, interceptação ou relatório de localização da operadora) e o mapa já mostra onde o alvo esteve, com os padrões de rotina.',
         path: 'localizacao',
         includes: [
           'Torres no mapa com total de eventos',

@@ -4,42 +4,46 @@
 @import '@fontsource/montserrat/700.css';
 @import '@fontsource/montserrat/800.css';
 @import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
 @import '@fontsource/jetbrains-mono/700.css';
 @import 'leaflet/dist/leaflet.css';
 
 /*
- * MARX — design system "Intelligence Operations"
- * Superfícies em camadas (fundo → sidebar → superfície → superfície elevada), bordas finas,
- * acento azul contido e cores de estado só onde significam algo. Sem gradientes decorativos,
- * sem brilho, sem preto absoluto: confortável para sessões longas.
+ * MARX — "Cyber Operations / Intelligence Center"
+ * Preto azulado em camadas, bordas finas em azul-petróleo translúcido, ciano e verde só em
+ * pontos estratégicos (estado, foco, seleção). Inter para leitura; JetBrains Mono para
+ * números, horários, identificadores e estados.
  */
 @theme {
   --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-display: 'Montserrat', 'Inter Variable', system-ui, sans-serif;
 
-  --color-ink: #0d1119; /* fundo principal */
-  --color-ink-2: #101722; /* sidebar, áreas de apoio */
-  --color-panel: #151e2b; /* superfícies */
-  --color-panel-2: #1b2635; /* superfícies secundárias / elevadas */
-  --color-field: #111824; /* campos de formulário */
-  --color-line: #263447; /* bordas */
-  --color-line-2: #34465d; /* bordas em destaque / hover */
-  --color-text: #e4eaf2;
-  --color-muted: #98a6b8;
-  --color-faint: #68778b;
-  --color-accent: #5689d8;
-  --color-accent-2: #6a98e0; /* hover do acento (mais claro no tema escuro) */
-  --color-teal: #56b8c4;
-  --color-ok: #43b58a;
-  --color-amber: #d5a653;
-  --color-danger: #d56f76;
-  --color-violet: #9c8fd8;
+  --color-ink: #030609; /* preto profundo — fundo */
+  --color-ink-2: #080e14; /* preto azulado — barra lateral, faixas */
+  --color-petrol: #0b1721; /* azul petróleo — cabeçalhos de painel, tabelas */
+  --color-panel: #101b26; /* superfícies */
+  --color-panel-2: #152431; /* superfície elevada */
+  --color-field: #0a141d; /* campos */
+  --color-line: rgba(95, 150, 180, 0.18);
+  --color-line-2: rgba(95, 150, 180, 0.32);
+  --color-text: #e7edf3;
+  --color-muted: #9aaaba;
+  --color-faint: #64778a;
+  --color-accent: #00d9f5; /* ciano tecnológico */
+  --color-accent-2: #5ae6f8;
+  --color-cyan: #00d9f5;
+  --color-teal: #3cc8c0;
+  --color-ok: #00d68f; /* verde operacional */
+  --color-amber: #e7aa4b;
+  --color-danger: #f0646e;
+  --color-violet: #9b8cf0;
   --color-gold: #d9a84e; /* cor da marca (X do logotipo) */
-  --color-white: #f1f4f9; /* "branco" do sistema: nunca branco puro */
+  --color-white: #f3f7fa;
 
-  --radius-card: 12px;
+  --radius-card: 10px;
   --ease-ui: cubic-bezier(0.2, 0, 0, 1);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 12px 32px -18px rgba(0, 0, 0, 0.85);
 }
 
 @layer base {
@@ -57,22 +61,22 @@
     font-feature-settings: 'cv11', 'ss01';
   }
   ::selection {
-    background: rgba(86, 137, 216, 0.32);
+    background: rgba(0, 217, 245, 0.25);
   }
   :focus-visible {
-    outline: 2px solid rgba(86, 137, 216, 0.75);
+    outline: 1.5px solid rgba(0, 217, 245, 0.8);
     outline-offset: 2px;
     border-radius: 6px;
   }
   h1,
   h2,
   h3 {
-    letter-spacing: -0.01em;
+    letter-spacing: -0.012em;
   }
   input,
   select,
   textarea {
-    @apply rounded-lg border border-line bg-field px-3 py-[7px] text-[13.5px] text-text placeholder:text-faint;
+    @apply rounded-md border border-line bg-field px-3 py-[7px] text-[13.5px] text-text placeholder:text-faint;
     transition:
       border-color 160ms var(--ease-ui),
       box-shadow 160ms var(--ease-ui),
@@ -86,8 +90,8 @@
   input:focus,
   select:focus,
   textarea:focus {
-    @apply border-accent outline-none;
-    box-shadow: 0 0 0 3px rgba(86, 137, 216, 0.18);
+    @apply border-accent/70 outline-none;
+    box-shadow: 0 0 0 3px rgba(0, 217, 245, 0.12);
   }
   input:disabled,
   select:disabled,
@@ -96,12 +100,12 @@
   }
   input[type='checkbox'],
   input[type='radio'] {
-    @apply h-4 w-4 accent-[#5689d8];
+    @apply h-4 w-4 accent-[#00c2dc];
     padding: 0;
     box-shadow: none !important;
   }
   input[type='range'] {
-    @apply accent-[#5689d8];
+    @apply accent-[#00c2dc];
     padding: 0;
     border: 0;
     background: transparent;
@@ -117,16 +121,19 @@
     font-variant-numeric: tabular-nums;
   }
   th {
-    @apply sticky top-0 z-10 border-b border-line bg-[#172130] px-3 py-2 text-left text-[11.5px] font-medium whitespace-nowrap text-muted;
+    @apply sticky top-0 z-10 border-b border-line-2 bg-petrol px-3 py-2 text-left font-mono text-[10.5px] font-medium tracking-[0.06em] whitespace-nowrap text-muted uppercase;
   }
   td {
-    @apply border-b border-line/70 px-3 py-2 align-top;
+    @apply border-b border-line px-3 py-2 align-top;
   }
   tbody tr {
     transition: background-color 120ms var(--ease-ui);
   }
+  tbody tr:nth-child(even) td {
+    background-color: rgba(95, 150, 180, 0.025);
+  }
   tbody tr:hover td {
-    background-color: rgba(152, 166, 184, 0.045);
+    background-color: rgba(0, 217, 245, 0.045);
   }
   tbody tr:last-child td {
     border-bottom: 0;
@@ -137,23 +144,22 @@
   details > summary::-webkit-details-marker {
     display: none;
   }
-  /* barras de rolagem discretas */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2a3a50 transparent;
+    scrollbar-color: #1c3140 transparent;
   }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a3a50;
+    background: #1c3140;
     border: 3px solid transparent;
     background-clip: padding-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #36495f;
+    background-color: #284558;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -166,79 +172,214 @@
   }
 }
 
+/* Painel técnico: superfície translúcida sobre o fundo, borda fina e entrada suave. */
 @utility card {
-  @apply rounded-[12px] border border-line bg-panel;
+  @apply rounded-[10px] border border-line;
+  background: rgba(16, 27, 38, 0.9);
+  box-shadow: var(--shadow-panel);
+  animation: panel-in 260ms var(--ease-ui) backwards;
 }
 
 @utility card-hover {
   transition:
     border-color 180ms var(--ease-ui),
-    background-color 180ms var(--ease-ui);
+    background-color 180ms var(--ease-ui),
+    transform 180ms var(--ease-ui),
+    box-shadow 180ms var(--ease-ui);
   &:hover {
-    border-color: var(--color-line-2);
-    background-color: #182231;
+    border-color: rgba(0, 217, 245, 0.38);
+    background-color: rgba(20, 36, 49, 0.92);
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px rgba(0, 217, 245, 0.06),
+      0 14px 34px -20px rgba(0, 217, 245, 0.35);
   }
 }
 
+/* cabeçalho de painel: faixa petróleo com rótulo técnico */
+@utility panel-head {
+  @apply flex items-center gap-2 border-b border-line bg-petrol/70 px-4 py-2.5 font-mono text-[11px] font-medium tracking-[0.08em] text-muted uppercase;
+}
+
 @utility btn {
-  @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[13px] font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:shrink-0;
+  @apply inline-flex h-9 items-center justify-center gap-2 rounded-md px-3.5 text-[13px] font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-45 [&>svg]:shrink-0;
   transition:
     background-color 160ms var(--ease-ui),
     border-color 160ms var(--ease-ui),
     color 160ms var(--ease-ui),
-    box-shadow 160ms var(--ease-ui);
+    box-shadow 160ms var(--ease-ui),
+    transform 120ms var(--ease-ui);
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
 }
 
 @utility btn-primary {
-  @apply btn bg-accent text-white enabled:hover:bg-accent-2 enabled:active:bg-[#4b7cc8];
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  @apply btn border border-accent/55 text-[#bff6fd];
+  background: linear-gradient(180deg, rgba(0, 217, 245, 0.2), rgba(0, 217, 245, 0.1));
+  &:hover:not(:disabled) {
+    border-color: rgba(0, 217, 245, 0.85);
+    color: #e9fdff;
+    box-shadow:
+      0 0 0 3px rgba(0, 217, 245, 0.1),
+      0 0 18px -4px rgba(0, 217, 245, 0.45);
+  }
 }
 
 @utility btn-ghost {
-  @apply btn border border-line bg-panel-2/60 text-text enabled:hover:border-line-2 enabled:hover:bg-panel-2;
+  @apply btn border border-line bg-panel-2/50 text-text enabled:hover:border-line-2 enabled:hover:bg-panel-2;
 }
 
 @utility btn-danger {
-  @apply btn border border-danger/40 bg-danger/[0.06] text-danger enabled:hover:bg-danger/[0.12];
+  @apply btn border border-danger/40 bg-danger/[0.06] text-danger enabled:hover:border-danger/70 enabled:hover:bg-danger/[0.12];
 }
 
 @utility label {
-  @apply mb-1.5 block text-[12px] font-medium text-muted;
+  @apply mb-1.5 block font-mono text-[10.5px] font-medium tracking-[0.06em] text-muted uppercase;
 }
 
 @utility chip {
-  @apply inline-flex items-center gap-1 rounded-md border px-1.5 py-px text-[11.5px] leading-[18px] font-medium whitespace-nowrap;
+  @apply inline-flex items-center gap-1 rounded-[5px] border px-1.5 py-px text-[11.5px] leading-[18px] font-medium whitespace-nowrap;
 }
 
 @utility section-title {
-  @apply text-[13px] font-semibold tracking-normal;
+  @apply text-[13.5px] font-semibold tracking-normal text-white;
 }
 
+/* rótulo técnico (mono, caixa alta) */
 @utility eyebrow {
-  @apply text-[11px] font-semibold tracking-[0.08em] text-faint uppercase;
+  @apply font-mono text-[10.5px] font-medium tracking-[0.12em] text-faint uppercase;
+}
+
+@utility mono-num {
+  @apply font-mono tabular-nums;
 }
 
 @utility scroll-x {
   @apply overflow-x-auto;
 }
 
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes skeleton {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes scan-line {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.view-in {
+  animation: fade-in 220ms var(--ease-ui) backwards;
+}
+.status-dot {
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(95, 150, 180, 0.06) 25%, rgba(95, 150, 180, 0.14) 50%, rgba(95, 150, 180, 0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.4s linear infinite;
+  border-radius: 6px;
+}
+/* barra de progresso indeterminada (processamento em andamento) */
+.scan-bar {
+  position: relative;
+  overflow: hidden;
+}
+.scan-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 217, 245, 0.55), transparent);
+  animation: scan-line 1.6s var(--ease-ui) infinite;
+}
+
+/* ambiente: gradientes radiais profundos, grade técnica e scanlines muito sutis (atrás de tudo) */
+.ops-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(0, 120, 160, 0.16), transparent 62%), radial-gradient(900px 600px at -6% 108%, rgba(0, 150, 110, 0.09), transparent 60%),
+    linear-gradient(180deg, #050a0f, #030609 60%);
+}
+.ops-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(95, 150, 180, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(95, 150, 180, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 60% 30%, #000 20%, transparent 75%);
+}
+.ops-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px);
+}
+
+/* mapas: base de ruas escurecida (só a camada de ruas; satélite fica natural) */
+.map-dark {
+  filter: invert(1) hue-rotate(185deg) brightness(0.82) contrast(0.92) saturate(0.55);
+}
+
 .leaflet-container {
-  background: #111824;
+  background: #0a141d;
   font-family: var(--font-sans);
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: #1b2635;
-  color: #e4eaf2;
-  border: 1px solid #263447;
-  border-radius: 10px;
+  background: #101b26;
+  color: #e7edf3;
+  border: 1px solid rgba(95, 150, 180, 0.32);
+  border-radius: 8px;
 }
 .leaflet-control-attribution {
-  background: rgba(13, 17, 25, 0.78) !important;
-  color: #98a6b8 !important;
+  background: rgba(3, 6, 9, 0.78) !important;
+  color: #9aaaba !important;
 }
 .leaflet-control-attribution a {
-  color: #8fb0e6 !important;
+  color: #5ae6f8 !important;
+}
+.leaflet-bar a {
+  background: #101b26 !important;
+  color: #e7edf3 !important;
+  border-color: rgba(95, 150, 180, 0.32) !important;
 }
 
 /* número de eventos sobre cada ERB no mapa */
@@ -498,4 +639,10 @@
   .auth-dot {
     animation: none !important;
   }
+}
+
+/* números, identificadores e horários em tabelas não quebram linha */
+td.font-mono,
+td .font-mono {
+  white-space: nowrap;
 }

@@ -399,7 +399,7 @@ function SequenceView({ tile, attr, playback }: { tile: string; attr: string; pl
     visible.forEach((x) => seen.set(`${x.lat},${x.lon}`, (seen.get(`${x.lat},${x.lon}`) ?? 0) + 1))
     for (const [k, n] of seen) {
       const [la, lo] = k.split(',').map(Number)
-      L.circleMarker([la, lo], { radius: 5 + Math.min(10, Math.sqrt(n) * 2), color: '#0b0f1a', weight: 2, fillColor: '#4c8dff', fillOpacity: 0.55 })
+      L.circleMarker([la, lo], { radius: 5 + Math.min(10, Math.sqrt(n) * 2), color: '#05090d', weight: 2, fillColor: '#159fbc', fillOpacity: 0.55 })
         .bindTooltip(`${n} registro(s)`)
         .addTo(layer.current)
     }

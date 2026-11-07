@@ -1,30 +1,48 @@
 import clsx from 'clsx'
 import { AlertTriangle, ChevronLeft, ChevronRight, Info, Loader2, X } from 'lucide-react'
-import { type ReactNode, useEffect } from 'react'
+import { createContext, type ReactNode, useContext, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { encodeFilter, fmtNumber } from '../lib/format'
 
-/** Cabeçalho de página: título à esquerda com subtítulo curto, ações à direita. */
+/** Verdadeiro dentro da moldura de um módulo (que já mostra ícone e identificação do módulo). */
+export const InModule = createContext(false)
+
+/** Cabeçalho da tela: título, descrição operacional curta e barra de ações. */
 export function PageHeader({ icon, title, subtitle, actions, badge }: { icon?: ReactNode; title: string; subtitle?: ReactNode; actions?: ReactNode; badge?: ReactNode }) {
-  return (
-    <header className="mb-6 flex flex-col gap-4 border-b border-line pb-5 md:flex-row md:items-end md:justify-between">
-      <div className="flex min-w-0 items-start gap-3.5">
-        {icon && (
-          <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-panel-2 text-accent [&>svg]:!h-[18px] [&>svg]:!w-[18px]">{icon}</div>
-        )}
+  const inModule = useContext(InModule)
+  if (inModule)
+    return (
+      <header className="mb-5 flex flex-col gap-3 rounded-[10px] border border-line bg-petrol/45 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.015em] text-white">{title}</h1>
-          {subtitle && <div className="mt-1.5 max-w-3xl text-[13.5px] leading-relaxed text-muted">{subtitle}</div>}
-          {badge && <div className="mt-2.5">{badge}</div>}
+          <h1 className="flex items-center gap-2 text-[14.5px] leading-tight font-semibold text-white">
+            <span className="h-3.5 w-[2px] rounded-full bg-accent shadow-[0_0_6px_rgba(0,217,245,0.8)]" aria-hidden="true" />
+            {title}
+          </h1>
+          {subtitle && <div className="mt-1 line-clamp-2 max-w-5xl text-[12.5px] leading-relaxed text-muted">{subtitle}</div>}
+          {badge && <div className="mt-2">{badge}</div>}
+        </div>
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2 [&_.btn-ghost]:h-8 [&_.btn-primary]:h-8 [&_.btn-danger]:h-8">{actions}</div>}
+      </header>
+    )
+  return (
+    <header className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        {icon && <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[7px] border border-line bg-petrol text-accent [&>svg]:!h-4 [&>svg]:!w-4">{icon}</div>}
+        <div className="min-w-0">
+          <h1 className="text-[17px] leading-tight font-semibold text-white">{title}</h1>
+          {subtitle && <div className="mt-1 max-w-4xl text-[13px] leading-relaxed text-muted">{subtitle}</div>}
+          {badge && <div className="mt-2">{badge}</div>}
         </div>
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-[8px] border border-line bg-petrol/50 p-1 [&_.btn-ghost]:h-8 [&_.btn-primary]:h-8">{actions}</div>
+      )}
     </header>
   )
 }
 
 const TONES = {
-  blue: 'text-[#8fb0e6] border-accent/25 bg-accent/[0.09]',
+  blue: 'text-[#7fe9f8] border-accent/25 bg-accent/[0.07]',
   teal: 'text-teal border-teal/25 bg-teal/[0.08]',
   amber: 'text-amber border-amber/25 bg-amber/[0.08]',
   red: 'text-danger border-danger/25 bg-danger/[0.08]',
@@ -125,26 +143,37 @@ export function ModuleCard({
 
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: Tone }) {
   return (
-    <div className="card px-4 py-3.5">
-      <div className="text-[12px] font-medium text-muted">{label}</div>
-      <div className={clsx('mt-1 text-[22px] leading-tight font-semibold tracking-[-0.01em] tabular-nums', tone ? TONE_TEXT[tone] : 'text-white')}>{value}</div>
+    <div className="card relative overflow-hidden px-4 py-3.5">
+      <span className={clsx('absolute top-0 left-4 h-px w-10', tone ? TONE_TEXT[tone].replace('text-', 'bg-') : 'bg-accent/70')} aria-hidden="true" />
+      <div className="font-mono text-[10.5px] tracking-[0.06em] text-muted uppercase">{label}</div>
+      <div className={clsx('mt-1.5 font-mono text-[21px] leading-tight font-medium tabular-nums', tone ? TONE_TEXT[tone] : 'text-white')}>{value}</div>
       {hint && <div className="mt-1 text-[12px] leading-snug text-faint">{hint}</div>}
     </div>
   )
 }
 
+/** Carregamento: esqueleto do conteúdo (linhas) + rótulo do que está sendo processado. */
 export function Loading({ label = 'Carregando…' }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2.5 py-10 text-[13px] text-muted" role="status">
-      <Loader2 className="h-4 w-4 animate-spin text-accent" /> {label}
+    <div className="py-4" role="status">
+      <div className="mb-3 flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" /> {label}
+      </div>
+      <div className="space-y-2" aria-hidden="true">
+        <div className="skeleton h-9 w-full" />
+        <div className="skeleton h-9 w-[92%]" />
+        <div className="skeleton h-9 w-[78%]" />
+      </div>
     </div>
   )
 }
 
 export function Empty({ title = 'Nada por aqui ainda', children, icon }: { title?: string; children?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-line-2 bg-panel/50 px-6 py-12 text-center">
-      {icon && <div className="mb-1 grid h-10 w-10 place-items-center rounded-lg border border-line bg-panel-2 text-muted [&>svg]:!h-5 [&>svg]:!w-5">{icon}</div>}
+    <div className="relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-line-2 bg-[radial-gradient(circle_at_50%_0%,rgba(0,217,245,0.06),transparent_60%)] px-6 py-12 text-center">
+      <div className="mb-1 grid h-10 w-10 place-items-center rounded-full border border-line bg-petrol text-faint [&>svg]:!h-5 [&>svg]:!w-5">
+        {icon ?? <span className="h-1.5 w-1.5 rounded-full bg-faint" />}
+      </div>
       <div className="text-[14px] font-semibold text-text">{title}</div>
       {children && <div className="max-w-lg text-[13px] leading-relaxed text-muted">{children}</div>}
     </div>
@@ -178,7 +207,7 @@ const NOTICE_BAR: Record<Tone, string> = {
 
 export function Notice({ children, tone = 'blue', title }: { children: ReactNode; tone?: Tone; title?: string }) {
   return (
-    <div className={clsx('flex items-start gap-3 rounded-lg border-y border-r border-l-2 border-y-line border-r-line bg-panel px-3.5 py-3 text-[13px]', NOTICE_BAR[tone])}>
+    <div className={clsx('flex items-start gap-3 rounded-[8px] border-y border-r border-l-2 border-y-line border-r-line bg-petrol/60 px-3.5 py-2.5 text-[13px]', NOTICE_BAR[tone])}>
       <Info className={clsx('mt-0.5 h-4 w-4 shrink-0', TONE_TEXT[tone])} />
       <div className="leading-relaxed text-text/85">
         {title && <div className="mb-0.5 font-semibold text-text">{title}</div>}
@@ -214,16 +243,19 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose])
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[rgba(6,9,14,0.66)] p-4" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[rgba(3,6,9,0.72)] p-4 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={clsx('mt-[8vh] w-full rounded-[14px] border border-line-2 bg-panel shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]', wide ? 'max-w-5xl' : 'max-w-xl')}
+        className={clsx(
+          'view-in mt-[8vh] w-full rounded-[12px] border border-line-2 bg-panel shadow-[0_0_0_1px_rgba(0,217,245,0.05),0_30px_80px_-24px_rgba(0,0,0,0.9)]',
+          wide ? 'max-w-5xl' : 'max-w-xl',
+        )}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-white">{title}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-petrol/70 px-5 py-3">
+          <h2 className="text-[14.5px] font-semibold text-white">{title}</h2>
           <button className="rounded-md p-1 text-muted transition-colors hover:bg-white/5 hover:text-text" onClick={onClose} aria-label="Fechar">
             <X className="h-4 w-4" />
           </button>
@@ -236,7 +268,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[] }) {
   return (
-    <div className="mb-4 inline-flex max-w-full flex-wrap gap-0.5 rounded-lg border border-line bg-ink-2 p-0.5" role="tablist">
+    <div className="scroll-x mb-4 flex max-w-full gap-0.5 border-b border-line" role="tablist">
       {items.map((it) => (
         <button
           key={it.value}
@@ -244,8 +276,8 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
           aria-selected={value === it.value}
           onClick={() => onChange(it.value)}
           className={clsx(
-            'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors duration-150',
-            value === it.value ? 'bg-panel-2 text-white shadow-[0_0_0_1px_var(--color-line-2)]' : 'text-muted hover:bg-white/[0.03] hover:text-text',
+            '-mb-px shrink-0 border-b-2 px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
+            value === it.value ? 'border-accent text-white' : 'border-transparent text-muted hover:text-text',
           )}
         >
           {it.label}
@@ -290,7 +322,7 @@ export function Criteria({ criteria }: { criteria?: Record<string, any> }) {
   const { filters, rules_version, ...rest } = criteria
   const entries = Object.entries(rest).filter(([, v]) => v !== null && v !== undefined && v !== '')
   return (
-    <details className="group mt-4 rounded-lg border border-line bg-ink-2/70 px-3.5 py-2.5 text-[12px] text-muted">
+    <details className="group mt-4 rounded-[8px] border border-line bg-petrol/50 px-3.5 py-2.5 text-[12px] text-muted">
       <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-faint transition-colors hover:text-muted">
         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /> Critérios, regras e limites deste resultado
       </summary>
@@ -342,8 +374,11 @@ export function Num({ n, caseId, label }: { n?: string | null; caseId?: number |
 export function Progress({ value, tone = 'blue' }: { value: number; tone?: Tone }) {
   const color = { blue: 'bg-accent', teal: 'bg-teal', amber: 'bg-amber', red: 'bg-danger', violet: 'bg-violet', green: 'bg-ok', gray: 'bg-muted' }[tone]
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <div className={clsx('h-full rounded-full transition-all', color)} style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
+    <div className="h-1 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
+      <div
+        className={clsx('h-full rounded-full shadow-[0_0_8px_currentColor] transition-all duration-300', color)}
+        style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }}
+      />
     </div>
   )
 }
@@ -351,7 +386,7 @@ export function Progress({ value, tone = 'blue' }: { value: number; tone?: Tone 
 export function DemoBanner({ show }: { show?: boolean }) {
   if (!show) return null
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber/30 bg-amber/[0.07] px-3.5 py-2 text-[12.5px] font-medium text-amber">
+    <div className="mb-4 flex items-center gap-2 rounded-[8px] border border-amber/30 bg-amber/[0.06] px-3.5 py-1.5 font-mono text-[11px] tracking-[0.04em] text-amber uppercase">
       <AlertTriangle className="h-4 w-4" /> Demonstração — dados sintéticos, sem valor investigativo
     </div>
   )
