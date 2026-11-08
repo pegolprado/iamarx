@@ -856,7 +856,11 @@ export async function sharedIps(f: EventFilter) {
       AND ip IN (SELECT ip FROM events e WHERE ${where(f)} AND ip IS NOT NULL GROUP BY ip HAVING count(DISTINCT target_number) > 1)
     GROUP BY 1, 2 ORDER BY 1, 2`)
   const by = new Map<string, any[]>()
-  for (const r of rows) by.set(r.ip, [...(by.get(r.ip) ?? []), r])
+  for (const r of rows) {
+    const l = by.get(r.ip)
+    if (l) l.push(r)
+    else by.set(r.ip, [r])
+  }
   const items = [...by.entries()]
     .map(([ip, per]) => ({ ip, targets: per.length, per_target: per, events: per.reduce((a, r) => a + r.n, 0) }))
     .sort((a, b) => b.targets - a.targets || b.events - a.events)

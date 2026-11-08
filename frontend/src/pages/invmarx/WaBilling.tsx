@@ -1,5 +1,22 @@
 import clsx from 'clsx'
-import { BarChart3, CalendarDays, ChevronDown, Download, FileText, Globe2, Home, MapPin, MessageCircle, Phone, Server, ShieldAlert, Trophy, Users, Wifi } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarDays,
+  ChevronDown,
+  Download,
+  FileText,
+  Globe2,
+  Home,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Server,
+  ShieldAlert,
+  Smartphone,
+  Trophy,
+  Users,
+  Wifi,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '../../app/auth'
@@ -24,6 +41,8 @@ export default function WaBilling() {
   const [res, setRes] = useState<Result | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [noGeo, setNoGeo] = useState(false)
+  // nome dado ao alvo (só nesta análise, na memória)
+  const [alias, setAlias] = useState<Record<string, string>>({})
 
   const analyze = async (bf: BFile[], acc: string) => {
     setBusy('Consultando provedores e cidades dos IPs…')
@@ -110,6 +129,7 @@ export default function WaBilling() {
           columns: ['Campo', 'Valor'],
           rows: [
             ['Alvo', fmtNumberPlain(r.account)],
+            ['Nome do alvo', alias[r.account] ?? ''],
             ['Caso (ticket)', r.tickets.join(', ')],
             ['Período', `${br(r.period?.[0])} a ${br(r.period?.[1])} (horário de Brasília)`],
             ['Arquivos', r.files],
@@ -166,6 +186,7 @@ export default function WaBilling() {
             {accounts.map((a) => (
               <option key={a} value={a}>
                 {fmtNumber(a)}
+                {alias[a] ? ` — ${alias[a]}` : ''}
               </option>
             ))}
           </select>
@@ -183,6 +204,16 @@ export default function WaBilling() {
         <p className="text-sm">
           <b>Alvo:</b> <span className="font-mono">{fmtNumber(r.account)}</span> · {r.files} arquivo(s)
         </p>
+        <label className="mt-1 flex max-w-sm items-center gap-2 text-sm">
+          <b>Nome:</b>
+          <input
+            value={alias[r.account] ?? ''}
+            onChange={(e) => setAlias((m) => ({ ...m, [r.account]: e.target.value }))}
+            placeholder="Nome do alvo (opcional)"
+            aria-label="Nome do alvo"
+            className="min-w-0 flex-1 !py-1 text-sm"
+          />
+        </label>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <Indicator label="Mensagens" value={r.msgs.length} icon={<MessageCircle />} />
           <Indicator label="Chamadas" value={r.calls.length} icon={<Phone />} />
@@ -218,38 +249,18 @@ export default function WaBilling() {
           tone="green"
         />
         {r.recentRes.length > 0 && (
-          <div>
-            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-accent">
-              <Wifi className="h-4 w-4" /> IPs mais recentes — internet residencial
-            </h3>
-            <p className="mb-2 text-xs text-muted">Provedor: {r.residential[0]?.name}</p>
-            <div className="scroll-x rounded-lg border border-line">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Endereço de IP</th>
-                    <th>Porta lógica</th>
-                    <th>Data/hora</th>
-                    <th>Fuso</th>
-                    <th>Cidade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {r.recentRes.map((o, i) => (
-                    <tr key={i}>
-                      <td>{i + 1}</td>
-                      <td className="font-mono text-xs">{o.ip}</td>
-                      <td className="font-mono text-xs">{o.port ?? '—'}</td>
-                      <td className="font-mono text-xs">{br(o.ts)}</td>
-                      <td className="text-xs">{tzLabel(o.ts)}</td>
-                      <td className="text-xs">{o.info.city ? `${o.info.city}/${o.info.uf ?? ''}` : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <RecentIps title="IPs mais recentes — internet residencial" icon={<Wifi className="h-4 w-4" />} provider={r.residential[0]?.name} items={r.recentRes} />
+        )}
+        <Ranking
+          icon={<Smartphone className="h-4 w-4 text-violet" />}
+          title="Análise de operadora móvel (alvo)"
+          hint="Operadoras com mais IPs do alvo em rede móvel (4G/5G). IPv4 móvel é compartilhado (CGNAT): só IP, porta e horário exatos identificam o usuário."
+          items={r.mobile.slice(0, 3)}
+          empty="Nenhum IP de operadora móvel."
+          unit="ocorrências"
+        />
+        {r.recentMobile.length > 0 && (
+          <RecentIps title="IPs mais recentes — operadora móvel" icon={<Smartphone className="h-4 w-4" />} provider={r.mobile[0]?.name} items={r.recentMobile} />
         )}
         <Ranking
           icon={<MapPin className="h-4 w-4 text-teal" />}
@@ -295,9 +306,46 @@ export default function WaBilling() {
         />
       </section>
       <Notice tone="amber">
-        Provedor e cidade são estimados por bases públicas de IP (IPtoASN; IP Geolocation by DB-IP — db-ip.com, CC BY 4.0): a cidade pode ser a do provedor. IPv4 de operadora móvel é compartilhado (CGNAT): só IP, porta e
-        horário exatos identificam o usuário junto ao provedor.
+        Provedor e cidade são estimados por bases públicas de IP (IPtoASN; IP Geolocation by DB-IP — db-ip.com, CC BY 4.0): a cidade pode ser a do provedor. IPv4 de operadora móvel
+        é compartilhado (CGNAT): só IP, porta e horário exatos identificam o usuário junto ao provedor.
       </Notice>
+    </div>
+  )
+}
+
+function RecentIps({ title, icon, provider, items }: { title: string; icon: React.ReactNode; provider?: string; items: Result['recentRes'] }) {
+  return (
+    <div>
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-accent">
+        {icon} {title}
+      </h3>
+      <p className="mb-2 text-xs text-muted">Provedor: {provider}</p>
+      <div className="scroll-x rounded-lg border border-line">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Endereço de IP</th>
+              <th>Porta lógica</th>
+              <th>Data/hora</th>
+              <th>Fuso</th>
+              <th>Cidade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((o, i) => (
+              <tr key={i}>
+                <td>{i + 1}</td>
+                <td className="font-mono text-xs">{o.ip}</td>
+                <td className="font-mono text-xs">{o.port ?? '—'}</td>
+                <td className="font-mono text-xs">{br(o.ts)}</td>
+                <td className="text-xs">{tzLabel(o.ts)}</td>
+                <td className="text-xs">{o.info.city ? `${o.info.city}/${o.info.uf ?? ''}` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

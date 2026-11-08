@@ -45,8 +45,9 @@ export function collect(files: BFile[]) {
   const msgs = new Map<string, BMsg>()
   const calls = new Map<string, BCall>()
   const obs = new Map<string, IpObs>()
-  const addObs = (o: IpObs) => {
-    const k = `${o.number}|${o.ip}|${o.port}|${o.ts}|${o.account}`
+  // cada mensagem, evento de chamada e login conta como um registro (o mesmo registro em dois arquivos do mesmo alvo conta uma vez)
+  const addObs = (o: IpObs, id: string) => {
+    const k = `${o.source}|${o.account}|${id}|${o.number}|${o.ip}|${o.port}|${o.ts}`
     if (!obs.has(k)) obs.set(k, o)
   }
   for (const f of files) {
@@ -58,7 +59,7 @@ export function collect(files: BFile[]) {
       const k = m.id ?? `${m.ts}|${from}|${to.join(',')}`
       if (!msgs.has(`${acc}|${k}`))
         msgs.set(`${acc}|${k}`, { id: m.id, ts: m.ts, from, to, group: m.group, ip: m.senderIp, port: m.senderPort, type: m.type, device: m.device, account: acc })
-      if (from && m.senderIp) addObs({ number: from, ip: m.senderIp, port: m.senderPort, ts: m.ts, source: 'mensagem', account: acc })
+      if (from && m.senderIp) addObs({ number: from, ip: m.senderIp, port: m.senderPort, ts: m.ts, source: 'mensagem', account: acc }, k)
     }
     for (const c of f.rec.calls) {
       const creator = num(c.creator) ?? num(c.events[0]?.from)
@@ -81,12 +82,12 @@ export function collect(files: BFile[]) {
           dur: tAcc !== null && tEnd ? Math.max(0, Math.round((tEnd - tAcc) / 1000)) : null,
           account: acc,
         })
-      for (const e of c.events) {
+      c.events.forEach((e, i) => {
         const from = num(e.from)
-        if (from && e.fromIp && e.ts !== null) addObs({ number: from, ip: e.fromIp, port: e.fromPort, ts: e.ts, source: 'chamada', account: acc })
-      }
+        if (from && e.fromIp && e.ts !== null) addObs({ number: from, ip: e.fromIp, port: e.fromPort, ts: e.ts, source: 'chamada', account: acc }, `${k}#${i}`)
+      })
     }
-    for (const i of f.rec.ips) addObs({ number: acc, ip: i.ip, port: i.port, ts: i.ts, source: 'login', account: acc })
+    for (const i of f.rec.ips) addObs({ number: acc, ip: i.ip, port: i.port, ts: i.ts, source: 'login', account: acc }, '')
   }
   return { msgs: [...msgs.values()].sort((a, b) => a.ts - b.ts), calls: [...calls.values()].sort((a, b) => a.ts - b.ts), obs: [...obs.values()].sort((a, b) => a.ts - b.ts) }
 }
@@ -129,7 +130,12 @@ export function interlocutors(account: string, msgs: BMsg[], calls: BCall[]) {
 export function proximity(account: string, obs: IpObs[], window = WINDOW) {
   const mine = obs.filter((o) => o.number === account)
   const byIp = new Map<string, IpObs[]>()
-  for (const o of obs) if (o.number !== account) byIp.set(o.ip, [...(byIp.get(o.ip) ?? []), o])
+  for (const o of obs)
+    if (o.number !== account) {
+      const l = byIp.get(o.ip)
+      if (l) l.push(o)
+      else byIp.set(o.ip, [o])
+    }
   const res = new Map<
     string,
     { number: string; hits: { ip: string; tsTarget: number; tsOther: number; portTarget: string | null; portOther: string | null; samePort: boolean; delta: number }[] }
@@ -183,6 +189,15 @@ export function individual(account: string, files: BFile[], lookup: Lookup | nul
         .sort((a, b) => b.ts - a.ts)
         .slice(0, 10)
     : []
+  const mobileObs = withInfo.filter((o) => isMobileNet(o.info))
+  const mobile = rank(mobileObs, (o) => o.info.org)
+  const topMob = mobile[0]?.name ?? null
+  const recentMobile = topMob
+    ? mobileObs
+        .filter((o) => o.info.org === topMob)
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, 10)
+    : []
   const cities = rank(withInfo, (o) =>
     o.info.city ? `${o.info.city}${o.info.uf ? ` · ${o.info.uf}` : ''}` : o.info.country && o.info.country !== 'BR' ? `Exterior (${o.info.country})` : null,
   )
@@ -203,13 +218,15 @@ export function individual(account: string, files: BFile[], lookup: Lookup | nul
     providers,
     residential,
     recentRes,
+    mobile,
+    recentMobile,
     cities,
     hasLookup: !!lookup,
   }
 }
 
 /** Análise de vínculos entre vários alvos (um ou mais arquivos por alvo). */
-export function links(files: BFile[], window = WINDOW) {
+export function links(files: BFile[], window = WINDOW, lookup: Lookup | null = null) {
   const targets = [...new Set(files.map((f) => f.account).filter((x): x is string => !!x))].sort()
   const { msgs, calls, obs } = collect(files)
   const inter = new Map(targets.map((t) => [t, interlocutors(t, msgs, calls)]))
@@ -227,11 +244,10 @@ export function links(files: BFile[], window = WINDOW) {
         d.last = Math.max(d.last, r.last)
         direct.set(`${a}|${b}`, d)
       }
-  // interlocutores em comum (não-alvos ligados a 2+ alvos)
+  // interlocutores em comum (ligados a 2+ alvos; um alvo também pode ser interlocutor em comum de outros alvos)
   const byContact = new Map<string, Map<string, number>>()
   for (const t of targets)
     for (const r of inter.get(t)!) {
-      if (tset.has(r.number)) continue
       const m = byContact.get(r.number) ?? new Map()
       m.set(t, r.total)
       byContact.set(r.number, m)
@@ -251,7 +267,11 @@ export function links(files: BFile[], window = WINDOW) {
   // mesmo IP usado por alvos diferentes em até 12 h
   const tObs = obs.filter((o) => tset.has(o.number))
   const byIp = new Map<string, IpObs[]>()
-  for (const o of tObs) byIp.set(o.ip, [...(byIp.get(o.ip) ?? []), o])
+  for (const o of tObs) {
+    const l = byIp.get(o.ip)
+    if (l) l.push(o)
+    else byIp.set(o.ip, [o])
+  }
   const ipHits: { ip: string; a: string; b: string; tsA: number; tsB: number; portA: string | null; portB: string | null; samePort: boolean; delta: number }[] = []
   for (const [ip, list] of byIp) {
     if (new Set(list.map((o) => o.number)).size < 2) continue
@@ -265,6 +285,7 @@ export function links(files: BFile[], window = WINDOW) {
       }
   }
   ipHits.sort((a, b) => Number(b.samePort) - Number(a.samePort) || a.delta - b.delta)
+  const coloc = colocation(obs, tset, inter, window, lookup)
   // grupos com mais de um alvo
   const byGroup = new Map<string, Map<string, number>>()
   for (const m of msgs)
@@ -287,9 +308,98 @@ export function links(files: BFile[], window = WINDOW) {
     common,
     commonSets: [...byTargetSet.values()].sort((a, b) => b.targets.length - a.targets.length || b.contacts.length - a.contacts.length),
     ipHits,
+    coloc,
     groups,
     sharedGroups: groups.filter((g) => g.targets.length > 1),
   }
+}
+
+export type Coloc = {
+  ip: string
+  info: IpInfo | null
+  numbers: { number: string; target: boolean; first: number; last: number; n: number }[]
+  days: string[]
+  samePort: boolean
+}
+
+/**
+ * Alvos e interlocutores que usaram o mesmo IP em até 12 h (possivelmente no mesmo local).
+ * Agrupa por IP e conjunto de números; IPv4 de operadora móvel (CGNAT) fica de fora quando
+ * a base de provedores está disponível, pois é compartilhado por milhares de usuários.
+ */
+export function colocation(obs: IpObs[], tset: Set<string>, inter: Map<string, { number: string }[]>, window = WINDOW, lookup: Lookup | null = null): Coloc[] {
+  // números relevantes: alvos e interlocutores diretos dos alvos
+  const known = new Set(tset)
+  for (const l of inter.values()) for (const i of l) known.add(i.number)
+  const byIp = new Map<string, IpObs[]>()
+  const seen = new Set<string>()
+  for (const o of obs) {
+    if (!known.has(o.number)) continue
+    const k = `${o.number}|${o.ip}|${o.port}|${o.ts}`
+    if (seen.has(k)) continue
+    seen.add(k)
+    const l = byIp.get(o.ip)
+    if (l) l.push(o)
+    else byIp.set(o.ip, [o])
+  }
+  const out = new Map<string, Coloc>()
+  for (const [ip, list] of byIp) {
+    if (list.length < 2) continue
+    const first = list[0].number
+    if (list.every((o) => o.number === first)) continue
+    const info = lookup ? lookup(ip) : null
+    if (info && !ip.includes(':') && isMobileNet(info)) continue
+    list.sort((a, b) => a.ts - b.ts)
+    // janela deslizante: registros com outro número a até 12 h
+    const cnt = new Map<string, number>()
+    let lo = 0
+    let hi = 0
+    const hit: boolean[] = new Array(list.length).fill(false)
+    for (let i = 0; i < list.length; i++) {
+      while (hi < list.length && list[hi].ts - list[i].ts <= window) {
+        cnt.set(list[hi].number, (cnt.get(list[hi].number) ?? 0) + 1)
+        hi++
+      }
+      while (list[i].ts - list[lo].ts > window) {
+        const c = cnt.get(list[lo].number)! - 1
+        if (c) cnt.set(list[lo].number, c)
+        else cnt.delete(list[lo].number)
+        lo++
+      }
+      if (cnt.size > 1) hit[i] = true
+    }
+    // por dia: conjunto de números que coincidiram
+    const byDay = new Map<string, IpObs[]>()
+    list.forEach((o, i) => {
+      if (!hit[i]) return
+      const d = localTs(o.ts).slice(0, 10)
+      const l = byDay.get(d)
+      if (l) l.push(o)
+      else byDay.set(d, [o])
+    })
+    for (const [day, l] of byDay) {
+      const nums = [...new Set(l.map((o) => o.number))].sort()
+      if (nums.length < 2) continue
+      // ao menos um alvo, ou números ligados a alvos diferentes
+      if (!nums.some((n) => tset.has(n)) && new Set(l.map((o) => o.account)).size < 2) continue
+      const key = `${ip}|${nums.join(',')}`
+      const c = out.get(key) ?? { ip, info, numbers: nums.map((n) => ({ number: n, target: tset.has(n), first: Infinity, last: 0, n: 0 })), days: [], samePort: false }
+      if (!c.days.includes(day)) c.days.push(day)
+      for (const o of l) {
+        const x = c.numbers.find((y) => y.number === o.number)!
+        x.first = Math.min(x.first, o.ts)
+        x.last = Math.max(x.last, o.ts)
+        x.n++
+      }
+      const ports = new Map<string, Set<string>>()
+      for (const o of l) if (o.port) ports.set(o.port, (ports.get(o.port) ?? new Set()).add(o.number))
+      if ([...ports.values()].some((s) => s.size > 1)) c.samePort = true
+      out.set(key, c)
+    }
+  }
+  return [...out.values()].sort(
+    (a, b) => b.numbers.filter((n) => n.target).length - a.numbers.filter((n) => n.target).length || b.days.length - a.days.length || b.numbers.length - a.numbers.length,
+  )
 }
 
 /** Arquivo é bilhetagem/records do WhatsApp? Lê só o começo. */
