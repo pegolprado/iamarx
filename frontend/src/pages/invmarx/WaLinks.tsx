@@ -273,21 +273,21 @@ function Contacts({ r, names, setName }: { r: Result; names: Names; setName: Set
 }
 
 /** Cores no padrão INVTECH: fundo claro, alvos vermelhos, em comum laranja, contatos verdes, IPs azuis. */
-const INV = { bg: '#f3f4f6', target: '#e53935', common: '#22a34a', contact: '#86c79a', ip: '#1e88e5', edge: '#b0bec5', direct: '#e53935', label: '#263238', badge: '#1e88e5' }
+const INV = { bg: '#f3f4f6', target: '#e53935', common: '#22a34a', contact: '#86c79a', ip: '#1e88e5', edge: '#b0bec5', direct: '#e53935', label: '#0f172a', badge: '#1e88e5' }
 const svgUri = (svg: string) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 const PERSON = svgUri(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',
 )
 const PHONE = svgUri(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
 )
 /** Selo no meio da ligação alvo → interlocutor: ↗ enviadas pelo alvo (verde), ↙ recebidas (vermelho). */
 const badgeSvg = (out: number, inn: number) => {
-  const w = Math.max(30, 14 + 6 * Math.max(String(out).length, String(inn).length))
+  const v = 24 + 8 * Math.max(String(out).length, String(inn).length)
   return {
-    w,
+    w: Math.round(v * 1.3),
     img: svgUri(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="26" viewBox="0 0 ${w} 26"><rect x="0.5" y="0.5" width="${w - 1}" height="12" rx="2.5" fill="#16a34a"/><rect x="0.5" y="13.5" width="${w - 1}" height="12" rx="2.5" fill="#dc2626"/><g font-family="Arial,Helvetica,sans-serif" font-size="9" font-weight="700" fill="#fff"><text x="3" y="10">↗ ${out}</text><text x="3" y="23">↙ ${inn}</text></g></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${v * 3}" height="96" viewBox="0 0 ${v} 32"><rect x="0.5" y="0.5" width="${v - 1}" height="15" rx="3" fill="#15803d"/><rect x="0.5" y="16.5" width="${v - 1}" height="15" rx="3" fill="#b91c1c"/><g font-family="Arial,Helvetica,sans-serif" font-size="11.5" font-weight="900" fill="#fff"><text x="3" y="12.5">↗ ${out}</text><text x="3" y="28.5">↙ ${inn}</text></g></svg>`,
     ),
   }
 }
@@ -301,9 +301,10 @@ const baseStyle: any[] = [
     selector: 'node',
     style: {
       label: 'data(label)',
-      'font-size': 9,
+      'font-size': 13,
+      'font-weight': 'bold',
       'font-family': 'JetBrains Mono, monospace',
-      color: INV.label,
+      color: '#0f172a',
       'text-valign': 'bottom',
       'text-halign': 'center',
       'text-wrap': 'wrap',
@@ -330,14 +331,31 @@ const baseStyle: any[] = [
       'font-size': 10.5,
     },
   },
-  { selector: 'node[big]', style: { width: 'data(big)', height: 'data(big)' } },
   {
     selector: 'node[kind = "comum"]',
-    style: { 'background-color': INV.common, 'background-image': PHONE, 'background-width': '62%', 'background-height': '62%', width: 28, height: 28 },
+    style: {
+      'background-color': INV.common,
+      'background-image': PHONE,
+      'background-width': '64%',
+      'background-height': '64%',
+      'background-position-x': '50%',
+      'background-position-y': '50%',
+      width: 34,
+      height: 34,
+    },
   },
   {
     selector: 'node[kind = "contato"]',
-    style: { 'background-color': INV.contact, 'background-image': PHONE, 'background-width': '62%', 'background-height': '62%', width: 20, height: 20 },
+    style: {
+      'background-color': INV.contact,
+      'background-image': PHONE,
+      'background-width': '64%',
+      'background-height': '64%',
+      'background-position-x': '50%',
+      'background-position-y': '50%',
+      width: 34,
+      height: 34,
+    },
   },
   {
     selector: 'node[kind = "badge"]',
@@ -361,7 +379,7 @@ const baseStyle: any[] = [
       width: 3,
       'line-color': INV.direct,
       label: 'data(w)',
-      'font-size': 9,
+      'font-size': 16,
       'font-weight': 'bold',
       color: '#ffffff',
       'text-background-color': INV.badge,
@@ -511,16 +529,12 @@ function Graph({ r, names, setName }: { r: Result; names: Names; setName: SetNam
         }
       const rows: Record<string, string[]> = { alvo: [], comum: [], contato: [] }
       for (const n of nodes.values()) rows[n.kind].push(n.id)
-      // alvos com mais interlocutores ficam maiores
-      const deg = new Map<string, number>()
-      for (const l of links) deg.set(l.t, (deg.get(l.t) ?? 0) + 1)
-      const maxDeg = Math.max(1, ...deg.values())
-      const W = Math.max(700, ...Object.values(rows).map((x) => x.length * 90))
+      const W = Math.max(700, ...Object.values(rows).map((x) => x.length * 150))
       const P = new Map<string, { x: number; y: number }>()
       for (const [kind, ids] of Object.entries(rows))
         ids.forEach((id, i) => P.set(id, { x: ((i + 0.5) * W) / Math.max(1, ids.length), y: kind === 'alvo' ? 0 : kind === 'comum' ? 480 : 640 }))
       const els: any[] = [...nodes.values()].map((n) => ({
-        data: { id: n.id, label: label(names, n.id), kind: n.kind, ...(n.kind === 'alvo' ? { big: 30 + Math.round((18 * (deg.get(n.id) ?? 0)) / maxDeg) } : {}) },
+        data: { id: n.id, label: label(names, n.id), kind: n.kind },
         position: P.get(n.id),
       }))
       links.forEach((l, i) => {
@@ -528,7 +542,7 @@ function Graph({ r, names, setName }: { r: Result; names: Names; setName: SetNam
         const b = P.get(l.c)!
         const bd = badgeSvg(l.out, l.inn)
         const id = `b${i}`
-        els.push({ data: { id, kind: 'badge', img: bd.img, w: bd.w, label: '' }, position: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } })
+        els.push({ data: { id, kind: 'badge', img: bd.img, w: bd.w, label: '' }, position: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + (i % 3) * 44 - 44 } })
         els.push({ data: { id: `e${i}a`, source: l.t, target: id, kind: 'contato' } })
         els.push({ data: { id: `e${i}b`, source: id, target: l.c, kind: 'contato' } })
       })
