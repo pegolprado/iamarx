@@ -340,7 +340,13 @@ export async function encryptShareM3(m: SharedMap): Promise<string> {
 
 /** Endereço público do link curto. */
 export const isErbHost = () => typeof location !== 'undefined' && /^erb\./i.test(location.hostname)
-export const shareUrl = (frag: string) => (isErbHost() ? `${location.origin}/#${frag}` : `${location.origin}/m#${frag}`)
+/** Endereço público do MARX Mapas ERB (no site oficial os links da plataforma apontam para ele). */
+export const ERB_SITE = 'https://erb.iamarx.com.br'
+export const shareUrl = (frag: string) => {
+  if (isErbHost()) return `${location.origin}/#${frag}`
+  if (/(^|\.)iamarx\.com\.br$/i.test(location.hostname)) return `${ERB_SITE}/#${frag}`
+  return `${location.origin}/m#${frag}` // ambiente local/teste
+}
 
 export class WrongPassword extends Error {}
 
