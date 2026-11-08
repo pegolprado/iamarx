@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Crosshair, Download, Eye, EyeOff, FileSpreadsheet, Info, Lock, Pencil, Plus, Share2, Trash2, Upload } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Crosshair, Download, Eye, EyeOff, FileSpreadsheet, Info, Lock, Pencil, Plus, RadioTower, Share2, Trash2, Upload } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { LocationMap, markHex } from '../components/LocationMap'
 import { exportSheet } from '../lib/erbSheet'
@@ -9,6 +9,15 @@ import { EMPTY, ErbDocModals, MarkGlyph, newDraft, TimesByDay, useErbDoc } from 
 
 const PAGE = 8
 const HOME = 'https://iamarx.com.br'
+
+/** Marcador colorido do grupo (antena na cor do número). */
+function GroupBadge({ color }: { color: string }) {
+  return (
+    <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full ring-2 ring-white" style={{ background: color, boxShadow: '0 1px 3px rgba(0,0,0,.35)' }}>
+      <RadioTower className="h-3.5 w-3.5 text-[#fff]" />
+    </span>
+  )
+}
 
 function Section({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -33,7 +42,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     base,
     sheetInput,
     title,
-    setTitle,
     marks,
     setMarks,
     showAnalysis,
@@ -63,10 +71,14 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     kml,
     copy,
     list,
-    totalEvents,
     setHelp,
     importSheetFile,
+    setGroupHidden,
+    removeGroup,
+    removeUngrouped,
   } = d
+  const ungrouped = useMemo(() => base.points.filter((p) => p.g === undefined), [base.points])
+  const [paste, setPaste] = useState(false)
   const [open, setOpen] = useState(() => !initial || (!initial.marks?.length && !initial.points.length))
   const [addMenu, setAddMenu] = useState(false)
   const [page, setPage] = useState(0)
@@ -198,81 +210,61 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          <Section title="Entrada">
-            <textarea
-              className="w-full resize-y !border-gray-300 !bg-[#fff] font-mono text-[12.5px] !text-gray-900"
-              rows={3}
-              placeholder={'Importar… cole coordenadas, linhas do extrato ou um link\n250 -26.25623 -49.2562\n10  -26-52-54,00  -49-08-31,00'}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 border-b border-gray-200 px-4 py-3.5">
+            <div className="relative">
               <button
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-blue-700"
-                onClick={doImport}
-                aria-label="Converter e importar"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-emerald-700"
+                onClick={() => setAddMenu(!addMenu)}
+                aria-expanded={addMenu}
               >
-                <Plus className="h-4 w-4" /> Converter
+                <Plus className="h-4 w-4" /> Adicionar ▾
               </button>
-              <div className="relative">
-                <button
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-emerald-700"
-                  onClick={() => setAddMenu(!addMenu)}
-                >
-                  <Plus className="h-4 w-4" /> Adicionar ▾
-                </button>
-                {addMenu && (
-                  <div className="absolute top-10 left-0 z-10 w-56 rounded-lg border border-gray-200 bg-[#fff] p-1 text-[13px] shadow-xl">
-                    {(
-                      [
-                        ['Lugar (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
-                        ['Antena / ERB (digitar)', () => setDraft(newDraft(null, null, 'erb', marks.length + 1))],
-                        ['Lugar — tocar no mapa', () => startPick('outro')],
-                        ['Antena — tocar no mapa', () => startPick('erb')],
-                      ] as const
-                    ).map(([l, fn]) => (
-                      <button
-                        key={l}
-                        className="block w-full rounded px-3 py-2 text-left hover:bg-blue-50"
-                        onClick={() => {
-                          setAddMenu(false)
-                          fn()
-                        }}
-                      >
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 bg-[#fff] px-3 text-[13px] font-medium text-gray-800 hover:bg-gray-50"
-                onClick={() => sheetInput.current?.click()}
-              >
-                <Upload className="h-4 w-4" /> Planilha
-              </button>
-              <input
-                ref={sheetInput}
-                type="file"
-                accept=".xlsx,.csv,.txt"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  e.target.value = ''
-                  if (f) void importSheetFile(f)
-                }}
-              />
+              {addMenu && (
+                <div className="absolute top-10 left-0 z-10 w-60 rounded-lg border border-gray-200 bg-[#fff] p-1 text-[13px] shadow-xl">
+                  {(
+                    [
+                      ['Colar linhas do extrato / coordenadas', () => setPaste(true)],
+                      ['Lugar (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
+                      ['Antena / ERB (digitar)', () => setDraft(newDraft(null, null, 'erb', marks.length + 1))],
+                      ['Lugar — tocar no mapa', () => startPick('outro')],
+                      ['Antena — tocar no mapa', () => startPick('erb')],
+                    ] as const
+                  ).map(([l, fn]) => (
+                    <button
+                      key={l}
+                      className="block w-full rounded px-3 py-2 text-left hover:bg-blue-50"
+                      onClick={() => {
+                        setAddMenu(false)
+                        fn()
+                      }}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <p className="mt-2 text-[11.5px] leading-snug text-gray-500">
-              Dica: clique com o <b>botão direito</b> no mapa (no celular, <b>toque longo</b>) para adicionar um ponto no local.
-            </p>
-          </Section>
+            <button
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 bg-[#fff] px-3 text-[13px] font-medium text-gray-800 hover:bg-gray-50"
+              onClick={() => sheetInput.current?.click()}
+            >
+              <Upload className="h-4 w-4" /> Planilha
+            </button>
+            <input
+              ref={sheetInput}
+              type="file"
+              accept=".xlsx,.csv,.txt"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const fs = [...(e.target.files ?? [])]
+                e.target.value = ''
+                for (const f of fs) await importSheetFile(f)
+              }}
+            />
+          </div>
 
-          <Section title="Compartilhar" right={link ? <span className="font-mono text-[10.5px] text-gray-400">{fmtInt(link.length)} caracteres</span> : null}>
-            <label className="mb-2 block">
-              <span className="text-[11.5px] text-gray-500">Título</span>
-              <input className="mt-0.5 w-full !border-gray-300 !bg-[#fff] !text-gray-900" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
-            </label>
+          <Section title="Link" right={link ? <span className="font-mono text-[10.5px] text-gray-400">{fmtInt(link.length)} caracteres</span> : null}>
             <div className="flex gap-2">
               <input
                 readOnly
@@ -318,11 +310,10 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
             {link.length > 60000 && (
               <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">Link muito longo: desmarque os dias e horários ou envie a planilha.</p>
             )}
-            <p className="mt-2 text-[11.5px] leading-snug text-gray-500">O link muda a cada alteração e abre exatamente este mapa. Nada é enviado nem guardado em servidor.</p>
           </Section>
 
           <Section
-            title={`Pontos (${fmtInt(marks.length)})`}
+            title={`Pontos (${fmtInt(marks.length + (base.groups?.length ?? 0) + (ungrouped.length ? 1 : 0))})`}
             right={
               <input
                 className="h-7 w-36 !border-gray-300 !bg-[#fff] !py-0 text-[12px] !text-gray-900"
@@ -332,16 +323,61 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
               />
             }
           >
-            {base.points.length > 0 && (
-              <div className="mb-2 flex items-center gap-2 rounded-md bg-blue-50 px-2.5 py-2 text-[12.5px] text-blue-900">
-                <button onClick={() => setShowAnalysis(!showAnalysis)} aria-label="Mostrar ou ocultar ERBs da planilha" className="text-blue-700">
-                  {showAnalysis ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                </button>
-                <span>
-                  {fmtInt(base.points.length)} ERBs da planilha/análise · {fmtInt(totalEvents)} eventos
-                  {base.period[0] ? ` · ${fmtDateTime(base.period[0])} → ${fmtDateTime(base.period[1])}` : ''}
-                </span>
-              </div>
+            {(base.groups?.length || ungrouped.length) > 0 && (
+              <ul className="mb-2 divide-y divide-gray-100 rounded-md border border-gray-200">
+                {ungrouped.length > 0 && (
+                  <li className={clsx('flex items-center gap-2.5 px-2.5 py-2', !showAnalysis && 'opacity-50')}>
+                    <button
+                      onClick={() => setShowAnalysis(!showAnalysis)}
+                      aria-label={showAnalysis ? 'Ocultar ERBs da análise' : 'Mostrar ERBs da análise'}
+                      className="text-gray-400 hover:text-gray-700"
+                    >
+                      {showAnalysis ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </button>
+                    <GroupBadge color="#b91c1c" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium text-gray-900">ERBs da análise</div>
+                      <div className="text-[11px] text-gray-500">
+                        {fmtInt(ungrouped.length)} ERBs · {fmtInt(ungrouped.reduce((n, p) => n + p.events, 0))} eventos
+                      </div>
+                    </div>
+                    <button className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" onClick={removeUngrouped} aria-label="Excluir ERBs da análise">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                )}
+                {(base.groups ?? []).map((g, i) => {
+                  const pts = base.points.filter((p) => p.g === i)
+                  const days = new Set(pts.flatMap((p) => (p.times ?? []).map((t) => t.slice(0, 10)))).size
+                  return (
+                    <li key={i} className={clsx('flex items-center gap-2.5 px-2.5 py-2', g.hidden && 'opacity-50')}>
+                      <button
+                        onClick={() => setGroupHidden(i, !g.hidden)}
+                        aria-label={g.hidden ? `Mostrar ${g.name}` : `Ocultar ${g.name}`}
+                        className="text-gray-400 hover:text-gray-700"
+                      >
+                        {g.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                      <GroupBadge color={g.color} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-medium text-gray-900" title={g.name}>
+                          {g.name}
+                        </div>
+                        <div className="text-[11px] text-gray-500">
+                          {fmtInt(pts.length)} ERBs · {fmtInt(pts.reduce((n, p) => n + p.events, 0))} eventos{days ? ` · ${days} dia${days > 1 ? 's' : ''}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => confirm(`Excluir ${g.name} do mapa?`) && removeGroup(i)}
+                        aria-label={`Excluir ${g.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
             {shown.length ? (
               <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
@@ -375,9 +411,9 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
                   </li>
                 ))}
               </ul>
-            ) : (
+            ) : base.points.length ? null : (
               <p className="rounded-md border border-dashed border-gray-300 px-3 py-5 text-center text-[12.5px] text-gray-500">
-                Nenhum ponto. Cole dados na entrada, use “Adicionar” ou o botão direito no mapa.
+                Nenhum ponto marcado. Use “Adicionar”, “Planilha” ou o botão direito no mapa.
               </p>
             )}
             {pages > 1 && (
@@ -407,6 +443,36 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         </div>
       </aside>
 
+      {paste && (
+        <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/40 p-4" onMouseDown={() => setPaste(false)}>
+          <div className="w-full max-w-lg rounded-xl bg-[#fff] p-4 text-gray-900 shadow-2xl" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Colar linhas">
+            <div className="mb-2 text-[15px] font-semibold">Colar linhas do extrato ou coordenadas</div>
+            <textarea
+              autoFocus
+              className="w-full resize-y !border-gray-300 !bg-[#fff] font-mono text-[12.5px] !text-gray-900"
+              rows={6}
+              placeholder={'Importar… uma linha por antena ou lugar\nGABRIEL - 5799 - 08h59|-23.60215|-46.90688|240\n250 -26.25623 -49.2562\n10  -26-52-54,00  -49-08-31,00'}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button className="h-9 rounded-md border border-gray-300 px-3 text-[13px]" onClick={() => setPaste(false)}>
+                Cancelar
+              </button>
+              <button
+                className="h-9 rounded-md bg-blue-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-blue-700"
+                aria-label="Converter e importar"
+                onClick={async () => {
+                  await doImport()
+                  setPaste(false)
+                }}
+              >
+                Converter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ErbDocModals d={d} />
     </div>
   )

@@ -30,7 +30,12 @@ export type SitePoint = {
   cl?: [string, number | null, number][]
   /** dias e horários dos eventos nesta torre ("AAAA-MM-DD HH:MM") */
   times?: string[]
+  /** grupo (número/planilha) a que a ERB pertence — índice em SharedMap.groups */
+  g?: number
 }
+
+/** Grupo de ERBs importadas (um número ou uma planilha). */
+export type MapGroup = { name: string; color: string; hidden?: boolean }
 
 /** Ponto marcado à mão no mapa (ex.: residência do alvo). */
 export const MARK_KINDS = ['casa', 'trabalho', 'outro', 'erb', 'alvo', 'veiculo', 'pessoa', 'local'] as const
@@ -68,6 +73,8 @@ export type SharedMap = {
   path?: [number, number, number, number, number][]
   /** pontos marcados à mão */
   marks?: MapMark[]
+  /** grupos de ERBs (um por número/planilha), cada um com sua cor */
+  groups?: MapGroup[]
 }
 
 const ITER = 250_000
@@ -215,7 +222,9 @@ function packV3(m: SharedMap) {
       p.name || 0,
       p.cl ?? p.az.map((a, j) => [p.cells[j] ?? '', a, 0]),
       p.times?.length ? packTimes(p.times) : 0,
+      ...(m.groups?.length ? [p.g ?? -1] : []),
     ])
+  if (m.groups?.length) o.g = m.groups.map((g) => (g.hidden ? [g.name, g.color, 1] : [g.name, g.color]))
   if (m.title && !['Mapa de localização (ERBs)', 'Mapas ERB', 'MARX Mapas ERB'].includes(m.title)) o.t = m.title
   if (m.radius) o.r = m.radius
   if (m.beam) o.b = m.beam
@@ -262,6 +271,7 @@ function unpackV3(o: any): SharedMap {
       last: times?.[times.length - 1] ?? null,
       name: a[3] || null,
       times,
+      ...(a[6] !== undefined && a[6] >= 0 ? { g: a[6] } : {}),
     }
   })
   return {
@@ -277,6 +287,7 @@ function unpackV3(o: any): SharedMap {
     radius: o.r,
     beam: o.b,
     path: (o.w ?? []).map(([i, j, n]: number[]) => [points[i].lat, points[i].lon, points[j].lat, points[j].lon, n]),
+    ...(o.g ? { groups: o.g.map((g: any[]) => ({ name: g[0], color: g[1], ...(g[2] ? { hidden: true } : {}) })) } : {}),
     marks: (o.k ?? []).map((k: any[]) => {
       const mk: MapMark = { lat: k[0] / 1e5, lon: k[1] / 1e5, label: k[2], kind: MARK_KINDS[k[3]] ?? 'outro' }
       if (k[4] !== undefined && k[4] >= 0) mk.color = MARK_COLORS[k[4]]

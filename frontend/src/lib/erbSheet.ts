@@ -102,15 +102,17 @@ export async function exportSheet(m: SharedMap, radius: number, fileName: string
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 
 /** "16/10/2026 09:26:39" ou "2026-10-16 09:26" → "2026-10-16 09:26" */
-function toIso(v: string): string | null {
-  let m = v.match(/(\d{2})\/(\d{2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})/)
-  if (m) return `${m[3]}-${m[2]}-${m[1]} ${m[4].padStart(2, '0')}:${m[5]}`
-  m = v.match(/(\d{4})-(\d{2})-(\d{2})[ T]+(\d{1,2}):(\d{2})/)
+export function toIso(v: string): string | null {
+  // aceita "16/10/2026 09:26:39", "09/10/2026–10:29:18" (Vigia), "16/10/26 09:26", "2026-10-16T09:26"
+  let m = v.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\D+(\d{1,2}):(\d{2})/)
+  if (m) return `${m[3].length === 2 ? `20${m[3]}` : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')} ${m[4].padStart(2, '0')}:${m[5]}`
+  m = v.match(/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2}):(\d{2})/)
   if (m) return `${m[1]}-${m[2]}-${m[3]} ${m[4].padStart(2, '0')}:${m[5]}`
   return null
 }
 
-export type SheetImport = { points: SitePoint[]; marks: MapMark[]; rows: number; skipped: number; radius: number | null }
+/** `groups`: números (alvos) encontrados na coluna Alvo; cada ponto traz o índice em `g`. */
+export type SheetImport = { points: SitePoint[]; marks: MapMark[]; rows: number; skipped: number; radius: number | null; groups: string[] }
 
 /**
  * Lê uma planilha (xlsx ou csv) com colunas Latitude/Longitude (e, se houver, Azimute, Célula,
@@ -130,16 +132,28 @@ export async function importSheet(file: File): Promise<SheetImport> {
   if (h < 0) throw new Error('A planilha precisa ter as colunas Latitude e Longitude.')
   const head = rows[h].map((c) => norm(c ?? ''))
   const col = (...names: string[]) => head.findIndex((c) => names.includes(c))
+  const find = (ok: (c: string) => boolean) => head.findIndex(ok)
   const iLat = col('latitude')
   const iLon = col('longitude')
-  const iAz = col('azimute', 'azimuth')
-  const iCell = col('celula', 'cgi', 'erb')
-  const iRaio = col('raio')
-  const iWhen = col('data do evento', 'data inicio', 'data', 'data/hora', 'inicio')
-  const iLoc = col('localizacao', 'endereco')
+  const iAz = find((c) => c.startsWith('azimut'))
+  const iCell = (() => {
+    const i = col('celula', 'celula origem', 'cgi', 'erb', 'cell', 'cell id', 'eci', 'ci')
+    return i >= 0 ? i : find((c) => c.startsWith('celula') || c.includes('cgi'))
+  })()
+  const iRaio = find((c) => c.startsWith('raio'))
+  const iWhen = (() => {
+    const i = col('data do evento', 'data inicio', 'data/hora', 'data hora', 'data e hora', 'inicio', 'incio', 'data/hora inicio', 'datahora')
+    return i >= 0 ? i : find((c) => (c.startsWith('data') || c.includes('inicio') || c.includes('incio')) && !c.includes('fim'))
+  })()
+  const iHora = find((c) => (c === 'hora' || c.startsWith('hora ') || c === 'horario') && !c.includes('data'))
+  const iLoc = find((c) => c.startsWith('localiza') || c.startsWith('endereco'))
+  const iCity = col('cidade', 'municipio')
+  const iUf = col('estado', 'uf')
+  const iAlvo = find((c) => c === 'alvo' || c.startsWith('alvo') || c === 'msisdn' || c === 'numero do alvo' || c === 'linha')
   const iTipo = col('tipo')
   const iCom = col('comentarios')
-  const towers = new Map<string, { lat: number; lon: number; name: string | null; cells: Map<string, [number | null, number]>; times: string[]; n: number }>()
+  const towers = new Map<string, { lat: number; lon: number; g: number; name: string | null; cells: Map<string, [number | null, number]>; times: string[]; n: number }>()
+  const groups: string[] = []
   const marks: MapMark[] = []
   let used = 0
   let skipped = 0
@@ -166,15 +180,39 @@ export async function importSheet(file: File): Promise<SheetImport> {
       )
       continue
     }
-    const key = `${la.v.toFixed(5)},${lo.v.toFixed(5)}`
+    const alvo = iAlvo >= 0 ? String(r[iAlvo] ?? '').replace(/\D/g, '') : ''
+    let g = -1
+    if (alvo) {
+      g = groups.indexOf(alvo)
+      if (g < 0) g = groups.push(alvo) - 1
+    }
+    const key = `${g}|${la.v.toFixed(5)},${lo.v.toFixed(5)}`
     let t = towers.get(key)
-    if (!t) towers.set(key, (t = { lat: la.v, lon: lo.v, name: iLoc >= 0 ? String(r[iLoc] ?? '') || null : null, cells: new Map(), times: [], n: 0 }))
+    if (!t) {
+      const place = [
+        iLoc >= 0 ? String(r[iLoc] ?? '').trim() : '',
+        [
+          iCity >= 0
+            ? String(r[iCity] ?? '')
+                .trim()
+                .replace(/_/g, ' ')
+            : '',
+          iUf >= 0 ? String(r[iUf] ?? '').trim() : '',
+        ]
+          .filter(Boolean)
+          .join('/'),
+      ]
+        .filter(Boolean)
+        .join(' - ')
+      towers.set(key, (t = { lat: la.v, lon: lo.v, g, name: place || null, cells: new Map(), times: [], n: 0 }))
+    }
     t.n++
     const cell = iCell >= 0 && r[iCell] ? String(r[iCell]) : az !== null ? `setor ${az}°` : 'ERB'
     const c = t.cells.get(cell) ?? [az, 0]
     c[1]++
     t.cells.set(cell, c)
-    const when = iWhen >= 0 ? toIso(String(r[iWhen] ?? '')) : null
+    const whenRaw = iWhen >= 0 ? String(r[iWhen] ?? '') : ''
+    const when = toIso(whenRaw) ?? (iHora >= 0 ? toIso(`${whenRaw} ${String(r[iHora] ?? '')}`) : null)
     if (when) t.times.push(when)
   }
   const points: SitePoint[] = [...towers.values()].map((t) => {
@@ -189,11 +227,12 @@ export async function importSheet(file: File): Promise<SheetImport> {
       az: [...t.cells.values()].map((c) => c[0]).filter((x): x is number => x !== null),
       cells: [...t.cells.keys()],
       cl: [...t.cells].map(([cell, [az, n]]) => [cell, az, n] as [string, number | null, number]),
+      ...(t.g >= 0 ? { g: t.g } : {}),
       first: t.times[0] ?? null,
       last: t.times[t.times.length - 1] ?? null,
       name: t.name,
       times: t.times.length ? t.times : undefined,
     }
   })
-  return { points, marks, rows: used, skipped, radius }
+  return { points, marks, rows: used, skipped, radius, groups }
 }

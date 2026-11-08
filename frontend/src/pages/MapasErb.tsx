@@ -16,8 +16,13 @@ const DEF_DIST = 1000
 const DEF_BEAM = 120
 
 /** Torres da análise compartilhada no formato do mapa de localização. */
-function toTowers(m: SharedMap): (Tower & { times?: string[] })[] {
-  return m.points.map((p, i) => {
+/** Cores dos grupos (um por número/planilha), em ordem fixa. */
+export const GROUP_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#ea580c', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4b5563', '#0d9488']
+
+function toTowers(m: SharedMap): (Tower & { times?: string[]; color?: string })[] {
+  return m.points.flatMap((p, i) => {
+    const grp = p.g !== undefined ? m.groups?.[p.g] : undefined
+    if (grp?.hidden) return []
     const cells = (p.cl ?? p.az.map((az, j) => [p.cells[j] ?? `setor ${j + 1}`, az, 0] as [string, number | null, number])).map(([cell, az, n]) => ({
       cell,
       az,
@@ -29,7 +34,7 @@ function toTowers(m: SharedMap): (Tower & { times?: string[] })[] {
       first: p.first,
       last: p.last,
     }))
-    return { key: String(i), lat: p.lat, lon: p.lon, n: p.events, cells: cells as any, address: p.name ?? null, city: null, times: p.times }
+    return [{ key: String(i), lat: p.lat, lon: p.lon, n: p.events, cells: cells as any, address: p.name ?? null, city: null, times: p.times, color: grp?.color }]
   })
 }
 
@@ -413,11 +418,23 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
     try {
       const r = await importSheet(f)
       if (!r.points.length && !r.marks.length) return toast.error('Nenhuma linha com latitude e longitude válidas.')
-      const all = [...base.points, ...r.points]
-      const times = all.flatMap((p) => p.times ?? []).sort()
-      setBase({ ...base, points: all, radius: base.radius ?? r.radius ?? undefined, period: times.length ? [times[0], times[times.length - 1]] : base.period })
-      if (r.marks.length) setMarks([...marks, ...r.marks])
-      if (title === 'Mapas ERB' || title === 'MARX Mapas ERB') setTitle(f.name.replace(/\.[^.]+$/, ''))
+      // um grupo (com cor própria) por número da coluna Alvo; sem essa coluna, um por planilha
+      // (atualização funcional: várias planilhas enviadas juntas não se sobrescrevem)
+      const fileName = f.name.replace(/\.[^.]+$/, '')
+      setBase((prev) => {
+        const groups = [...(prev.groups ?? [])]
+        const gIndex = (name: string) => {
+          let i = groups.findIndex((g) => g.name === name)
+          if (i < 0) i = groups.push({ name, color: GROUP_COLORS[groups.length % GROUP_COLORS.length] }) - 1
+          return i
+        }
+        const added = r.points.map((p) => ({ ...p, g: gIndex(p.g !== undefined ? r.groups[p.g] : fileName) }))
+        const all = [...prev.points, ...added]
+        const times = all.flatMap((p) => p.times ?? []).sort()
+        return { ...prev, groups, points: all, radius: prev.radius ?? r.radius ?? undefined, period: times.length ? [times[0], times[times.length - 1]] : prev.period }
+      })
+      if (r.marks.length) setMarks((prev) => [...prev, ...r.marks])
+      setTitle((t) => (t === 'Mapas ERB' || t === 'MARX Mapas ERB' ? fileName : t))
       toast.success(`${fmtInt(r.rows)} linhas lidas: ${fmtInt(r.points.length)} ERBs${r.marks.length ? ` e ${r.marks.length} pontos` : ''}.`, {
         description: r.skipped ? `${r.skipped} linhas sem coordenadas válidas foram ignoradas.` : undefined,
       })
@@ -427,7 +444,18 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
       setProgress(null)
     }
   }
+  const setGroupHidden = (i: number, hidden: boolean) => setBase({ ...base, groups: (base.groups ?? []).map((g, j) => (j === i ? { ...g, hidden } : g)) })
+  const removeGroup = (i: number) => {
+    const points = base.points.filter((p) => p.g !== i).map((p) => (p.g !== undefined && p.g > i ? { ...p, g: p.g - 1 } : p))
+    const times = points.flatMap((p) => p.times ?? []).sort()
+    setBase({ ...base, points, groups: (base.groups ?? []).filter((_, j) => j !== i), period: times.length ? [times[0], times[times.length - 1]] : [null, null] })
+  }
+  /** ERBs que não pertencem a nenhum grupo (vieram de uma análise da plataforma) */
+  const removeUngrouped = () => setBase({ ...base, points: base.points.filter((p) => p.g !== undefined), path: [] })
   return {
+    setGroupHidden,
+    removeGroup,
+    removeUngrouped,
     base,
     setBase,
     sheetInput,

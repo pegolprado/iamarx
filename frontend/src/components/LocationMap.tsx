@@ -72,10 +72,10 @@ export const PATH_COLOR = '#dc2626'
 export const CURRENT_COLOR = '#f97316'
 
 /** Ícone de torre (antena) com o total de eventos embaixo. */
-export const towerIcon = (n: number, active = false) =>
+export const towerIcon = (n: number, active = false, color?: string) =>
   L.divIcon({
     className: 'erb-tower',
-    html: `<div class="erb-tower-in${active ? ' is-active' : ''}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/></svg><span>${n.toLocaleString('pt-BR')}</span></div>`,
+    html: `<div class="erb-tower-in${active ? ' is-active' : ''}"${color ? ` style="--tw:${color}"` : ''}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><circle cx="12" cy="9" r="2"/><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"/><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"/><path d="M9.5 18h5"/><path d="m8 22 4-11 4 11"/></svg><span>${n.toLocaleString('pt-BR')}</span></div>`,
     iconSize: [44, 40],
     iconAnchor: [22, 30],
   })
@@ -199,10 +199,10 @@ export function LocationMap({
         for (const c of t.cells)
           if (c.az !== null)
             L.polygon(sector(t.lat, t.lon, c.az, radius, beam), {
-              color: SECTOR_COLOR,
+              color: (t as Tower & { color?: string }).color ?? SECTOR_COLOR,
               weight: 1,
               opacity: 0.7,
-              fillColor: SECTOR_COLOR,
+              fillColor: (t as Tower & { color?: string }).color ?? SECTOR_COLOR,
               fillOpacity: 0.12,
               interactive: false,
             }).addTo(g)
@@ -212,7 +212,7 @@ export function LocationMap({
         L.polyline([t.a, t.b], { color: PATH_COLOR, weight: 1.5 + 2.5 * Math.sqrt(t.n / maxN), opacity: 0.85, dashArray: '6 6', interactive: false }).addTo(g)
     }
     for (const t of towers) {
-      const mk = L.marker([t.lat, t.lon], { icon: towerIcon(t.n), riseOnHover: true })
+      const mk = L.marker([t.lat, t.lon], { icon: towerIcon(t.n, false, (t as Tower & { color?: string }).color), riseOnHover: true })
       mk.bindTooltip(`${t.address ?? 'ERB'}${t.city ? ` · ${t.city}` : ''} — ${t.n.toLocaleString('pt-BR')} eventos em ${t.cells.length} célula(s)`)
       mk.on('click', () => onTower?.(t))
       mk.addTo(g)
@@ -300,6 +300,22 @@ export function LocationMap({
     if (picking) m.doubleClickZoom.disable()
     else m.doubleClickZoom.enable()
   }, [picking])
+  // clique no mapa fecha o quadro de detalhes e o menu de camadas
+  const closeDetail = useRef(onCloseDetail)
+  closeDetail.current = onCloseDetail
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    const h = () => {
+      setLayersOpen(false)
+      closeDetail.current?.()
+    }
+    m.on('click', h)
+    m.on('dragstart', () => setLayersOpen(false))
+    return () => {
+      m.off('click', h)
+    }
+  }, [])
   useEffect(() => {
     const m = map.current
     if (!m || !onMapClick) return

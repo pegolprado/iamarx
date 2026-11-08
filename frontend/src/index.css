@@ -488,7 +488,7 @@
 .erb-tower-in span {
   margin-top: -2px;
   border-radius: 4px;
-  background: #b91c1c;
+  background: var(--tw, #b91c1c);
   padding: 0 4px;
   font:
     700 10px/14px ui-monospace,
@@ -766,4 +766,7 @@ select {
 }
 .leaflet-tooltip.erb-label::before {
   display: none;
+}
+.erb-tower-in[style] svg {
+  color: var(--tw);
 }

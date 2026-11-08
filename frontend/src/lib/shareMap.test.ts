@@ -101,4 +101,17 @@ describe('mapa compartilhado', () => {
     const old = await encryptShareM3(m)
     expect((await decryptMapOpen(old)).marks?.[0].label).toBe('GABRIEL - 5799 - 08h59')
   })
+  it('link curto guarda os grupos (cor por número) e o grupo de cada ERB', async () => {
+    const m: SharedMap = {
+      ...map,
+      groups: [
+        { name: '5511999999999', color: '#2563eb' },
+        { name: '5511888888888', color: '#dc2626', hidden: true },
+      ],
+      points: [{ ...map.points[0], g: 1 }],
+    }
+    const back = await decryptMapOpen(await encryptShare(m))
+    expect(back.groups).toEqual(m.groups)
+    expect(back.points[0].g).toBe(1)
+  })
 })
