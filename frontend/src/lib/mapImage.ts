@@ -9,7 +9,7 @@ import type { MapMark, SharedMap } from './shareMap'
 const TILE = 256
 const W = 1280
 const H = 860
-const FOOT = 34
+const FOOT = 0
 
 type XY = [number, number]
 const worldPx = (lat: number, lon: number, z: number): XY => {
@@ -82,7 +82,7 @@ export async function renderMapImage(m: SharedMap, opts: { radius: number; beam:
   const cx = (Math.max(...px.map((p) => p[0])) + Math.min(...px.map((p) => p[0]))) / 2
   const cy = (Math.max(...px.map((p) => p[1])) + Math.min(...px.map((p) => p[1]))) / 2
   const ox = cx - W / 2
-  const oy = cy - (H - FOOT) / 2 + 12
+  const oy = cy - H / 2 + 12
   const at = (lat: number, lon: number): XY => {
     const [x, y] = worldPx(lat, lon, z)
     return [x - ox, y - oy]
@@ -201,19 +201,17 @@ export async function renderMapImage(m: SharedMap, opts: { radius: number; beam:
     if (img) ctx.drawImage(img, x - 20, y - 48, 40, 50)
     if (p.label) label(p.label, x, y + 6)
   }
-  // rodapé
-  ctx.fillStyle = 'rgba(255,255,255,0.94)'
-  ctx.fillRect(0, H - FOOT, W, FOOT)
-  ctx.fillStyle = '#1d4ed8'
-  ctx.font = font(700, 14)
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  const title = m.title && !['Mapas ERB', 'MARX Mapas ERB'].includes(m.title) ? `MARX Mapas ERB · ${m.title}` : 'MARX Mapas ERB'
-  ctx.fillText(title.slice(0, 90), 14, H - FOOT / 2)
-  ctx.fillStyle = '#6b7280'
-  ctx.font = font(500, 11.5)
+  // só o mapa e os desenhos; crédito mínimo do mapa no canto (exigido pelo OpenStreetMap)
+  ctx.font = font(500, 10)
+  const credit = '© OpenStreetMap'
+  const cw = ctx.measureText(credit).width + 8
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillRect(W - cw, H - 15, cw, 15)
+  ctx.fillStyle = '#4b5563'
   ctx.textAlign = 'right'
-  ctx.fillText(`Caráter ilustrativo · Mapa © colaboradores do OpenStreetMap${failed ? ' · parte do mapa indisponível' : ''}`, W - 14, H - FOOT / 2)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(credit, W - 4, H - 7.5)
+  void failed
 
   return new Promise((res, rej) => {
     try {
