@@ -119,7 +119,8 @@ export function lookupIp(db: Db, ip: string): IpInfo {
 const VPN_HINTS =
   /\b(amazon|aws|google cloud|google-cloud|microsoft|azure|digitalocean|ovh|hetzner|m247|datacamp|cdn77|linode|akamai|vultr|choopa|leaseweb|packethub|proton|nord|tefincom|surfshark|expressvpn|mullvad|hostinger|contabo|oracle|alibaba|tencent|g-core|gcore|zenlayer|psychz|quadranet|colocrossing|hostwinds|kamatera|scaleway|ionos|private internet|ipxo|xtom|cogent)\b/i
 /** Redes móveis (4G/5G) das operadoras no Brasil: TIM, Vivo móvel e Claro móvel. */
-const MOBILE_ASN = new Set([26615, 26599, 22085])
+// 10429: Telefônica (Vivo) — anuncia parte do bloco móvel 2804:18::/32 (4G/5G)
+const MOBILE_ASN = new Set([26615, 26599, 22085, 10429])
 
 export function isVpnLike(i: IpInfo) {
   return (!!i.country && i.country !== 'BR') || (!!i.org && VPN_HINTS.test(i.org))

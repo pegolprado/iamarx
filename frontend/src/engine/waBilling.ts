@@ -96,9 +96,9 @@ const WINDOW = 12 * 3600 * 1000
 
 /** Interlocutores do alvo: mensagens e chamadas trocadas com cada número. */
 export function interlocutors(account: string, msgs: BMsg[], calls: BCall[]) {
-  const by = new Map<string, { number: string; msgs: number; sent: number; received: number; calls: number; first: number; last: number }>()
+  const by = new Map<string, { number: string; msgs: number; sent: number; received: number; calls: number; callsOut: number; callsIn: number; first: number; last: number }>()
   const hit = (n: string, ts: number) => {
-    const r = by.get(n) ?? { number: n, msgs: 0, sent: 0, received: 0, calls: 0, first: ts, last: ts }
+    const r = by.get(n) ?? { number: n, msgs: 0, sent: 0, received: 0, calls: 0, callsOut: 0, callsIn: 0, first: ts, last: ts }
     r.first = Math.min(r.first, ts)
     r.last = Math.max(r.last, ts)
     by.set(n, r)
@@ -119,7 +119,15 @@ export function interlocutors(account: string, msgs: BMsg[], calls: BCall[]) {
       r.received++
     }
   }
-  for (const c of calls) if (c.account === account) for (const p of c.parts) if (p !== account) hit(p, c.ts).calls++
+  for (const c of calls)
+    if (c.account === account)
+      for (const p of c.parts)
+        if (p !== account) {
+          const r = hit(p, c.ts)
+          r.calls++
+          if (c.creator === account) r.callsOut++
+          else r.callsIn++
+        }
   return [...by.values()].map((r) => ({ ...r, total: r.msgs + r.calls })).sort((a, b) => b.total - a.total)
 }
 
@@ -169,6 +177,19 @@ function rank<T>(items: T[], key: (x: T) => string | null) {
   return [...by.entries()].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n)
 }
 
+/** Os IPs mais recentes, um por endereço (o uso mais recente de cada), até 10. */
+function recentByIp<T extends { ip: string; ts: number }>(list: T[], n = 10) {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const o of [...list].sort((a, b) => b.ts - a.ts)) {
+    if (seen.has(o.ip)) continue
+    seen.add(o.ip)
+    out.push(o)
+    if (out.length >= n) break
+  }
+  return out
+}
+
 /** Análise individual completa de um alvo. */
 export function individual(account: string, files: BFile[], lookup: Lookup | null) {
   const mine = files.filter((f) => f.account === account)
@@ -183,21 +204,11 @@ export function individual(account: string, files: BFile[], lookup: Lookup | nul
   const residentialObs = withInfo.filter((o) => isNight(o.ts) && !isMobileNet(o.info))
   const residential = rank(residentialObs, (o) => o.info.org)
   const topRes = residential[0]?.name ?? null
-  const recentRes = topRes
-    ? residentialObs
-        .filter((o) => o.info.org === topRes)
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, 10)
-    : []
+  const recentRes = topRes ? recentByIp(residentialObs.filter((o) => o.info.org === topRes)) : []
   const mobileObs = withInfo.filter((o) => isMobileNet(o.info))
   const mobile = rank(mobileObs, (o) => o.info.org)
   const topMob = mobile[0]?.name ?? null
-  const recentMobile = topMob
-    ? mobileObs
-        .filter((o) => o.info.org === topMob)
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, 10)
-    : []
+  const recentMobile = topMob ? recentByIp(mobileObs.filter((o) => o.info.org === topMob)) : []
   const cities = rank(withInfo, (o) =>
     o.info.city ? `${o.info.city}${o.info.uf ? ` · ${o.info.uf}` : ''}` : o.info.country && o.info.country !== 'BR' ? `Exterior (${o.info.country})` : null,
   )
@@ -231,19 +242,23 @@ export function links(files: BFile[], window = WINDOW, lookup: Lookup | null = n
   const { msgs, calls, obs } = collect(files)
   const inter = new Map(targets.map((t) => [t, interlocutors(t, msgs, calls)]))
   const tset = new Set(targets)
-  // comunicação direta entre alvos
-  const direct = new Map<string, { a: string; b: string; msgs: number; calls: number; first: number; last: number }>()
-  for (const t of targets)
-    for (const r of inter.get(t)!)
-      if (tset.has(r.number)) {
-        const [a, b] = [t, r.number].sort()
-        const d = direct.get(`${a}|${b}`) ?? { a, b, msgs: 0, calls: 0, first: r.first, last: r.last }
-        d.msgs = Math.max(d.msgs, r.msgs)
-        d.calls = Math.max(d.calls, r.calls)
-        d.first = Math.min(d.first, r.first)
-        d.last = Math.max(d.last, r.last)
-        direct.set(`${a}|${b}`, d)
-      }
+  // comunicação direta entre alvos: mensagens e chamadas distintas (a mesma mensagem nos arquivos dos dois alvos conta uma vez)
+  const dsets = new Map<string, { a: string; b: string; m: Set<string>; c: Set<string>; first: number; last: number }>()
+  const dhit = (x: string, y: string, kind: 'm' | 'c', id: string, ts: number) => {
+    const [a, b] = x < y ? [x, y] : [y, x]
+    const d = dsets.get(`${a}|${b}`) ?? { a, b, m: new Set(), c: new Set(), first: ts, last: ts }
+    d[kind].add(id)
+    d.first = Math.min(d.first, ts)
+    d.last = Math.max(d.last, ts)
+    dsets.set(`${a}|${b}`, d)
+  }
+  for (const m of msgs)
+    if (!m.group && m.from && tset.has(m.from)) for (const t of m.to) if (t !== m.from && tset.has(t)) dhit(m.from, t, 'm', m.id ?? `${m.ts}|${m.from}|${t}`, m.ts)
+  for (const c of calls) {
+    const ps = [...new Set([...c.parts, ...(c.creator ? [c.creator] : [])])].filter((p) => tset.has(p))
+    for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) dhit(ps[i], ps[j], 'c', c.id ?? `${c.ts}|${c.creator}`, c.ts)
+  }
+  const direct = new Map([...dsets].map(([k, d]) => [k, { a: d.a, b: d.b, msgs: d.m.size, calls: d.c.size, first: d.first, last: d.last }]))
   // interlocutores em comum (ligados a 2+ alvos; um alvo também pode ser interlocutor em comum de outros alvos)
   const byContact = new Map<string, Map<string, number>>()
   for (const t of targets)
@@ -301,6 +316,11 @@ export function links(files: BFile[], window = WINDOW, lookup: Lookup | null = n
     targets,
     files: files.length,
     obsCount: obs.length,
+    obsBy: {
+      mensagem: obs.filter((o) => o.source === 'mensagem').length,
+      chamada: obs.filter((o) => o.source === 'chamada').length,
+      login: obs.filter((o) => o.source === 'login').length,
+    },
     msgs,
     calls,
     interlocutors: inter,

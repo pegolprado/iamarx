@@ -167,7 +167,12 @@ export default function WaLinks() {
       <div className="card grid gap-3 p-3 sm:grid-cols-3">
         <Stat icon={<FolderOpen />} label="Arquivos processados" value={r.files} />
         <Stat icon={<Users />} label="Alvos" value={r.targets.length} />
-        <Stat icon={<Clock />} label="Registros de IPs cruzados" value={r.obsCount.toLocaleString('pt-BR')} />
+        <Stat
+          icon={<Clock />}
+          label="Registros de IPs cruzados"
+          value={r.obsCount.toLocaleString('pt-BR')}
+          sub={`${r.obsBy.mensagem.toLocaleString('pt-BR')} mensagens · ${r.obsBy.chamada.toLocaleString('pt-BR')} eventos de chamada · ${r.obsBy.login.toLocaleString('pt-BR')} logins`}
+        />
       </div>
       <TargetNames r={r} names={names} setName={setName} />
       <section className="card p-4">
@@ -210,13 +215,14 @@ export default function WaLinks() {
   )
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub?: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-ink-2 px-3 py-2">
       <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/5 text-teal [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       <div>
         <div className="text-xs text-muted">{label}</div>
         <div className="font-mono text-lg font-bold text-ok">{value}</div>
+        {sub && <div className="text-[10px] text-faint">{sub}</div>}
       </div>
     </div>
   )
@@ -267,7 +273,24 @@ function Contacts({ r, names, setName }: { r: Result; names: Names; setName: Set
 }
 
 /** Cores no padrão INVTECH: fundo claro, alvos vermelhos, em comum laranja, contatos verdes, IPs azuis. */
-const INV = { bg: '#ffffff', target: '#e53935', common: '#fb8c00', contact: '#43a047', ip: '#1e88e5', edge: '#b0bec5', direct: '#e53935', label: '#263238', badge: '#1e88e5' }
+const INV = { bg: '#f3f4f6', target: '#e53935', common: '#22a34a', contact: '#86c79a', ip: '#1e88e5', edge: '#b0bec5', direct: '#e53935', label: '#263238', badge: '#1e88e5' }
+const svgUri = (svg: string) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+const PERSON = svgUri(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',
+)
+const PHONE = svgUri(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+)
+/** Selo no meio da ligação alvo → interlocutor: ↗ enviadas pelo alvo (verde), ↙ recebidas (vermelho). */
+const badgeSvg = (out: number, inn: number) => {
+  const w = Math.max(30, 14 + 6 * Math.max(String(out).length, String(inn).length))
+  return {
+    w,
+    img: svgUri(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="26" viewBox="0 0 ${w} 26"><rect x="0.5" y="0.5" width="${w - 1}" height="12" rx="2.5" fill="#16a34a"/><rect x="0.5" y="13.5" width="${w - 1}" height="12" rx="2.5" fill="#dc2626"/><g font-family="Arial,Helvetica,sans-serif" font-size="9" font-weight="700" fill="#fff"><text x="3" y="10">↗ ${out}</text><text x="3" y="23">↙ ${inn}</text></g></svg>`,
+    ),
+  }
+}
 type Names = Record<string, string>
 type SetName = (n: string, v: string) => void
 const label = (names: Names, n: string) => (names[n] ? `${names[n]}\n${fmtNumber(n)}` : fmtNumber(n))
@@ -294,11 +317,44 @@ const baseStyle: any[] = [
       'border-color': '#ffffff',
     },
   },
-  { selector: 'node[kind = "alvo"]', style: { 'background-color': INV.target, width: 34, height: 34, 'font-weight': 'bold', 'font-size': 10.5 } },
-  { selector: 'node[kind = "comum"]', style: { 'background-color': INV.common, shape: 'rectangle', width: 22, height: 22 } },
-  { selector: 'node[kind = "contato"]', style: { 'background-color': INV.contact } },
+  {
+    selector: 'node[kind = "alvo"]',
+    style: {
+      'background-color': INV.target,
+      'background-image': PERSON,
+      'background-width': '62%',
+      'background-height': '62%',
+      width: 32,
+      height: 32,
+      'font-weight': 'bold',
+      'font-size': 10.5,
+    },
+  },
+  { selector: 'node[big]', style: { width: 'data(big)', height: 'data(big)' } },
+  {
+    selector: 'node[kind = "comum"]',
+    style: { 'background-color': INV.common, 'background-image': PHONE, 'background-width': '62%', 'background-height': '62%', width: 28, height: 28 },
+  },
+  {
+    selector: 'node[kind = "contato"]',
+    style: { 'background-color': INV.contact, 'background-image': PHONE, 'background-width': '62%', 'background-height': '62%', width: 20, height: 20 },
+  },
+  {
+    selector: 'node[kind = "badge"]',
+    style: {
+      shape: 'rectangle',
+      'background-opacity': 0,
+      'border-width': 0,
+      'background-image': 'data(img)',
+      'background-fit': 'contain',
+      width: 'data(w)',
+      height: 26,
+      label: '',
+      'z-index': 10,
+    },
+  },
   { selector: 'node[kind = "ip"]', style: { 'background-color': INV.ip, shape: 'round-rectangle', width: 26, height: 26, 'font-size': 8.5 } },
-  { selector: 'edge', style: { width: 1.2, 'line-color': INV.edge, 'curve-style': 'straight', opacity: 0.9 } },
+  { selector: 'edge', style: { width: 0.8, 'line-color': '#37474f', 'curve-style': 'straight', opacity: 0.75 } },
   {
     selector: 'edge[kind = "direto"]',
     style: {
@@ -349,7 +405,7 @@ function useCy(box: React.RefObject<HTMLDivElement | null>, build: () => { eleme
     // duplo clique num número: dar ou trocar o nome
     cy.current.on('dbltap', 'node', (ev) => {
       const id = String(ev.target.id())
-      if (ev.target.data('kind') === 'ip') return
+      if (ev.target.data('kind') === 'ip' || ev.target.data('kind') === 'badge') return
       const v = window.prompt(`Nome para ${fmtNumber(id)} (vazio remove):`, namesRef.current[id] ?? '')
       if (v !== null) setName(id, v)
     })
@@ -362,7 +418,7 @@ function useCy(box: React.RefObject<HTMLDivElement | null>, build: () => { eleme
   // nomes trocados: só atualiza os rótulos
   useEffect(() => {
     cy.current?.nodes().forEach((n) => {
-      if (n.data('kind') !== 'ip') n.data('label', label(names, String(n.id())))
+      if (n.data('kind') !== 'ip' && n.data('kind') !== 'badge') n.data('label', label(names, String(n.id())))
     })
   }, [names])
   return cy
@@ -410,7 +466,7 @@ function GraphBox({
           />
         </div>
         <GraphControls cy={cy} />
-        <div ref={boxRef} className="h-[480px] w-full" role="img" aria-label={aria} />
+        <div ref={boxRef} className="h-[560px] w-full" role="img" aria-label={aria} />
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-x-3 gap-y-1 rounded-[6px] border border-[#cfd8dc] bg-[#fff] px-2 py-1 font-mono text-[10px] text-[#37474f]">
           {legend.map((l) => (
             <span key={l.label} className="flex items-center gap-1">
@@ -443,7 +499,7 @@ function Graph({ r, names, setName }: { r: Result; names: Names; setName: SetNam
       const tset = new Set(r.targets)
       const commonSet = new Set(r.common.map((c) => c.number))
       const nodes = new Map<string, { id: string; kind: string }>()
-      const edges: { s: string; t: string; w: number; kind: string }[] = []
+      const links: { t: string; c: string; out: number; inn: number }[] = []
       for (const t of r.targets) nodes.set(t, { id: t, kind: 'alvo' })
       for (const t of r.targets)
         for (const i of r.interlocutors.get(t)!) {
@@ -451,18 +507,34 @@ function Graph({ r, names, setName }: { r: Result; names: Names; setName: SetNam
           const isCommon = commonSet.has(i.number)
           if (!isCommon && !showAll) continue
           nodes.set(i.number, { id: i.number, kind: isCommon ? 'comum' : 'contato' })
-          edges.push({ s: t, t: i.number, w: i.total, kind: 'contato' })
+          links.push({ t, c: i.number, out: i.sent + i.callsOut, inn: i.received + i.callsIn })
         }
-      for (const d of r.direct) edges.push({ s: d.a, t: d.b, w: d.msgs + d.calls, kind: 'direto' })
       const rows: Record<string, string[]> = { alvo: [], comum: [], contato: [] }
       for (const n of nodes.values()) rows[n.kind].push(n.id)
-      const W = Math.max(600, ...Object.values(rows).map((x) => x.length * 80))
-      const pos = (kind: string, i: number) => ({ x: ((i + 0.5) * W) / Math.max(1, rows[kind].length), y: kind === 'alvo' ? 0 : kind === 'comum' ? 240 : 480 })
+      // alvos com mais interlocutores ficam maiores
+      const deg = new Map<string, number>()
+      for (const l of links) deg.set(l.t, (deg.get(l.t) ?? 0) + 1)
+      const maxDeg = Math.max(1, ...deg.values())
+      const W = Math.max(700, ...Object.values(rows).map((x) => x.length * 90))
+      const P = new Map<string, { x: number; y: number }>()
+      for (const [kind, ids] of Object.entries(rows))
+        ids.forEach((id, i) => P.set(id, { x: ((i + 0.5) * W) / Math.max(1, ids.length), y: kind === 'alvo' ? 0 : kind === 'comum' ? 480 : 640 }))
+      const els: any[] = [...nodes.values()].map((n) => ({
+        data: { id: n.id, label: label(names, n.id), kind: n.kind, ...(n.kind === 'alvo' ? { big: 30 + Math.round((18 * (deg.get(n.id) ?? 0)) / maxDeg) } : {}) },
+        position: P.get(n.id),
+      }))
+      links.forEach((l, i) => {
+        const a = P.get(l.t)!
+        const b = P.get(l.c)!
+        const bd = badgeSvg(l.out, l.inn)
+        const id = `b${i}`
+        els.push({ data: { id, kind: 'badge', img: bd.img, w: bd.w, label: '' }, position: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } })
+        els.push({ data: { id: `e${i}a`, source: l.t, target: id, kind: 'contato' } })
+        els.push({ data: { id: `e${i}b`, source: id, target: l.c, kind: 'contato' } })
+      })
+      r.direct.forEach((d, i) => els.push({ data: { id: `d${i}`, source: d.a, target: d.b, kind: 'direto', w: d.msgs + d.calls } }))
       return {
-        elements: [
-          ...[...nodes.values()].map((n) => ({ data: { id: n.id, label: label(names, n.id), kind: n.kind }, position: pos(n.kind, rows[n.kind].indexOf(n.id)) })),
-          ...edges.map((e, i) => ({ data: { id: `e${i}`, source: e.s, target: e.t, kind: e.kind, w: e.w } })),
-        ],
+        elements: els,
         layout:
           layout === 'org'
             ? { name: 'preset', padding: 30 }
@@ -481,9 +553,11 @@ function Graph({ r, names, setName }: { r: Result; names: Names; setName: SetNam
       aria="Grafo de vínculos entre alvos"
       legend={[
         { color: INV.target, label: 'alvo' },
-        { color: INV.common, label: 'interlocutor em comum', shape: 'square' },
+        { color: INV.common, label: 'interlocutor em comum' },
         { color: INV.contact, label: 'contato' },
         { color: INV.direct, label: 'contato direto (nº de interações)', shape: 'line' },
+        { color: '#16a34a', label: '↗ enviadas pelo alvo', shape: 'square' },
+        { color: '#dc2626', label: '↙ recebidas pelo alvo', shape: 'square' },
       ]}
     >
       <button className={toggle(layout === 'rede')} onClick={() => setLayout('rede')}>
