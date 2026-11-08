@@ -117,6 +117,7 @@ export function LocationMap({
   onContext,
   layout = 'default',
   focus,
+  onBackgroundClick,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -146,6 +147,8 @@ export function LocationMap({
   layout?: 'default' | 'app'
   /** centraliza o mapa neste ponto (muda `key` para repetir) */
   focus?: { lat: number; lon: number; key: number } | null
+  /** clique numa área vazia do mapa */
+  onBackgroundClick?: () => void
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -166,7 +169,7 @@ export function LocationMap({
 
   useEffect(() => {
     if (!box.current || map.current) return
-    map.current = L.map(box.current, { maxZoom: 19, tapHold: true } as L.MapOptions).setView([-15.78, -47.93], 4)
+    map.current = L.map(box.current, { maxZoom: 19, tapHold: true } as L.MapOptions).setView([-23.55, -46.63], 12) // São Paulo
     erbRenderer.current = L.canvas({ padding: 0.3 })
     erbs.current = L.layerGroup().addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
@@ -276,7 +279,8 @@ export function LocationMap({
       }
       const mk = L.marker([k.lat, k.lon], { icon: markIcon(k), zIndexOffset: 1000 })
       if (k.kind === 'erb') mk.bindTooltip(esc(k.label), { permanent: true, direction: 'right', offset: [10, 0], className: 'erb-label' })
-      else mk.bindTooltip(`${MARK_STYLE[k.kind].label}: ${esc(k.label)}`, { direction: 'top', offset: [0, -30] })
+      // nome sempre visível ao lado do ponto
+      else if (k.label) mk.bindTooltip(esc(k.label), { permanent: true, direction: 'right', offset: [14, -26], className: 'erb-label' })
       mk.on('click', () => onMark?.(i))
       mk.addTo(g)
     })
@@ -303,12 +307,15 @@ export function LocationMap({
   // clique no mapa fecha o quadro de detalhes e o menu de camadas
   const closeDetail = useRef(onCloseDetail)
   closeDetail.current = onCloseDetail
+  const bgClick = useRef(onBackgroundClick)
+  bgClick.current = onBackgroundClick
   useEffect(() => {
     const m = map.current
     if (!m) return
     const h = () => {
       setLayersOpen(false)
       closeDetail.current?.()
+      bgClick.current?.()
     }
     m.on('click', h)
     m.on('dragstart', () => setLayersOpen(false))

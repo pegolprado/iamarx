@@ -9,7 +9,7 @@ import { Modal, Notice } from '../components/ui'
 import type { Tower } from '../engine/location'
 import { parseCoord, parseInput, type ParsedItem } from '../lib/coords'
 import { fmtDateTime, fmtInt } from '../lib/format'
-import { decryptMapOpen, encryptShare, MARK_COLORS, MARK_KINDS, type MapMark, type MarkColor, type MarkKind, type SharedMap, shareUrl, toKml } from '../lib/shareMap'
+import { decryptMapOpen, encryptShare, MARK_COLORS, MARK_KINDS, type MapMark, type MarkColor, type MarkKind, type SharedMap, shareUrl, siteUrl, toKml } from '../lib/shareMap'
 
 export const EMPTY: SharedMap = { v: 1, title: 'Mapas ERB', by: '', at: '', exp: null, period: [null, null], types: '', numbers: [], points: [] }
 const DEF_DIST = 1000
@@ -92,11 +92,9 @@ export function MarkGlyph({ kind, color, size = 22 }: { kind: MarkKind; color: s
 
 type Draft = { mark: MapMark; index: number | null; latText: string; lonText: string }
 
-export function newDraft(lat: number | null, lon: number | null, kind: MarkKind, n: number): Draft {
+export function newDraft(lat: number | null, lon: number | null, kind: MarkKind, _n?: number): Draft {
   const mark: MapMark =
-    kind === 'erb'
-      ? { lat: lat ?? 0, lon: lon ?? 0, label: `ERB ${n}`, kind: 'erb', az: null, dist: DEF_DIST, beam: DEF_BEAM }
-      : { lat: lat ?? 0, lon: lon ?? 0, label: kind === 'casa' ? 'Residência do alvo' : `Lugar ${n}`, kind }
+    kind === 'erb' ? { lat: lat ?? 0, lon: lon ?? 0, label: '', kind: 'erb', az: null, dist: DEF_DIST, beam: DEF_BEAM } : { lat: lat ?? 0, lon: lon ?? 0, label: '', kind }
   return { mark, index: null, latText: lat === null ? '' : lat.toFixed(6), lonText: lon === null ? '' : lon.toFixed(6) }
 }
 
@@ -128,7 +126,7 @@ function MarkForm({ draft, onSave, onDelete, onClose }: { draft: Draft; onSave: 
         <div className="flex gap-1 border-b border-line" role="tablist">
           {(
             [
-              [false, 'Lugar', <MapPin key="l" className="h-4 w-4" />],
+              [false, 'Ponto', <MapPin key="l" className="h-4 w-4" />],
               [true, 'Antena (ERB)', <RadioTower key="a" className="h-4 w-4" />],
             ] as const
           ).map(([erb, label, icon]) => (
@@ -142,8 +140,6 @@ function MarkForm({ draft, onSave, onDelete, onClose }: { draft: Draft; onSave: 
                   ...(erb
                     ? { kind: 'erb' as const, dist: m.dist || DEF_DIST, beam: m.beam || DEF_BEAM, az: m.az ?? null }
                     : { kind: m.kind === 'erb' ? ('outro' as const) : m.kind }),
-                  // nome padrão acompanha o tipo (Lugar n ↔ ERB n)
-                  label: m.label.replace(/^(Lugar|ERB) (\d+)$/, (_, _t, n) => `${erb ? 'ERB' : 'Lugar'} ${n}`),
                 })
               }
               className={clsx('-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2', isErb === erb ? 'border-accent text-white' : 'border-transparent text-muted')}
@@ -262,7 +258,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-[8px] border border-line bg-petrol/50 p-3 font-mono text-[12px]">
-            <div className="mb-1 font-sans text-[11px] text-muted">Lugar</div>-26.25623 -49.2562
+            <div className="mb-1 font-sans text-[11px] text-muted">Ponto</div>-26.25623 -49.2562
             <div className="mt-2 mb-1 font-sans text-[11px] text-muted">ERB (azimute antes ou depois)</div>250 -26.25623 -49.2562
             <br />
             -26.25623 -49.2562 250
@@ -327,17 +323,19 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
   useEffect(() => {
     let alive = true
     const t = setTimeout(async () => {
-      const f = await encryptShare(current)
+      // mapa vazio: sem link de dados (só o endereço do site)
+      const empty = !current.points.length && !current.marks?.length
+      const f = empty ? '' : await encryptShare(current)
       if (!alive) return
       setFrag(f)
-      if (urlPath !== null) history.replaceState(null, '', `${urlPath}#${f}`)
+      if (urlPath !== null) history.replaceState(null, '', f ? `${urlPath}#${f}` : urlPath)
     }, 250)
     return () => {
       alive = false
       clearTimeout(t)
     }
   }, [current, urlPath])
-  const link = frag ? shareUrl(frag) : ''
+  const link = frag ? shareUrl(frag) : siteUrl()
 
   const onMapClick = useCallback(
     (lat: number, lon: number) => {
@@ -394,7 +392,7 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
       n++
       return p.az !== null
         ? { lat: p.lat, lon: p.lon, label: p.name || `ERB ${n}`, kind: 'erb', az: p.az, dist: p.dist ?? DEF_DIST, beam: p.beam ?? DEF_BEAM }
-        : { lat: p.lat, lon: p.lon, label: p.name || `Lugar ${n}`, kind: 'outro' }
+        : { lat: p.lat, lon: p.lon, label: p.name || `Ponto ${n}`, kind: 'outro' }
     })
     setMarks([...marks, ...add])
     setParsed(null)
@@ -530,7 +528,7 @@ export function ErbDocModals({ d }: { d: ErbDoc }) {
                 <tbody>
                   {parsed.items.map((p, i) => (
                     <tr key={i}>
-                      <td>{p.az !== null ? 'ERB' : 'Lugar'}</td>
+                      <td>{p.az !== null ? 'ERB' : 'Ponto'}</td>
                       <td>{p.name ?? '—'}</td>
                       <td className="font-mono">{p.lat.toFixed(6)}</td>
                       <td className="font-mono">{p.lon.toFixed(6)}</td>
@@ -650,9 +648,9 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
               <div className="absolute top-9 left-0 z-[700] w-56 rounded-[8px] border border-line-2 bg-glass p-1 text-[13px] shadow-lg">
                 {(
                   [
-                    ['Lugar (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
+                    ['Ponto (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
                     ['Antena / ERB (digitar)', () => setDraft(newDraft(null, null, 'erb', marks.length + 1))],
-                    ['Lugar — tocar no mapa', () => setPicking('outro')],
+                    ['Ponto — tocar no mapa', () => setPicking('outro')],
                     ['Antena — tocar no mapa', () => setPicking('erb')],
                   ] as const
                 ).map(([l, fn]) => (
@@ -724,7 +722,7 @@ export function ErbMapsEditor({ initial, standalone }: { initial: SharedMap | nu
 
       {picking && (
         <p className="flex items-center gap-2 text-[12.5px] text-accent">
-          Toque no ponto do mapa para adicionar {picking === 'erb' ? 'a antena' : 'o lugar'}.
+          Toque no ponto do mapa para adicionar {picking === 'erb' ? 'a antena' : 'o ponto'}.
           <button className="text-muted underline" onClick={() => setPicking(null)}>
             cancelar
           </button>

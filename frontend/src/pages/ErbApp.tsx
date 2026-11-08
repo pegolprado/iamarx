@@ -51,8 +51,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     picking,
     setPicking,
     setDraft,
-    input,
-    setInput,
     filter,
     setFilter,
     radius,
@@ -67,7 +65,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     onMapClick,
     onContext,
     onMark,
-    doImport,
     kml,
     copy,
     list,
@@ -78,8 +75,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     removeUngrouped,
   } = d
   const ungrouped = useMemo(() => base.points.filter((p) => p.g === undefined), [base.points])
-  const [paste, setPaste] = useState(false)
-  const [open, setOpen] = useState(() => !initial || (!initial.marks?.length && !initial.points.length))
+  const [open, setOpen] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
   const [page, setPage] = useState(0)
   const [focus, setFocus] = useState<{ lat: number; lon: number; key: number } | null>(null)
@@ -101,13 +97,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     }
   }, [])
 
-  const startPick = (k: 'outro' | 'erb') => {
-    setAddMenu(false)
-    setSel(null)
-    setPicking(k)
-    if (window.innerWidth < 768) setOpen(false)
-  }
-
   return (
     <div className="fixed inset-0 overflow-hidden bg-[var(--map-bg)] text-gray-900">
       <LocationMap
@@ -128,6 +117,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         onMark={onMark}
         focus={focus}
         onCloseDetail={() => setSel(null)}
+        onBackgroundClick={() => (setOpen(false), setAddMenu(false))}
         detail={
           sel ? (
             <div className="space-y-1.5">
@@ -155,7 +145,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
 
       {picking && (
         <div className="absolute top-3 left-1/2 z-[700] flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900/90 px-4 py-2 text-[13px] text-[#fff] shadow-lg">
-          <Crosshair className="h-4 w-4 text-sky-300" /> Toque no mapa para adicionar {picking === 'erb' ? 'a antena' : 'o lugar'}
+          <Crosshair className="h-4 w-4 text-sky-300" /> Toque no mapa para adicionar {picking === 'erb' ? 'a antena' : 'o ponto'}
           <button className="text-sky-300 underline" onClick={() => setPicking(null)}>
             cancelar
           </button>
@@ -189,7 +179,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
       {/* painel */}
       <aside
         className={clsx(
-          'absolute top-0 right-0 bottom-0 z-[800] flex w-full flex-col bg-[#fff] shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.35)] transition-transform duration-200 sm:w-[440px]',
+          'absolute top-0 right-0 z-[800] flex max-h-full w-full flex-col overflow-hidden bg-[#fff] shadow-[-12px_8px_40px_-12px_rgba(0,0,0,0.35)] transition-transform duration-200 sm:w-[400px] sm:rounded-bl-xl',
           open ? 'visible translate-x-0' : 'pointer-events-none invisible translate-x-full',
         )}
         aria-hidden={!open}
@@ -199,7 +189,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
           <img src="/icon-192.png" alt="" className="h-9 w-9 rounded-full ring-2 ring-white/70" />
           <div className="min-w-0 flex-1">
             <div className="text-[16px] leading-tight font-semibold">MARX Mapas ERB</div>
-            <div className="text-[11.5px] text-blue-100">Antenas, setores e lugares no mapa</div>
+            <div className="text-[11.5px] text-blue-100">Antenas, setores e pontos no mapa</div>
           </div>
           <button className="rounded-md p-1.5 hover:bg-[#fff]/15" onClick={() => setHelp(true)} aria-label="Como usar" title="Como usar">
             <Info className="h-5 w-5" />
@@ -209,7 +199,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 overflow-y-auto">
           <div className="flex flex-wrap gap-2 border-b border-gray-200 px-4 py-3.5">
             <div className="relative">
               <button
@@ -223,11 +213,8 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
                 <div className="absolute top-10 left-0 z-10 w-60 rounded-lg border border-gray-200 bg-[#fff] p-1 text-[13px] shadow-xl">
                   {(
                     [
-                      ['Colar linhas do extrato / coordenadas', () => setPaste(true)],
-                      ['Lugar (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
+                      ['Ponto (digitar)', () => setDraft(newDraft(null, null, 'outro', marks.length + 1))],
                       ['Antena / ERB (digitar)', () => setDraft(newDraft(null, null, 'erb', marks.length + 1))],
-                      ['Lugar — tocar no mapa', () => startPick('outro')],
-                      ['Antena — tocar no mapa', () => startPick('erb')],
                     ] as const
                   ).map(([l, fn]) => (
                     <button
@@ -443,36 +430,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         </div>
       </aside>
 
-      {paste && (
-        <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/40 p-4" onMouseDown={() => setPaste(false)}>
-          <div className="w-full max-w-lg rounded-xl bg-[#fff] p-4 text-gray-900 shadow-2xl" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Colar linhas">
-            <div className="mb-2 text-[15px] font-semibold">Colar linhas do extrato ou coordenadas</div>
-            <textarea
-              autoFocus
-              className="w-full resize-y !border-gray-300 !bg-[#fff] font-mono text-[12.5px] !text-gray-900"
-              rows={6}
-              placeholder={'Importar… uma linha por antena ou lugar\nGABRIEL - 5799 - 08h59|-23.60215|-46.90688|240\n250 -26.25623 -49.2562\n10  -26-52-54,00  -49-08-31,00'}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <button className="h-9 rounded-md border border-gray-300 px-3 text-[13px]" onClick={() => setPaste(false)}>
-                Cancelar
-              </button>
-              <button
-                className="h-9 rounded-md bg-blue-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-blue-700"
-                aria-label="Converter e importar"
-                onClick={async () => {
-                  await doImport()
-                  setPaste(false)
-                }}
-              >
-                Converter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <ErbDocModals d={d} />
     </div>
   )
