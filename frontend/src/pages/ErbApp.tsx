@@ -1,8 +1,29 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Crosshair, Download, Eye, EyeOff, FileSpreadsheet, Info, Lock, Pencil, Plus, RadioTower, Share2, Trash2, Upload } from 'lucide-react'
+import {
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  Download,
+  FileText,
+  X,
+  Eye,
+  EyeOff,
+  FileSpreadsheet,
+  Info,
+  Lock,
+  Pencil,
+  Plus,
+  RadioTower,
+  Share2,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { LocationMap, markHex } from '../components/LocationMap'
 import { exportSheet } from '../lib/erbSheet'
+import { exportMapPdf, renderMapImage } from '../lib/mapImage'
+import { toast } from 'sonner'
 import { fmtDateTime, fmtInt } from '../lib/format'
 import { decryptMap, decryptMapOpen, isErbHost, isOpenLink, type SharedMap, WrongPassword } from '../lib/shareMap'
 import { EMPTY, ErbDocModals, MarkGlyph, newDraft, TimesByDay, useErbDoc } from './MapasErb'
@@ -65,7 +86,6 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     onMapClick,
     onContext,
     onMark,
-    kml,
     copy,
     list,
     setHelp,
@@ -75,6 +95,64 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     removeUngrouped,
   } = d
   const ungrouped = useMemo(() => base.points.filter((p) => p.g === undefined), [base.points])
+  const hasContent = base.points.length > 0 || marks.some((m) => !m.hidden)
+  const [working, setWorking] = useState<string | null>(null)
+  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null)
+  const photoName = `${(title && !['Mapas ERB', 'MARX Mapas ERB'].includes(title) ? title : 'Mapa_ERB').replace(/[^\w.-]+/g, '_').slice(0, 60)}.png`
+  const makePhoto = async () => {
+    setWorking('Gerando a foto…')
+    try {
+      const blob = await renderMapImage(current, { radius, beam, showAnalysis }, (st) => setWorking(st))
+      setPhoto({ blob, url: URL.createObjectURL(blob) })
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Não foi possível gerar a foto.')
+    } finally {
+      setWorking(null)
+    }
+  }
+  const makePdf = async () => {
+    setWorking('Gerando o PDF…')
+    try {
+      await exportMapPdf(current, { radius, beam, showAnalysis, link }, (st) => setWorking(st))
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Não foi possível gerar o PDF.')
+    } finally {
+      setWorking(null)
+    }
+  }
+  const sharePhoto = async () => {
+    if (!photo) return
+    const file = new File([photo.blob], photoName, { type: 'image/png' })
+    const text = `${title && !['Mapas ERB', 'MARX Mapas ERB'].includes(title) ? `${title}\n` : ''}${link}`
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text })
+        return
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return
+      }
+    }
+    // sem compartilhamento nativo (computador): baixa a foto e copia o link
+    downloadPhoto()
+    await navigator.clipboard?.writeText(link).catch(() => {})
+    toast.success('Foto baixada e link copiado: anexe a foto e cole o link na conversa.')
+  }
+  const downloadPhoto = () => {
+    if (!photo) return
+    const a = document.createElement('a')
+    a.href = photo.url
+    a.download = photoName
+    a.click()
+  }
+  const copyPhoto = async () => {
+    if (!photo) return
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': photo.blob })])
+      toast.success('Foto copiada: cole na conversa (Ctrl+V) e depois o link.')
+    } catch {
+      toast.error('Este navegador não permite copiar imagens; use “Baixar foto”.')
+    }
+  }
   const [open, setOpen] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
   const [page, setPage] = useState(0)
@@ -269,25 +347,28 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
               </button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {link && (
-                <a
-                  className="inline-flex h-8 items-center rounded-md bg-[#25D366] px-3 text-[12.5px] font-medium text-[#fff] hover:brightness-95"
-                  href={`https://wa.me/?text=${encodeURIComponent(link)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  WhatsApp
-                </a>
-              )}
+              <button
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[12.5px] font-medium text-[#fff] hover:bg-emerald-700 disabled:opacity-50"
+                onClick={makePhoto}
+                disabled={!hasContent || !!working}
+                title="Gera uma foto do mapa (onde estão as ERBs) para enviar junto com o link"
+              >
+                <Camera className="h-4 w-4" /> Link com foto
+              </button>
               <button
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[12.5px] text-gray-800 hover:bg-gray-50"
                 onClick={() => exportSheet(current, radius, `${(title || 'Mapas_ERB').replace(/[^\w.-]+/g, '_').slice(0, 60)}.xlsx`)}
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel
               </button>
-              <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[12.5px] text-gray-800 hover:bg-gray-50" onClick={kml}>
-                <Download className="h-4 w-4 text-blue-600" /> KML
+              <button
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[12.5px] text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                onClick={makePdf}
+                disabled={!hasContent || !!working}
+              >
+                <FileText className="h-4 w-4 text-red-600" /> PDF
               </button>
+              {working && <span className="text-[12px] text-gray-500">{working}</span>}
             </div>
             {hasTimes && (
               <label className="mt-2 flex items-center gap-2 text-[12.5px] text-gray-600">
@@ -430,6 +511,33 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         </div>
       </aside>
 
+      {photo && (
+        <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/50 p-3" onMouseDown={() => (URL.revokeObjectURL(photo.url), setPhoto(null))}>
+          <div className="w-full max-w-3xl rounded-xl bg-[#fff] p-4 text-gray-900 shadow-2xl" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Link com foto">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[15px] font-semibold">Link com foto</div>
+              <button className="rounded p-1 text-gray-500 hover:bg-gray-100" onClick={() => (URL.revokeObjectURL(photo.url), setPhoto(null))} aria-label="Fechar">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <img src={photo.url} alt="Foto do mapa" className="max-h-[60vh] w-full rounded-lg border border-gray-200 object-contain" />
+            <p className="mt-2 text-[12px] text-gray-500">
+              A foto vai como imagem junto com o link (o link continua curto). No celular, “Compartilhar” envia os dois juntos para o WhatsApp ou outro app.
+            </p>
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <button className="h-9 rounded-md border border-gray-300 px-3 text-[13px]" onClick={copyPhoto}>
+                Copiar foto
+              </button>
+              <button className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px]" onClick={downloadPhoto}>
+                <Download className="h-4 w-4" /> Baixar foto
+              </button>
+              <button className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[13px] font-medium text-[#fff] hover:bg-blue-700" onClick={sharePhoto}>
+                <Share2 className="h-4 w-4" /> Compartilhar foto + link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ErbDocModals d={d} />
     </div>
   )

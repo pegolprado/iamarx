@@ -155,11 +155,11 @@ function MarkForm({ draft, onSave, onDelete, onClose }: { draft: Draft; onSave: 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="label">Latitude *</span>
-            <input className="w-full font-mono" placeholder="-23.55052" value={d.latText} onChange={(e) => setD({ ...d, latText: e.target.value })} />
+            <input className="w-full font-mono" value={d.latText} onChange={(e) => setD({ ...d, latText: e.target.value })} />
           </label>
           <label className="block">
             <span className="label">Longitude *</span>
-            <input className="w-full font-mono" placeholder="-46.63331" value={d.lonText} onChange={(e) => setD({ ...d, lonText: e.target.value })} />
+            <input className="w-full font-mono" value={d.lonText} onChange={(e) => setD({ ...d, lonText: e.target.value })} />
           </label>
         </div>
         {isErb && (

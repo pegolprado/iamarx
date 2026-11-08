@@ -487,6 +487,10 @@ test('MARX Mapas ERB público: sem login, painel fechado, antena e ponto digitad
   await page.waitForTimeout(800) // o link é recalculado 250 ms após a última alteração
   const link = await page.getByLabel('Link desta análise').inputValue()
   expect(link.length).toBeLessThan(260)
+  // link com foto: gera a imagem do mapa no navegador
+  await page.click('button:has-text("Link com foto")')
+  await expect(page.getByRole('dialog', { name: 'Link com foto' }).getByAltText('Foto do mapa')).toBeVisible({ timeout: 60_000 })
+  await page.click('button[aria-label="Fechar"]')
   // clicar no mapa fecha o painel
   await page.mouse.click(300, 500)
   await expect(page.getByLabel('Painel do Mapas ERB')).toBeHidden()

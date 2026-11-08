@@ -278,9 +278,9 @@ export function LocationMap({
         L.polyline([[k.lat, k.lon], dest(k.lat, k.lon, k.az, dist)], { color: '#ef4444', weight: 2.2, opacity: 0.95, interactive: false }).addTo(g)
       }
       const mk = L.marker([k.lat, k.lon], { icon: markIcon(k), zIndexOffset: 1000 })
-      if (k.kind === 'erb') mk.bindTooltip(esc(k.label), { permanent: true, direction: 'right', offset: [10, 0], className: 'erb-label' })
+      if (k.kind === 'erb') mk.bindTooltip(esc(k.label), { permanent: true, direction: 'bottom', offset: [0, 10], className: 'erb-label' })
       // nome sempre visível ao lado do ponto
-      else if (k.label) mk.bindTooltip(esc(k.label), { permanent: true, direction: 'right', offset: [14, -26], className: 'erb-label' })
+      else if (k.label) mk.bindTooltip(esc(k.label), { permanent: true, direction: 'bottom', offset: [0, 2], className: 'erb-label' })
       mk.on('click', () => onMark?.(i))
       mk.addTo(g)
     })
