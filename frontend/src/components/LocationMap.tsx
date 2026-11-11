@@ -90,6 +90,12 @@ export function sector(lat: number, lon: number, az: number, m: number, bw = 65)
   return pts
 }
 
+/** Pontos que delimitam o desenho de um ponto marcado (a ERB com o setor inteiro). */
+function markExtent(k: { lat: number; lon: number; kind: string; az?: number | null; dist?: number; beam?: number }, radius: number, beam: number): [number, number][] {
+  if (k.kind === 'erb' && k.az !== null && k.az !== undefined) return sector(k.lat, k.lon, k.az, k.dist || radius, k.beam || beam)
+  return [[k.lat, k.lon]]
+}
+
 type Base = 'mapa' | 'mapa2' | 'satelite'
 
 /**
@@ -225,7 +231,15 @@ export function LocationMap({
   useEffect(() => {
     const m = map.current
     if (!m || !towers.length) return
-    m.fitBounds(L.latLngBounds(towers.map((t) => [t.lat, t.lon] as [number, number])), { padding: [30, 30], maxZoom: 15, animate: false })
+    // enquadra as torres com o desenho dos setores, para a ERB ficar centralizada com o leque inteiro à vista
+    const pts: [number, number][] = []
+    for (const t of towers) {
+      pts.push([t.lat, t.lon])
+      if (showSectors) for (const c of t.cells) if (c.az !== null) pts.push(...sector(t.lat, t.lon, c.az, radius, beam))
+    }
+    for (const k of marks ?? []) if (!k.hidden) pts.push(...markExtent(k, radius, beam))
+    m.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 16, animate: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [towers])
   // sem torres da análise: enquadra os pontos marcados na primeira vez que aparecem
   const fittedMarks = useRef(false)
@@ -234,7 +248,7 @@ export function LocationMap({
     const vis = (marks ?? []).filter((k) => !k.hidden)
     if (!m || towers.length || !vis.length || fittedMarks.current) return
     fittedMarks.current = true
-    m.fitBounds(L.latLngBounds(vis.map((k) => [k.lat, k.lon] as [number, number])), { padding: [40, 40], maxZoom: 15, animate: false })
+    m.fitBounds(L.latLngBounds(vis.flatMap((k) => markExtent(k, radius, beam))), { padding: [40, 40], maxZoom: 16, animate: false })
   }, [marks, towers.length])
 
   // evento atual (seleção ou reprodução)
