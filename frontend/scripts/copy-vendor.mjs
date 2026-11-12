@@ -29,4 +29,11 @@ for (let i = 0, off = 0; off < wasm.length; i++, off += PART) {
   parts.push(`/vendor/duckdb/${sha.slice(0, 16)}/${name}`)
 }
 writeFileSync(join(dd, 'manifest.json'), JSON.stringify({ sha256: sha, size: wasm.length, parts }))
-console.log('vendor copiado: OCR em public/vendor/tesseract; DuckDB em', parts.length, 'partes')
+// FaceCompare (MarxCompare): modelos do @vladmandic/face-api servidos pelo próprio site
+const fa = join(root, 'public', 'vendor', 'faceapi')
+mkdirSync(fa, { recursive: true })
+const faSrc = join(nm, '@vladmandic', 'face-api', 'model')
+for (const n of ['ssd_mobilenetv1', 'face_landmark_68', 'face_recognition'])
+  for (const f of [`${n}_model-weights_manifest.json`, `${n}_model.bin`]) copyFileSync(join(faSrc, f), join(fa, f))
+
+console.log('vendor copiado: OCR em public/vendor/tesseract; DuckDB em', parts.length, 'partes; face-api em public/vendor/faceapi')

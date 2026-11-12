@@ -40,6 +40,7 @@ const InvWaLinks = lazy(() => import('./pages/invmarx/WaLinks'))
 const InvExtrato = lazy(() => import('./pages/invmarx/Extrato'))
 const InvMapasErb = lazy(() => import('./pages/invmarx/MapasErbTool'))
 const InvSteg = lazy(() => import('./pages/invmarx/Steg'))
+const InvFaceCompare = lazy(() => import('./pages/invmarx/FaceCompare'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="invmarx/extrato" element={<InvExtrato />} />
             <Route path="invmarx/mapas-erb" element={<InvMapasErb />} />
             <Route path="invmarx/secret" element={<InvSteg />} />
+            <Route path="invmarx/comparar-faces" element={<InvFaceCompare />} />
             <Route path="analise" element={<CaseLayout />}>
               <Route index element={<Overview />} />
               <Route path="alvos" element={<Targets />} />
