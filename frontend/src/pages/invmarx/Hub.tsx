@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, FileText, Map as MapIcon, MapPin, Network } from 'lucide-react'
+import { ChevronRight, Clock, FileText, Map as MapIcon, Network, ShieldCheck } from 'lucide-react'
 import { MarxLogo } from '../../components/brand'
 import { Link } from 'react-router-dom'
 import { Notice } from '../../components/ui'
@@ -33,11 +33,11 @@ export const INVMARX_TOOLS = [
     text: 'Plote antenas (com azimute, distância e abertura) e lugares colando dados do extrato em vários formatos; cada alteração gera um link único para a equipe abrir só clicando.',
   },
   {
-    to: '/analise/localizacao',
-    title: 'Localização do alvo (análise atual)',
-    icon: <MapPin />,
+    to: '/invmarx/secret',
+    title: 'MARX Secret — ocultar arquivo',
+    icon: <ShieldCheck />,
     tone: 'text-amber border-line bg-panel-2',
-    text: 'A mesma análise de localização sobre os arquivos já carregados na análise atual (bilhetagem, interceptação, cadastro de ERB).',
+    text: 'Esconda qualquer arquivo (documentos, planilhas, PDFs, ZIPs…), de qualquer tamanho, dentro de uma imagem, com senha (AES-256-GCM). A imagem continua abrindo normal; o conteúdo só volta com a senha.',
   },
 ]
 

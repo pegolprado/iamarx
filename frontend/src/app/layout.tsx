@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Monitor, Moon, Network, Settings, ShieldCheck, Sun, Users, Wrench, X } from 'lucide-react'
+import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Monitor, Moon, Network, Settings, ShieldCheck, Sun, Users, X } from 'lucide-react'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { NetworkBackground } from '../components/auth/NetworkBackground'
 import { BrandLockup } from '../components/brand'
-import { GAlert, GCore, GExport, GFiles, GGraph, GComms, GConsole, GMap, GOverview, GSignal, GTarget, GTower } from '../components/glyphs'
+import { GAlert, GCore, GExport, GFiles, GGraph, GComms, GConsole, GMap, GSignal, GTarget, GTower } from '../components/glyphs'
 import { DemoBanner, InModule } from '../components/ui'
 import { meta as engineMetaFn } from '../engine/analytics'
 import { APP_VERSION } from '../engine/normalize'
@@ -73,15 +73,12 @@ function NavSection({ label, children, aria }: { label: ReactNode; children: Rea
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { me } = useAuth()
   const ops = useOps()
-  const loc = useLocation()
-  const group = loc.pathname.startsWith(ANALYSIS) ? navGroup(loc.pathname) : null
   const initials = (me?.name ?? '?')
     .split(/\s+/)
     .slice(0, 2)
     .map((p) => p[0])
     .join('')
     .toUpperCase()
-  const counts: Record<string, number> = { Arquivos: ops.files, Bilhetagem: ops.cdr, Alertas: ops.alertsPending, 'WhatsApp e IPs': ops.wa + ops.access }
   return (
     <div className="flex min-h-full flex-col px-3 pt-4 pb-3">
       <Link to="/" onClick={onNavigate} className="rounded-md px-1.5 py-1 transition-colors hover:bg-white/[0.03]" aria-label="MARX Intelligence Pro — Workspace">
@@ -116,37 +113,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem to="/invmarx/mapas-erb" icon={<GMap />} onClick={onNavigate}>
             Mapas ERB
           </NavItem>
-        </NavSection>
-        <NavSection label="Workspace">
-          <NavItem to="/" end icon={<GOverview />} onClick={onNavigate}>
-            Workspace
+          <NavItem to="/invmarx/secret" icon={<ShieldCheck />} onClick={onNavigate}>
+            Ocultar arquivo
           </NavItem>
-          <NavItem to="/ferramentas" icon={<Wrench />} onClick={onNavigate}>
-            Catálogo de ferramentas
-          </NavItem>
-        </NavSection>
-        <NavSection
-          aria="Módulos da análise"
-          label={
-            <Link to={ANALYSIS} onClick={onNavigate} className="flex flex-1 items-center justify-between hover:text-muted">
-              Análise atual
-              {ops.hasData && <span className="h-1.5 w-1.5 rounded-full bg-ok" title="Há dados carregados nesta aba" />}
-            </Link>
-          }
-        >
-          {NAV.map((g) => (
-            <NavItem
-              key={g.label}
-              to={apath(g.sub[0][0])}
-              end={g.sub[0][0] === ''}
-              icon={g.icon}
-              onClick={onNavigate}
-              active={group === g}
-              count={counts[g.label] ? fmtInt(counts[g.label]) : undefined}
-            >
-              {g.label}
-            </NavItem>
-          ))}
         </NavSection>
         {me?.role === 'admin' && (
           <NavSection label="Administração">
@@ -559,6 +528,20 @@ export function CaseLayout() {
               <span className="text-accent uppercase">{sub[1]}</span>
             </>
           )}
+        </nav>
+        <nav className="scroll-x mb-4 flex gap-1 border-b border-line" aria-label="Módulos da análise">
+          {NAV.map((g) => (
+            <Link
+              key={g.label}
+              to={apath(g.sub[0][0])}
+              className={clsx(
+                '-mb-px shrink-0 border-b-2 px-3 py-2 text-[13px] whitespace-nowrap transition-colors duration-150',
+                group === g ? 'border-accent text-white' : 'border-transparent text-muted hover:text-text',
+              )}
+            >
+              {g.label}
+            </Link>
+          ))}
         </nav>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-3.5">

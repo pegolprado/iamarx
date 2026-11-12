@@ -9,7 +9,7 @@ async function login(page: Page) {
   await page.fill('input[type=email]', EMAIL)
   await page.fill('input[type=password]', PASSWORD)
   await page.click('form button.btn-primary')
-  await expect(page.getByRole('heading', { name: 'Workspace investigativo' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Ferramentas INVMARX' })).toBeVisible()
 }
 
 // telas agrupadas: [grupo na barra principal, tela na sub-barra]
@@ -39,7 +39,7 @@ test('fluxo completo: demonstração, telas, exportação e apagamento ao sair',
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('dialog', (d) => d.accept())
   await login(page)
-
+  await page.goto('/workspace')
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
@@ -93,7 +93,7 @@ test('fluxo completo: demonstração, telas, exportação e apagamento ao sair',
 
 test('carregar arquivo do computador e importar pelo assistente', async ({ page }) => {
   await login(page)
-  await page.click('text=Análise atual')
+  await page.goto('/analise')
   await tab(page, 'Arquivos')
   const lines = ['Origem;Destino;Data;Hora;Duração;Tipo;LAC;CI']
   for (let i = 0; i < 2000; i++) {
@@ -137,13 +137,14 @@ test('administrador cadastra usuário, que ativa a conta pelo link e entra', asy
   await other.fill('input[type=email]', novo)
   await other.fill('input[type=password]', 'SenhaDaAna2026')
   await other.click('form button.btn-primary')
-  await expect(other.getByRole('heading', { name: 'Workspace investigativo' })).toBeVisible()
+  await expect(other.getByRole('link', { name: 'Ferramentas INVMARX' })).toBeVisible()
   await expect(other.getByText('Usuários', { exact: true })).toHaveCount(0)
 })
 
 test('ocultar números na tela e bloquear a tela sem perder a análise', async ({ page }) => {
   page.on('dialog', (d) => d.accept())
   await login(page)
+  await page.goto('/workspace')
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
   await tab(page, 'Contatos')
@@ -173,6 +174,7 @@ test('ocultar números na tela e bloquear a tela sem perder a análise', async (
 test('WhatsApp Records: importação automática, IPs em comum, grupos e exportação', async ({ page }) => {
   page.on('dialog', (d) => d.accept())
   await login(page)
+  await page.goto('/workspace')
   // demonstração já traz o WhatsApp do alvo A e IP de dados do alvo B em comum
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
@@ -201,6 +203,7 @@ test('análise completa e vínculos: tudo calculado de uma vez a partir da impor
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('dialog', (d) => d.accept())
   await login(page)
+  await page.goto('/workspace')
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
@@ -246,6 +249,7 @@ test('WhatsApp: dados cadastrais e agenda; logs de acesso com correlação de IP
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('dialog', (d) => d.accept())
   await login(page)
+  await page.goto('/workspace')
   await page.click('text=Gerar análise de demonstração')
   await expect(page.getByText('Registros considerados')).toBeVisible()
 
@@ -280,7 +284,7 @@ test('extrato de interceptação com coordenadas: importa, plota as ERBs e compa
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('dialog', (d) => d.accept())
   await login(page)
-  await page.click('text=Análise atual')
+  await page.goto('/analise')
   await tab(page, 'Arquivos')
   // mesmo layout das exportações de interceptação (dados fictícios)
   const head =
@@ -530,6 +534,6 @@ test('cadastro pela tela de acesso: aguarda liberação do administrador e depoi
   await expect(page.locator('tr', { hasText: novo }).getByText('ativo', { exact: true })).toBeVisible()
 
   await p.click('form button.btn-primary')
-  await expect(p.getByText('WORKSPACE INVESTIGATIVO')).toBeVisible({ timeout: 30_000 })
+  await expect(p.getByRole('link', { name: 'Ferramentas INVMARX' })).toBeVisible({ timeout: 30_000 })
   await ctx.close()
 })
