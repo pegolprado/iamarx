@@ -113,10 +113,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem to="/invmarx/mapas-erb" icon={<GMap />} onClick={onNavigate}>
             Mapas ERB
           </NavItem>
-          <NavItem to="/invmarx/secret" icon={<ShieldCheck />} onClick={onNavigate}>
+        </NavSection>
+        <NavSection
+          label={
+            <Link to="/marxtool" onClick={onNavigate} className="flex-1 hover:text-muted">
+              MARXTOOL
+            </Link>
+          }
+        >
+          <NavItem to="/marxtool/secret" icon={<ShieldCheck />} onClick={onNavigate}>
             Ocultar arquivo
           </NavItem>
-          <NavItem to="/invmarx/comparar-faces" icon={<ScanFace />} onClick={onNavigate}>
+          <NavItem to="/marxtool/compare" icon={<ScanFace />} onClick={onNavigate}>
             MarxCompare
           </NavItem>
         </NavSection>

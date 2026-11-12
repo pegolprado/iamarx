@@ -9,11 +9,16 @@
 import type * as FaceApi from '@vladmandic/face-api'
 
 type FA = typeof FaceApi
+const URL = '/vendor/faceapi'
 let faPromise: Promise<FA> | null = null
-let loaded = false
+let recogPromise: Promise<void> | null = null
 
-/** Carrega a biblioteca e os modelos uma única vez. */
-export async function loadFace(onStatus?: (s: string) => void): Promise<FA> {
+/**
+ * Carrega a biblioteca e os modelos leves (detector rápido TinyFaceDetector 0,19 MB + 68 pontos).
+ * O modelo de reconhecimento (descritor, 6,2 MB) só é carregado quando `descriptor` é pedido
+ * (modalidade de identidade), para a modalidade de semelhança abrir muito mais rápido.
+ */
+export async function loadFace(onStatus?: (s: string) => void, descriptor = false): Promise<FA> {
   if (!faPromise)
     faPromise = (async () => {
       onStatus?.('Carregando o motor de análise facial…')
@@ -26,29 +31,34 @@ export async function loadFace(onStatus?: (s: string) => void): Promise<FA> {
       } catch {
         ok = false
       }
-      if (!ok) {
+      if (!ok)
         try {
           await tf.setBackend('cpu')
         } catch {
           /* mantém o backend que houver */
         }
-      }
       await tf.ready?.()
       onStatus?.('Carregando os modelos…')
-      const url = '/vendor/faceapi'
-      await Promise.all([fa.nets.ssdMobilenetv1.loadFromUri(url), fa.nets.faceLandmark68Net.loadFromUri(url), fa.nets.faceRecognitionNet.loadFromUri(url)])
-      loaded = true
+      await Promise.all([fa.nets.tinyFaceDetector.loadFromUri(URL), fa.nets.faceLandmark68Net.loadFromUri(URL)])
       return fa
     })()
-  return faPromise
+  const fa = await faPromise
+  if (descriptor) {
+    if (!recogPromise) {
+      onStatus?.('Carregando o modelo de identidade…')
+      recogPromise = fa.nets.faceRecognitionNet.loadFromUri(URL)
+    }
+    await recogPromise
+  }
+  return fa
 }
-export const faceReady = () => loaded
+export const faceReady = () => !!faPromise
 
 export type Landmark = { x: number; y: number }
 export type DetectedFace = {
   box: { x: number; y: number; width: number; height: number }
   landmarks: Landmark[] // 68 pontos
-  descriptor: Float32Array // 128 dimensões
+  descriptor: Float32Array | null // 128 dimensões (só na modalidade de identidade)
   score: number // confiança da detecção (0–1)
 }
 export type ImageQuality = {
@@ -60,15 +70,16 @@ export type ImageQuality = {
   warnings: string[]
 }
 
-/** Detecta todos os rostos de uma imagem (com pontos e descritor). */
-export async function detectFaces(fa: FA, img: HTMLImageElement | HTMLCanvasElement): Promise<DetectedFace[]> {
-  const opts = new fa.SsdMobilenetv1Options({ minConfidence: 0.3 })
-  const res = await fa.detectAllFaces(img, opts).withFaceLandmarks().withFaceDescriptors()
+/** Detecta todos os rostos de uma imagem (com pontos; com descritor quando `descriptor` = true). */
+export async function detectFaces(fa: FA, img: HTMLImageElement | HTMLCanvasElement, descriptor = true): Promise<DetectedFace[]> {
+  const opts = new fa.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 })
+  const base = fa.detectAllFaces(img, opts).withFaceLandmarks()
+  const res: any[] = descriptor ? await base.withFaceDescriptors() : await base
   return res
     .map((r) => ({
       box: { x: r.detection.box.x, y: r.detection.box.y, width: r.detection.box.width, height: r.detection.box.height },
-      landmarks: r.landmarks.positions.map((p) => ({ x: p.x, y: p.y })),
-      descriptor: r.descriptor,
+      landmarks: r.landmarks.positions.map((p: Landmark) => ({ x: p.x, y: p.y })),
+      descriptor: r.descriptor ?? null,
       score: r.detection.score,
     }))
     .sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height)
@@ -89,21 +100,34 @@ export function descriptorDistance(a: Float32Array, b: Float32Array): number {
  * (distância ≈ 0.6 como fronteira). Valores apenas indicativos, nunca prova de identidade.
  */
 export function distanceToSimilarity(dist: number): number {
-  const MATCH = 0.4 // bem parecidos
-  const LIMIT = 0.6 // fronteira usual
-  let pct: number
-  if (dist <= MATCH)
-    pct = 100 - (dist / MATCH) * 20 // 0→100 ; 0.4→80
-  else if (dist <= LIMIT)
-    pct = 80 - ((dist - MATCH) / (LIMIT - MATCH)) * 30 // 0.4→80 ; 0.6→50
-  else pct = Math.max(0, 50 - ((dist - LIMIT) / 0.6) * 50) // 0.6→50 ; 1.2→0
-  return Math.round(pct * 100) / 100
+  // curva por âncoras (distância → semelhança%): suave e intuitiva, sem inflar como apps comerciais.
+  // O limiar de decisão do modelo fica ~0,6; abaixo disso cresce a chance de ser a mesma pessoa.
+  const pts: [number, number][] = [
+    [0, 100],
+    [0.2, 92],
+    [0.35, 82],
+    [0.5, 70],
+    [0.6, 60],
+    [0.75, 42],
+    [0.9, 26],
+    [1.1, 8],
+    [1.3, 0],
+  ]
+  if (dist <= 0) return 100
+  for (let i = 1; i < pts.length; i++) {
+    if (dist <= pts[i][0]) {
+      const [x0, y0] = pts[i - 1]
+      const [x1, y1] = pts[i]
+      return Math.round((y0 + ((dist - x0) / (x1 - x0)) * (y1 - y0)) * 100) / 100
+    }
+  }
+  return 0
 }
 
 export type Verdict = 'alta' | 'media' | 'baixa'
 export function verdictFor(dist: number): Verdict {
   if (dist <= 0.45) return 'alta'
-  if (dist <= 0.6) return 'media'
+  if (dist <= 0.62) return 'media'
   return 'baixa'
 }
 

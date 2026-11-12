@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, FileText, Map as MapIcon, Network, ScanFace, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Clock, FileText, Map as MapIcon, Network } from 'lucide-react'
 import { MarxLogo } from '../../components/brand'
 import { Link } from 'react-router-dom'
 import { Notice } from '../../components/ui'
@@ -31,20 +31,6 @@ export const INVMARX_TOOLS = [
     icon: <MapIcon />,
     tone: 'text-violet border-line bg-panel-2',
     text: 'Plote antenas (com azimute, distância e abertura) e lugares colando dados do extrato em vários formatos; cada alteração gera um link único para a equipe abrir só clicando.',
-  },
-  {
-    to: '/invmarx/comparar-faces',
-    title: 'MarxCompare — comparação facial',
-    icon: <ScanFace />,
-    tone: 'text-teal border-line bg-panel-2',
-    text: 'Compara dois rostos no próprio navegador (nada é enviado): modalidade de identidade (compatibilidade biométrica) e de semelhança visual (formatos e proporções), com caixa, pontos e relatório em PDF.',
-  },
-  {
-    to: '/invmarx/secret',
-    title: 'MARX Secret — ocultar arquivo',
-    icon: <ShieldCheck />,
-    tone: 'text-amber border-line bg-panel-2',
-    text: 'Esconda qualquer arquivo (documentos, planilhas, PDFs, ZIPs…), de qualquer tamanho, dentro de uma imagem, com senha (AES-256-GCM). Modo “resistente a redes sociais” grava uma mensagem curta que sobrevive ao WhatsApp/Instagram.',
   },
 ]
 

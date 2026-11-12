@@ -52,7 +52,7 @@ test('modo resistente: grava, recomprime como rede social e lê de volta', async
   await page.fill('input[type=password]', 'Teste!Marx2026')
   await page.click('form button.btn-primary')
   await expect(page.getByRole('link', { name: 'Ferramentas INVMARX' })).toBeVisible()
-  await page.goto('/invmarx/secret')
+  await page.goto('/marxtool/secret')
   await page.getByRole('tab', { name: 'Resistente a redes sociais' }).click()
   await page.getByRole('button', { name: 'Gravar mensagem' }).click()
   await page.locator('input[type=file][accept*="image"]').setInputFiles(`${TMP}/foto.png`)

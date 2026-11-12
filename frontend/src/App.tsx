@@ -41,6 +41,7 @@ const InvExtrato = lazy(() => import('./pages/invmarx/Extrato'))
 const InvMapasErb = lazy(() => import('./pages/invmarx/MapasErbTool'))
 const InvSteg = lazy(() => import('./pages/invmarx/Steg'))
 const InvFaceCompare = lazy(() => import('./pages/invmarx/FaceCompare'))
+const MarxToolHub = lazy(() => import('./pages/marxtool/Hub'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -81,8 +82,9 @@ export default function App() {
             <Route path="invmarx/whatsapp-vinculos" element={<InvWaLinks />} />
             <Route path="invmarx/extrato" element={<InvExtrato />} />
             <Route path="invmarx/mapas-erb" element={<InvMapasErb />} />
-            <Route path="invmarx/secret" element={<InvSteg />} />
-            <Route path="invmarx/comparar-faces" element={<InvFaceCompare />} />
+            <Route path="marxtool" element={<MarxToolHub />} />
+            <Route path="marxtool/secret" element={<InvSteg />} />
+            <Route path="marxtool/compare" element={<InvFaceCompare />} />
             <Route path="analise" element={<CaseLayout />}>
               <Route index element={<Overview />} />
               <Route path="alvos" element={<Targets />} />

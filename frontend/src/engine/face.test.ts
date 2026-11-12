@@ -7,16 +7,16 @@ describe('MarxCompare — motor facial (cálculos)', () => {
     const a = vec((i) => Math.sin(i))
     expect(descriptorDistance(a, a)).toBe(0)
     expect(distanceToSimilarity(0)).toBe(100)
-    expect(distanceToSimilarity(0.4)).toBeCloseTo(80, 1)
-    expect(distanceToSimilarity(0.6)).toBeCloseTo(50, 1)
-    expect(distanceToSimilarity(1.2)).toBe(0)
+    expect(distanceToSimilarity(0.2)).toBeCloseTo(92, 1)
+    expect(distanceToSimilarity(0.6)).toBeCloseTo(60, 1)
+    expect(distanceToSimilarity(1.3)).toBe(0)
     // monotônica decrescente
     expect(distanceToSimilarity(0.3)).toBeGreaterThan(distanceToSimilarity(0.5))
   })
 
   it('veredito por faixa de distância', () => {
     expect(verdictFor(0.3)).toBe('alta')
-    expect(verdictFor(0.5)).toBe('media')
+    expect(verdictFor(0.6)).toBe('media')
     expect(verdictFor(0.9)).toBe('baixa')
   })
 

@@ -97,10 +97,11 @@ export default function FaceCompare() {
     setResult(null)
     setBusy('Analisando a imagem…')
     try {
-      const fa = await loadFace(setBusy)
+      const needDesc = mode === 'identidade'
+      const fa = await loadFace(setBusy, needDesc)
       const { img, canvas, url } = await loadImage(file)
       setBusy('Detectando rostos…')
-      const faces = await detectFaces(fa, canvas)
+      const faces = await detectFaces(fa, canvas, needDesc)
       if (!faces.length) {
         URL.revokeObjectURL(url)
         return toast.error('Nenhum rosto detectado nesta imagem. Use uma foto nítida, de frente.')
@@ -121,19 +122,32 @@ export default function FaceCompare() {
     if (mode === 'identidade' && !consent) return toast.error('Confirme o consentimento para a análise de identidade.')
     setBusy('Comparando…')
     try {
-      const fa = slots[0]!.faces[slots[0]!.pick]
-      const fb = slots[1]!.faces[slots[1]!.pick]
-      const dist = descriptorDistance(fa.descriptor, fb.descriptor)
+      let s0 = a
+      let s1 = b
+      // na modalidade de identidade precisamos do descritor; se a foto foi analisada no modo
+      // semelhança (sem descritor), re-analisa agora carregando o modelo de identidade.
+      if (mode === 'identidade' && (!a.faces[a.pick].descriptor || !b.faces[b.pick].descriptor)) {
+        const fa = await loadFace(setBusy, true)
+        const redo = async (s: Slot) => (s.faces[s.pick].descriptor ? s : { ...s, faces: await detectFaces(fa, s.canvas, true), pick: 0 })
+        s0 = await redo(a)
+        s1 = await redo(b)
+        setSlots((prev) => prev.map((s, k) => (k === 0 ? s0 : k === 1 ? s1 : s)))
+      }
+      const fa = s0.faces[s0.pick]
+      const fb = s1.faces[s1.pick]
+      const dist = fa.descriptor && fb.descriptor ? descriptorDistance(fa.descriptor, fb.descriptor) : null
       setResult({
         mode,
         at: new Date(),
         distance: dist,
-        similarity: distanceToSimilarity(dist),
-        verdict: verdictFor(dist),
+        similarity: dist === null ? null : distanceToSimilarity(dist),
+        verdict: dist === null ? null : verdictFor(dist),
         traits: compareVisual(faceMetrics(fa.landmarks), faceMetrics(fb.landmarks)),
-        quality: [a.quality, b.quality],
-        imgs: [renderFace(a).toDataURL('image/jpeg', 0.85), renderFace(b).toDataURL('image/jpeg', 0.85)],
+        quality: [s0.quality, s1.quality],
+        imgs: [renderFace(s0).toDataURL('image/jpeg', 0.85), renderFace(s1).toDataURL('image/jpeg', 0.85)],
       })
+    } catch (e: any) {
+      toast.error(`Falha ao comparar: ${e?.message ?? e}`)
     } finally {
       setBusy(null)
     }
@@ -213,9 +227,9 @@ export default function FaceCompare() {
 type CompareResult = {
   mode: Mode
   at: Date
-  distance: number
-  similarity: number
-  verdict: Verdict
+  distance: number | null
+  similarity: number | null
+  verdict: Verdict | null
   traits: Trait[]
   quality: [ImageQuality, ImageQuality]
   imgs: [string, string]
@@ -344,7 +358,7 @@ function Report({ r }: { r: CompareResult }) {
     doc.addImage(r.imgs[1], 'JPEG', W - 14 - iw, 34, iw, ih)
     let y = 34 + ih + 8
     doc.setTextColor(20)
-    if (r.mode === 'identidade') {
+    if (r.mode === 'identidade' && r.distance !== null && r.similarity !== null && r.verdict !== null) {
       doc.setFontSize(12)
       doc.text(`Nível de semelhança: ${r.similarity.toFixed(1)}%  ·  distância do descritor: ${r.distance.toFixed(3)}`, 14, y)
       y += 6
@@ -395,7 +409,7 @@ function Report({ r }: { r: CompareResult }) {
         ))}
       </div>
 
-      {r.mode === 'identidade' ? (
+      {r.mode === 'identidade' && r.distance !== null && r.verdict !== null && r.similarity !== null ? (
         <div className="space-y-2">
           <div className="rounded-xl border border-line bg-ink-2 p-4 text-center">
             <div className="text-xs tracking-wide text-muted uppercase">Nível de semelhança</div>
