@@ -37,7 +37,7 @@ export const INVMARX_TOOLS = [
     title: 'MARX Secret — ocultar arquivo',
     icon: <ShieldCheck />,
     tone: 'text-amber border-line bg-panel-2',
-    text: 'Esconda qualquer arquivo (documentos, planilhas, PDFs, ZIPs…), de qualquer tamanho, dentro de uma imagem, com senha (AES-256-GCM). A imagem continua abrindo normal; o conteúdo só volta com a senha.',
+    text: 'Esconda qualquer arquivo (documentos, planilhas, PDFs, ZIPs…), de qualquer tamanho, dentro de uma imagem, com senha (AES-256-GCM). Modo “resistente a redes sociais” grava uma mensagem curta que sobrevive ao WhatsApp/Instagram.',
   },
 ]
 

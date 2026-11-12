@@ -1,8 +1,9 @@
-import { Download, Eye, EyeOff, FileUp, Image as ImageIcon, KeyRound, Lock, RefreshCw, ShieldCheck, Trash2, Unlock } from 'lucide-react'
+import { Download, Eye, EyeOff, FileUp, Image as ImageIcon, KeyRound, Lock, Radio, RefreshCw, ShieldCheck, Trash2, Unlock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Notice } from '../../components/ui'
 import { hideFile, inspect, revealFile } from '../../engine/steg'
+import { decodeRobustImage, encodeRobustImage, robustSecretLimit } from '../../engine/stegRobust'
 import { ToolTitle } from './common'
 
 const fmtBytes = (n: number) =>
@@ -30,19 +31,21 @@ const STR_LABEL = ['muito fraca', 'fraca', 'razoável', 'boa', 'forte']
 const STR_COLOR = ['#ef4444', '#f59e0b', '#eab308', '#84cc16', '#22c55e']
 
 export default function Steg() {
-  const [tab, setTab] = useState<'ocultar' | 'revelar'>('ocultar')
+  const [tab, setTab] = useState<'ocultar' | 'revelar' | 'robusto'>('ocultar')
   return (
     <div className="space-y-4">
-      <ToolTitle icon={<ShieldCheck />} title="MARX Secret — ocultar arquivo em imagem" />
+      <ToolTitle icon={<ShieldCheck />} title="MARX Secret — ocultar em imagem" />
       <p className="max-w-3xl text-[13.5px] text-muted">
-        Esconda qualquer arquivo (documentos, planilhas, PDFs, ZIPs…), de qualquer tamanho, dentro de uma imagem. A imagem continua abrindo normalmente; o conteúdo vai
-        criptografado (AES-256-GCM) e só volta com a senha. Tudo é feito no seu navegador e nada é enviado para servidor nenhum.
+        Dois modos: <b className="text-text">Arquivo</b> esconde qualquer arquivo, de qualquer tamanho, dentro de uma imagem (ideal para guardar ou enviar como anexo).{' '}
+        <b className="text-text">Resistente a redes sociais</b> grava uma mensagem curta que sobrevive mesmo quando a foto é reenviada pelo WhatsApp/Instagram. Tudo é feito no seu
+        navegador, com senha (AES-256-GCM), e nada é enviado para servidor nenhum.
       </p>
-      <div className="grid max-w-md grid-cols-2 rounded-lg border border-line bg-ink-2 p-1 text-sm" role="tablist">
+      <div className="grid max-w-2xl grid-cols-3 rounded-lg border border-line bg-ink-2 p-1 text-sm" role="tablist">
         {(
           [
             ['ocultar', 'Ocultar arquivo', <Lock key="l" className="h-4 w-4" />],
             ['revelar', 'Revelar arquivo', <Unlock key="u" className="h-4 w-4" />],
+            ['robusto', 'Resistente a redes sociais', <Radio key="r" className="h-4 w-4" />],
           ] as const
         ).map(([id, label, icon]) => (
           <button
@@ -50,18 +53,189 @@ export default function Steg() {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`flex items-center justify-center gap-2 rounded-md py-1.5 font-medium transition-colors ${tab === id ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'}`}
+            className={`flex items-center justify-center gap-2 rounded-md px-2 py-1.5 text-center font-medium transition-colors ${tab === id ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'}`}
           >
             {icon}
+            <span className="truncate">{label}</span>
+          </button>
+        ))}
+      </div>
+      {tab === 'ocultar' && <Hide />}
+      {tab === 'revelar' && <Reveal />}
+      {tab === 'robusto' && <Robust />}
+      {tab === 'robusto' ? (
+        <Notice tone="amber">
+          Modo resistente: grava uma <b>mensagem curta</b> (até ~{robustSecretLimit(true)} caracteres com senha) na própria textura da foto, para sobreviver à recompressão das
+          redes sociais. A recuperação é muito provável, mas não 100% garantida — cada rede comprime de um jeito, e recorte de foto (feed do Instagram) ainda pode apagar. Envie a
+          foto no tamanho em que foi gerada, sem cortar.
+        </Notice>
+      ) : (
+        <Notice tone="amber">
+          Guarde a senha: sem ela o conteúdo não volta, nem por nós. Modo Arquivo: evite reenviar a imagem por apps que recomprimem fotos (WhatsApp, Instagram), pois apagam o
+          conteúdo — envie o arquivo original (anexo/documento) ou um ZIP. Para enviar por foto, use o modo “Resistente a redes sociais”.
+        </Notice>
+      )}
+    </div>
+  )
+}
+
+function Robust() {
+  const [sub, setSub] = useState<'gravar' | 'ler'>('gravar')
+  return (
+    <div className="space-y-4">
+      <div className="grid max-w-xs grid-cols-2 rounded-lg border border-line bg-ink-2 p-1 text-sm">
+        {(
+          [
+            ['gravar', 'Gravar mensagem'],
+            ['ler', 'Ler mensagem'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSub(id)}
+            className={`rounded-md py-1.5 font-medium transition-colors ${sub === id ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'}`}
+          >
             {label}
           </button>
         ))}
       </div>
-      {tab === 'ocultar' ? <Hide /> : <Reveal />}
-      <Notice tone="amber">
-        Guarde a senha: sem ela o conteúdo não volta, nem por nós. Evite reenviar a imagem por apps que recomprimem fotos (WhatsApp, Instagram): eles podem apagar o conteúdo
-        oculto. Para enviar, use o arquivo original (anexo/documento) ou um ZIP.
-      </Notice>
+      {sub === 'gravar' ? <RobustWrite /> : <RobustRead />}
+    </div>
+  )
+}
+
+function RobustWrite() {
+  const [img, setImg] = useState<File | null>(null)
+  const [msg, setMsg] = useState('')
+  const [encrypt, setEncrypt] = useState(true)
+  const [pwd, setPwd] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const limit = robustSecretLimit(encrypt)
+  const bytes = new TextEncoder().encode(msg).length
+
+  const run = async () => {
+    if (!img) return toast.error('Escolha a imagem.')
+    if (!msg.trim()) return toast.error('Escreva a mensagem a gravar.')
+    if (bytes > limit) return toast.error(`A mensagem passou do limite (${bytes}/${limit} bytes). Encurte.`)
+    if (encrypt) {
+      if (pwd.length < 4) return toast.error('Defina uma senha com pelo menos 4 caracteres.')
+      if (pwd !== confirm) return toast.error('As senhas não conferem.')
+    }
+    setBusy(true)
+    try {
+      const blob = await encodeRobustImage(img, new TextEncoder().encode(msg), encrypt ? pwd : undefined)
+      const base = img.name.replace(/\.[^.]+$/, '')
+      save(new Uint8Array(await blob.arrayBuffer()), `${base}_marx.jpg`, 'image/jpeg')
+      toast.success('Pronto! Foto gerada com a mensagem gravada. Envie-a sem cortar.')
+    } catch (e: any) {
+      toast.error(`Falha: ${e?.message ?? e}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <ImagePicker label="Imagem (foto)" file={img} onPick={setImg} onClear={() => setImg(null)} />
+      <div className="space-y-4">
+        <div className="card space-y-2 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Radio className="h-4 w-4 text-teal" /> Mensagem a gravar
+          </h2>
+          <textarea
+            value={msg}
+            onChange={(e) => setMsg(e.target.value)}
+            rows={4}
+            placeholder="Ex.: alvo, senha de um cofre, coordenadas, um recado curto…"
+            aria-label="Mensagem a gravar"
+            className="w-full resize-none"
+          />
+          <div className={`text-right text-xs ${bytes > limit ? 'text-danger' : 'text-faint'}`}>
+            {bytes}/{limit} bytes
+          </div>
+        </div>
+        <div className="card space-y-3 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Lock className="h-4 w-4 text-amber" /> Proteção
+          </h2>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={encrypt} onChange={(e) => setEncrypt(e.target.checked)} />
+            <span>
+              Criptografar com senha <span className="text-xs text-faint">(AES-256-GCM)</span>
+            </span>
+          </label>
+          {encrypt && <PasswordBox pwd={pwd} setPwd={setPwd} confirm={confirm} setConfirm={setConfirm} />}
+        </div>
+        <button className="btn-primary w-full" onClick={run} disabled={busy}>
+          {busy ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" /> Gravando…
+            </>
+          ) : (
+            <>
+              <Radio className="h-4 w-4" /> Gravar e baixar foto
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function RobustRead() {
+  const [img, setImg] = useState<File | null>(null)
+  const [pwd, setPwd] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const run = async () => {
+    if (!img) return toast.error('Escolha a imagem.')
+    setBusy(true)
+    setResult(null)
+    try {
+      const data = await decodeRobustImage(img, pwd || undefined)
+      if (!data) {
+        toast.error('Nenhuma mensagem robusta encontrada (ou a foto foi muito comprimida/cortada).')
+        return
+      }
+      setResult(new TextDecoder().decode(data))
+      toast.success('Mensagem recuperada.')
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <ImagePicker label="Foto com a mensagem" file={img} onPick={setImg} onClear={() => (setImg(null), setResult(null))} />
+      <div className="space-y-4">
+        <div className="card space-y-3 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <KeyRound className="h-4 w-4 text-amber" /> Senha (se houver)
+          </h2>
+          <PasswordBox pwd={pwd} setPwd={setPwd} />
+        </div>
+        <button className="btn-primary w-full" onClick={run} disabled={busy || !img}>
+          {busy ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" /> Lendo…
+            </>
+          ) : (
+            <>
+              <Radio className="h-4 w-4" /> Ler mensagem
+            </>
+          )}
+        </button>
+        {result !== null && (
+          <div className="card p-4">
+            <h3 className="mb-2 text-sm font-semibold text-ok">Mensagem recuperada</h3>
+            <p className="rounded-lg border border-line bg-ink-2 px-3 py-2 text-sm break-words whitespace-pre-wrap text-white">{result}</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
