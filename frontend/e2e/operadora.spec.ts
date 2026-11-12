@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test'
+test('MarxOperadora: consulta número e mostra DDD/UF/tipo', async ({ page }) => {
+  await page.goto('/login')
+  await page.fill('input[type=email]', 'admin@marx.local')
+  await page.fill('input[type=password]', 'Teste!Marx2026')
+  await page.click('form button.btn-primary')
+  await expect(page.getByRole('link', { name: 'Ferramentas INVMARX' })).toBeVisible()
+  await page.goto('/marxtool/operadora')
+  await expect(page.getByRole('heading', { name: /MarxOperadora/ })).toBeVisible()
+  await page.getByLabel('Número', { exact: true }).fill('(11) 98185-5165')
+  await page.getByRole('button', { name: 'Consultar número' }).click()
+  await expect(page.getByText('Celular (móvel)')).toBeVisible()
+  await expect(page.getByText(/São Paulo · Sudeste/)).toBeVisible()
+  await expect(page.getByText('carregue a base ANATEL')).toBeVisible()
+  // lote
+  await page.getByRole('tab', { name: 'Consulta em lote' }).click()
+  await page.getByLabel('Números').fill('(11) 98185-5165\n(21) 3030-4040\nxxx')
+  await page.getByRole('button', { name: 'Consultar números' }).click()
+  await expect(page.getByText(/3 números · 2 válidos/)).toBeVisible()
+})

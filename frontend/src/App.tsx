@@ -42,6 +42,7 @@ const InvMapasErb = lazy(() => import('./pages/invmarx/MapasErbTool'))
 const InvSteg = lazy(() => import('./pages/invmarx/Steg'))
 const InvFaceCompare = lazy(() => import('./pages/invmarx/FaceCompare'))
 const MarxToolHub = lazy(() => import('./pages/marxtool/Hub'))
+const MarxOperadora = lazy(() => import('./pages/marxtool/Operadora'))
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="marxtool" element={<MarxToolHub />} />
             <Route path="marxtool/secret" element={<InvSteg />} />
             <Route path="marxtool/compare" element={<InvFaceCompare />} />
+            <Route path="marxtool/operadora" element={<MarxOperadora />} />
             <Route path="analise" element={<CaseLayout />}>
               <Route index element={<Overview />} />
               <Route path="alvos" element={<Targets />} />

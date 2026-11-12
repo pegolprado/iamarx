@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Monitor, Moon, Network, ScanFace, Settings, ShieldCheck, Sun, Users, X } from 'lucide-react'
+import { Boxes, ChevronRight, Clock, EyeOff, FileText, Lock, LogOut, Menu, Monitor, Moon, Network, Radio, ScanFace, Settings, ShieldCheck, Sun, Users, X } from 'lucide-react'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { NetworkBackground } from '../components/auth/NetworkBackground'
@@ -126,6 +126,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </NavItem>
           <NavItem to="/marxtool/compare" icon={<ScanFace />} onClick={onNavigate}>
             MarxCompare
+          </NavItem>
+          <NavItem to="/marxtool/operadora" icon={<Radio />} onClick={onNavigate}>
+            MarxOperadora
           </NavItem>
         </NavSection>
         {me?.role === 'admin' && (

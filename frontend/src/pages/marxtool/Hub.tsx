@@ -1,4 +1,4 @@
-import { ChevronRight, ScanFace, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Radio, ScanFace, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export const MARXTOOL_TOOLS = [
@@ -15,6 +15,13 @@ export const MARXTOOL_TOOLS = [
     icon: <ShieldCheck />,
     tone: 'text-amber border-line bg-panel-2',
     text: 'Esconde qualquer arquivo (de qualquer tamanho) dentro de uma imagem, com senha (AES-256-GCM). Modo “resistente a redes sociais” grava uma mensagem curta que sobrevive ao WhatsApp/Instagram.',
+  },
+  {
+    to: '/marxtool/operadora',
+    title: 'MarxOperadora — consulta de número',
+    icon: <Radio />,
+    tone: 'text-ok border-line bg-panel-2',
+    text: 'DDD, região/UF e tipo (móvel/fixo) de qualquer número, no navegador. Operadora de origem com a base pública da ANATEL (carregada por você). Consulta individual e em lote.',
   },
 ]
 
