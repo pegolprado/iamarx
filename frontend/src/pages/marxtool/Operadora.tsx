@@ -29,19 +29,25 @@ export default function Operadora() {
   const [base, setBase] = useState<OperadoraBase | null>(memoBase)
   const [loading, setLoading] = useState(!memoBase)
 
-  // ao abrir, tenta recuperar a base guardada no navegador (IndexedDB)
+  // ao abrir: usa a base da sessão; senão a enviada pelo usuário (IndexedDB); senão a embutida no site.
   useEffect(() => {
     if (memoBase) return setLoading(false)
     let alive = true
     ;(async () => {
-      const text = await idbGet<string>(BASE_KEY)
-      if (alive && text) {
-        try {
-          memoBase = parseAnatelSmp(text)
-          if (alive) setBase(memoBase)
-        } catch {
-          /* ignora base inválida */
+      try {
+        const saved = await idbGet<string>(BASE_KEY)
+        if (saved) {
+          memoBase = parseAnatelSmp(saved)
+        } else {
+          const r = await fetch('/vendor/operadora/smp.txt.gz')
+          if (r.ok) {
+            const { gunzipSync } = await import('fflate')
+            memoBase = parseAnatelSmp(new TextDecoder('windows-1252').decode(gunzipSync(new Uint8Array(await r.arrayBuffer()))))
+          }
         }
+        if (alive && memoBase) setBase(memoBase)
+      } catch {
+        /* sem base embutida: segue só com DDD/região/tipo */
       }
       if (alive) setLoading(false)
     })()
@@ -59,8 +65,8 @@ export default function Operadora() {
     <div className="space-y-4">
       <ToolTitle icon={<Radio />} title="MarxOperadora — consulta de número" />
       <p className="max-w-3xl text-[13.5px] text-muted">
-        Identifica DDD, região/UF e tipo (móvel/fixo) de qualquer número brasileiro, no próprio navegador. A <b className="text-text">operadora de origem</b> aparece quando você
-        carrega a base pública da ANATEL (abaixo). Portabilidade pode ter mudado a operadora da faixa — o resultado é indicativo.
+        Identifica DDD, região/UF e tipo (móvel/fixo) de qualquer número brasileiro, no próprio navegador. A <b className="text-text">operadora de origem</b> já vem da base pública
+        da ANATEL embutida (você pode atualizar). Portabilidade pode ter mudado a operadora da faixa — o resultado é indicativo.
       </p>
 
       <OperadoraBaseLoader base={base} loading={loading} onBase={setBaseAll} />
@@ -135,9 +141,7 @@ function OperadoraBaseLoader({ base, loading, onBase }: { base: OperadoraBase | 
           <span className="text-faint">Operadora = origem da faixa (pode ter mudado por portabilidade).</span>
         </span>
       ) : (
-        <span className="text-muted">
-          Para ver a operadora, carregue a base pública da ANATEL (arquivo SMP — .zip ou .txt — de dados abertos). Fica salva no navegador; sem ela, mostramos DDD/região/tipo.
-        </span>
+        <span className="text-muted">A base da ANATEL não carregou agora; mostramos DDD/região/tipo. Você pode carregar o arquivo SMP (.zip/.txt) manualmente.</span>
       )}
       <button className="btn-ghost ml-auto !py-1.5 text-xs" onClick={() => input.current?.click()} disabled={busy || loading}>
         {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 text-accent" />} {base ? 'Atualizar base' : 'Carregar base ANATEL (.zip/.txt)'}

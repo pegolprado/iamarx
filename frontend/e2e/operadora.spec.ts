@@ -11,7 +11,9 @@ test('MarxOperadora: consulta número e mostra DDD/UF/tipo', async ({ page }) =>
   await page.getByRole('button', { name: 'Consultar número' }).click()
   await expect(page.getByText('Celular (móvel)')).toBeVisible()
   await expect(page.getByText(/São Paulo · Sudeste/)).toBeVisible()
-  await expect(page.getByText('carregue a base ANATEL')).toBeVisible()
+  // a base da ANATEL vem embutida e carrega sozinha: a operadora aparece
+  await expect(page.getByText(/Base ANATEL ativa/)).toBeVisible({ timeout: 60000 })
+  await expect(page.getByText('carregue a base ANATEL')).toHaveCount(0)
   // lote
   await page.getByRole('tab', { name: 'Consulta em lote' }).click()
   await page.getByLabel('Números').fill('(11) 98185-5165\n(21) 3030-4040\nxxx')

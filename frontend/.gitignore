@@ -1,5 +1,6 @@
 public/vendor/*
 !public/vendor/ipdb/
 !public/vendor/erbs/
+!public/vendor/operadora/
 test-results/
 playwright-report/
