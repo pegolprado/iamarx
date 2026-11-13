@@ -182,53 +182,90 @@ export function parsePhone(raw: string): PhoneInfo {
 export const waLink = (p: PhoneInfo) => (p.valid ? `https://wa.me/55${p.digits}` : null)
 export const tgLink = (p: PhoneInfo) => (p.valid ? `https://t.me/+55${p.digits}` : null)
 
-// ---- base de operadora (ANATEL), carregada pelo usuário ----
-export type OperadoraBase = { byPrefix: Map<string, string>; maxLen: number; count: number }
-
-const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-
-/**
- * Lê um CSV da ANATEL (prefixos ou portabilidade) e monta um índice prefixo→operadora.
- * Detecta de forma flexível a coluna de prefixo/EOT e a de operadora/prestadora. Cada linha vira
- * um prefixo nacional (DDD+faixa) apontando para a operadora.
- */
-export function parseOperadoraCsv(text: string): OperadoraBase {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim())
-  if (!lines.length) throw new Error('Arquivo vazio.')
-  const delim = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ';' : ','
-  const split = (l: string) => l.split(delim).map((c) => c.replace(/^"|"$/g, '').trim())
-  const head = split(lines[0]).map(norm)
-  const find = (...names: string[]) => head.findIndex((h) => names.some((n) => h.includes(n)))
-  const iOper = find('operadora', 'prestadora', 'empresa', 'detentora', 'eild', 'razao')
-  // colunas que ajudam a montar o prefixo nacional
-  const iDDD = find('cn', 'ddd', 'codigo nacional', 'codnac')
-  const iPref = find('prefixo', 'faixa', 'numero', 'telefone', 'msisdn', 'bloco')
-  if (iOper < 0 || (iPref < 0 && iDDD < 0)) throw new Error('CSV não reconhecido: faltam colunas de prefixo/DDD e operadora.')
-  const byPrefix = new Map<string, string>()
-  let maxLen = 0
-  for (let i = 1; i < lines.length; i++) {
-    const c = split(lines[i])
-    const oper = (c[iOper] || '').trim()
-    if (!oper) continue
-    let pref = ''
-    if (iDDD >= 0) pref += (c[iDDD] || '').replace(/\D/g, '')
-    if (iPref >= 0) pref += (c[iPref] || '').replace(/\D/g, '')
-    pref = pref.slice(0, 7)
-    if (pref.length < 3) continue
-    byPrefix.set(pref, oper)
-    if (pref.length > maxLen) maxLen = pref.length
-  }
-  if (!byPrefix.size) throw new Error('Nenhum prefixo válido encontrado no CSV.')
-  return { byPrefix, maxLen, count: byPrefix.size }
+/** Nome comercial curto a partir da razão social da ANATEL (ex.: "TELEFONICA BRASIL S.A." → "Vivo"). */
+export function prettyOperadora(name: string | null): string | null {
+  if (!name) return name
+  const u = name.toUpperCase()
+  if (u.includes('TELEFONICA') || u.includes('VIVO')) return 'Vivo'
+  if (u.startsWith('TIM')) return 'TIM'
+  if (u.includes('CLARO')) return 'Claro'
+  if (u.includes('ALGAR')) return 'Algar'
+  if (u.includes('SERCOMTEL')) return 'Sercomtel'
+  if (u.includes('BRISANET')) return 'Brisanet'
+  if (u.includes('SURF')) return 'Surf'
+  if (u.includes('ARQIA')) return 'Arqia'
+  if (u.includes('AMERICA NET')) return 'America Net'
+  // demais MVNOs: usa a razão social sem os sufixos de tipo societário
+  return name.replace(/\s+(S\/?A|S\.A\.?|LTDA|EIRELI|ME|EPP|SA)\b.*/i, '').trim() || name
 }
 
-/** Operadora de origem por casamento do maior prefixo (DDD+faixa). Null se não houver na base. */
-export function lookupOperadora(base: OperadoraBase | null, p: PhoneInfo): string | null {
-  if (!base || !p.valid) return null
-  const key = p.digits
-  for (let len = Math.min(base.maxLen, key.length); len >= 3; len--) {
-    const hit = base.byPrefix.get(key.slice(0, len))
-    if (hit) return hit
+// ---- base de operadora (ANATEL SMP), carregada pelo usuário ----
+// Formato oficial (txt, separado por ';', codificação latin-1):
+//   Nome da Prestadora;CNPJ;Código Nacional (DDD);Prefixo(5);Faixa Inicial(4);Faixa Final(4);Status
+// Cada linha é uma faixa de MCDU (últimos 4 dígitos) dentro de DDD+Prefixo → operadora de origem.
+export type OperadoraBase = {
+  groups: Map<string, { ini: Uint16Array; fim: Uint16Array; op: Uint16Array }>
+  ops: string[]
+  count: number
+}
+
+/** Lê o arquivo SMP da ANATEL (GERAL ou incremental) e monta o índice DDD+Prefixo → faixas. */
+export function parseAnatelSmp(text: string, into?: OperadoraBase): OperadoraBase {
+  const ops = into?.ops ?? []
+  const opId = new Map<string, number>()
+  ops.forEach((n, i) => opId.set(n, i))
+  // grupos temporários como arrays, depois compactados em TypedArray
+  const tmp = new Map<string, { ini: number[]; fim: number[]; op: number[] }>()
+  if (into) for (const [k, g] of into.groups) tmp.set(k, { ini: [...g.ini], fim: [...g.fim], op: [...g.op] })
+  let count = into?.count ?? 0
+  let nl = 0
+  const n = text.length
+  for (let i = 0; i < n; i = nl + 1) {
+    nl = text.indexOf('\n', i)
+    if (nl < 0) nl = n
+    const line = text[nl - 1] === '\r' ? text.slice(i, nl - 1) : text.slice(i, nl)
+    if (!line || line.charCodeAt(0) === 35) continue // vazia ou cabeçalho '#'
+    const p = line.split(';')
+    if (p.length < 7) continue
+    if (p[6].trim() !== '1') continue // só faixas ativas
+    const cn = p[2].trim()
+    const pref = p[3].trim()
+    if (cn.length !== 2 || pref.length !== 5) continue
+    const name = p[0].trim()
+    let id = opId.get(name)
+    if (id === undefined) {
+      id = ops.length
+      ops.push(name)
+      opId.set(name, id)
+    }
+    const key = cn + pref
+    let g = tmp.get(key)
+    if (!g) tmp.set(key, (g = { ini: [], fim: [], op: [] }))
+    g.ini.push(+p[4])
+    g.fim.push(+p[5])
+    g.op.push(id)
+    count++
   }
+  const groups = new Map<string, { ini: Uint16Array; fim: Uint16Array; op: Uint16Array }>()
+  for (const [k, g] of tmp) {
+    // ordena por início
+    const idx = g.ini.map((_, i) => i).sort((a, b) => g.ini[a] - g.ini[b])
+    groups.set(k, {
+      ini: Uint16Array.from(idx, (i) => g.ini[i]),
+      fim: Uint16Array.from(idx, (i) => g.fim[i]),
+      op: Uint16Array.from(idx, (i) => g.op[i]),
+    })
+  }
+  return { groups, ops, count }
+}
+
+/** Operadora de origem do número pela base ANATEL (respeita a faixa de MCDU). Null se não houver. */
+export function lookupOperadora(base: OperadoraBase | null, p: PhoneInfo): string | null {
+  if (!base || !p.valid || p.tipo !== 'movel') return null // a base SMP é só de celulares
+  const key = p.digits.slice(0, 7) // DDD(2) + Prefixo(5)
+  const mcdu = +p.digits.slice(7) // últimos 4 dígitos
+  const g = base.groups.get(key)
+  if (!g) return null
+  for (let i = 0; i < g.ini.length; i++) if (mcdu >= g.ini[i] && mcdu <= g.fim[i]) return base.ops[g.op[i]]
   return null
 }

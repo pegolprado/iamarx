@@ -1,13 +1,60 @@
 import { CheckCircle2, Delete, Download, FileText, MapPin, Radio, RefreshCw, Search, Signal, Smartphone, Upload, XCircle } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Notice } from '../../components/ui'
-import { type OperadoraBase, type PhoneInfo, lookupOperadora, parseOperadoraCsv, parsePhone, tgLink, waLink } from '../../engine/operadora'
+import { type OperadoraBase, type PhoneInfo, lookupOperadora, parseAnatelSmp, parsePhone, prettyOperadora, tgLink, waLink } from '../../engine/operadora'
+import { idbDel, idbGet, idbSet } from '../../lib/idb'
 import { ToolTitle } from '../invmarx/common'
+
+const BASE_KEY = 'anatel-smp-v1'
+// mantém a base em memória entre navegações de abas (evita reprocessar)
+let memoBase: OperadoraBase | null = null
+
+/** Lê os bytes de um arquivo .zip (ANATEL) ou .txt e devolve o texto (latin-1). */
+async function readSmpText(file: File): Promise<string> {
+  const buf = new Uint8Array(await file.arrayBuffer())
+  const dec = new TextDecoder('windows-1252')
+  if (buf[0] === 0x50 && buf[1] === 0x4b) {
+    const { unzipSync } = await import('fflate')
+    const files = unzipSync(buf, { filter: (f) => /\.txt$/i.test(f.name) })
+    const name = Object.keys(files)[0]
+    if (!name) throw new Error('O .zip não contém um arquivo .txt da ANATEL.')
+    return dec.decode(files[name])
+  }
+  return dec.decode(buf)
+}
 
 export default function Operadora() {
   const [tab, setTab] = useState<'individual' | 'lote'>('individual')
-  const [base, setBase] = useState<OperadoraBase | null>(null)
+  const [base, setBase] = useState<OperadoraBase | null>(memoBase)
+  const [loading, setLoading] = useState(!memoBase)
+
+  // ao abrir, tenta recuperar a base guardada no navegador (IndexedDB)
+  useEffect(() => {
+    if (memoBase) return setLoading(false)
+    let alive = true
+    ;(async () => {
+      const text = await idbGet<string>(BASE_KEY)
+      if (alive && text) {
+        try {
+          memoBase = parseAnatelSmp(text)
+          if (alive) setBase(memoBase)
+        } catch {
+          /* ignora base inválida */
+        }
+      }
+      if (alive) setLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const setBaseAll = (b: OperadoraBase | null) => {
+    memoBase = b
+    setBase(b)
+  }
+
   return (
     <div className="space-y-4">
       <ToolTitle icon={<Radio />} title="MarxOperadora — consulta de número" />
@@ -16,7 +63,7 @@ export default function Operadora() {
         carrega a base pública da ANATEL (abaixo). Portabilidade pode ter mudado a operadora da faixa — o resultado é indicativo.
       </p>
 
-      <OperadoraBaseLoader base={base} onBase={setBase} />
+      <OperadoraBaseLoader base={base} loading={loading} onBase={setBaseAll} />
 
       <div className="grid max-w-md grid-cols-2 rounded-lg border border-line bg-ink-2 p-1 text-sm" role="tablist">
         {(
@@ -48,43 +95,59 @@ export default function Operadora() {
   )
 }
 
-function OperadoraBaseLoader({ base, onBase }: { base: OperadoraBase | null; onBase: (b: OperadoraBase | null) => void }) {
+function OperadoraBaseLoader({ base, loading, onBase }: { base: OperadoraBase | null; loading: boolean; onBase: (b: OperadoraBase | null) => void }) {
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
-  const load = async (file: File) => {
+  const load = async (files: FileList) => {
     setBusy(true)
     try {
-      const text = new TextDecoder().decode(new Uint8Array(await file.arrayBuffer()))
-      const b = parseOperadoraCsv(text)
-      onBase(b)
-      toast.success(`Base de operadora carregada: ${b.count.toLocaleString('pt-BR')} faixas.`)
+      // GERAL primeiro, depois os incrementais (por nome/data); aplica um sobre o outro
+      const sorted = [...files].sort((a, b) => (a.name.includes('GERAL') ? -1 : b.name.includes('GERAL') ? 1 : a.name.localeCompare(b.name)))
+      const texts: string[] = []
+      let acc: OperadoraBase | undefined
+      for (const f of sorted) {
+        const text = await readSmpText(f)
+        texts.push(text)
+        acc = parseAnatelSmp(text, acc)
+      }
+      if (!acc || !acc.count) throw new Error('Nenhuma faixa válida encontrada (confira se é o arquivo SMP da ANATEL).')
+      onBase(acc)
+      await idbSet(BASE_KEY, texts.join('\n'))
+      toast.success(`Base ANATEL carregada: ${acc.count.toLocaleString('pt-BR')} faixas, ${acc.ops.length} operadoras. Fica salva no navegador.`)
     } catch (e: any) {
       toast.error(`Não foi possível ler a base: ${e?.message ?? e}`)
     } finally {
       setBusy(false)
     }
   }
+  const remove = () => {
+    onBase(null)
+    idbDel(BASE_KEY)
+  }
   return (
     <div className="card flex flex-wrap items-center gap-3 p-3 text-sm">
       <Signal className="h-4 w-4 shrink-0 text-accent" />
-      {base ? (
+      {loading ? (
+        <span className="text-muted">Recuperando a base salva…</span>
+      ) : base ? (
         <span className="text-ok">
-          Base de operadora ativa · {base.count.toLocaleString('pt-BR')} faixas (ANATEL). <span className="text-faint">Operadora = origem da faixa (pode ter portabilidade).</span>
+          Base ANATEL ativa · {base.count.toLocaleString('pt-BR')} faixas · {base.ops.length} operadoras.{' '}
+          <span className="text-faint">Operadora = origem da faixa (pode ter mudado por portabilidade).</span>
         </span>
       ) : (
         <span className="text-muted">
-          Operadora indisponível: carregue a base pública da ANATEL (CSV de prefixos/portabilidade, baixada de dados.gov.br). Sem ela, mostramos só DDD/região/tipo.
+          Para ver a operadora, carregue a base pública da ANATEL (arquivo SMP — .zip ou .txt — de dados abertos). Fica salva no navegador; sem ela, mostramos DDD/região/tipo.
         </span>
       )}
-      <button className="btn-ghost ml-auto !py-1.5 text-xs" onClick={() => input.current?.click()} disabled={busy}>
-        {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 text-accent" />} {base ? 'Trocar base' : 'Carregar base ANATEL (CSV)'}
+      <button className="btn-ghost ml-auto !py-1.5 text-xs" onClick={() => input.current?.click()} disabled={busy || loading}>
+        {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 text-accent" />} {base ? 'Atualizar base' : 'Carregar base ANATEL (.zip/.txt)'}
       </button>
       {base && (
-        <button className="btn-ghost !py-1.5 text-xs" onClick={() => onBase(null)}>
+        <button className="btn-ghost !py-1.5 text-xs" onClick={remove}>
           Remover
         </button>
       )}
-      <input ref={input} type="file" accept=".csv,.txt" className="hidden" onChange={(e) => (e.target.files?.[0] && load(e.target.files[0]), (e.target.value = ''))} />
+      <input ref={input} type="file" accept=".zip,.txt" multiple className="hidden" onChange={(e) => (e.target.files?.length && load(e.target.files), (e.target.value = ''))} />
     </div>
   )
 }
@@ -158,7 +221,7 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
 }
 
 function Resultado({ p, base }: { p: PhoneInfo; base: OperadoraBase | null }) {
-  const oper = lookupOperadora(base, p)
+  const oper = prettyOperadora(lookupOperadora(base, p))
   const wa = waLink(p)
   const tg = tgLink(p)
   return (
@@ -172,8 +235,14 @@ function Resultado({ p, base }: { p: PhoneInfo; base: OperadoraBase | null }) {
         <p className="text-sm text-danger">{p.erro}</p>
       ) : (
         <>
-          <Row icon={<Radio />} label="Operadora (origem da faixa)">
-            {oper ?? <span className="text-faint">{base ? 'faixa não encontrada na base' : 'carregue a base ANATEL'}</span>}
+          <Row icon={<Radio />} label="Operadora (origem da faixa · SMP)">
+            {oper ? (
+              <>
+                {oper} {p.tipo === 'movel' && <span className="text-xs text-faint">· Móvel (SMP)</span>}
+              </>
+            ) : (
+              <span className="text-faint">{!base ? 'carregue a base ANATEL' : p.tipo !== 'movel' ? 'base SMP cobre só celulares' : 'faixa não encontrada'}</span>
+            )}
           </Row>
           <Row icon={<Smartphone />} label="Tipo">
             {p.tipo === 'movel' ? 'Celular (móvel)' : 'Telefone fixo'}
