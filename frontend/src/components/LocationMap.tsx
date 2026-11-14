@@ -3,6 +3,7 @@ import L from 'leaflet'
 import { Layers, Maximize2, Minimize2, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { sectorIntersections } from '../lib/geo'
+import type { HomeWork } from '../lib/homework'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
 import { drawErbs, ERB_OPS, erbSitesIn } from './erbLayer'
@@ -125,6 +126,7 @@ export function LocationMap({
   layout = 'default',
   focus,
   onBackgroundClick,
+  places,
 }: {
   towers: Tower[]
   transitions: { a: [number, number]; b: [number, number]; n: number }[]
@@ -156,6 +158,8 @@ export function LocationMap({
   focus?: { lat: number; lon: number; key: number } | null
   /** clique numa área vazia do mapa */
   onBackgroundClick?: () => void
+  /** provável residência × trabalho (destaque no mapa) */
+  places?: HomeWork
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -171,6 +175,8 @@ export function LocationMap({
   const [erbOn, setErbOn] = useState(false)
   const [interOn, setInterOn] = useState(false)
   const interLayer = useRef<L.LayerGroup | null>(null)
+  const [placesOn, setPlacesOn] = useState(true)
+  const placesLayer = useRef<L.LayerGroup | null>(null)
   const [ops, setOps] = useState<Set<number>>(() => new Set([0, 1, 2, 3]))
   const [erbMsg, setErbMsg] = useState('')
   const [layersOpen, setLayersOpen] = useState(false)
@@ -320,6 +326,32 @@ export function LocationMap({
     for (const o of sectorIntersections(erbList))
       L.polygon(o.poly, { color: '#f59e0b', weight: 1, opacity: 0.9, fillColor: '#f59e0b', fillOpacity: 0.28, dashArray: '4 3', interactive: false }).addTo(g)
   }, [marks, interOn, radius, beam])
+  // provável residência × trabalho
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    placesLayer.current ??= L.layerGroup()
+    const g = placesLayer.current
+    g.clearLayers()
+    const list = [
+      places?.home ? { ...places.home, label: 'Provável residência', n: places.home.night, cls: 'hw-home', emoji: '\u{1F3E0}' } : null,
+      places?.work ? { ...places.work, label: 'Provável trabalho', n: places.work.day, cls: 'hw-work', emoji: '\u{1F4BC}' } : null,
+    ].filter(Boolean) as { lat: number; lon: number; label: string; n: number; cls: string; emoji: string }[]
+    if (!placesOn || !list.length) {
+      m.removeLayer(g)
+      return
+    }
+    g.addTo(m)
+    for (const h of list) {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="hw-badge ${h.cls}"><span class="hw-emoji">${h.emoji}</span><span>${h.label}</span><b>${h.n}</b></div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 34],
+      })
+      L.marker([h.lat, h.lon], { icon, zIndexOffset: 2000, interactive: false }).addTo(g)
+    }
+  }, [places, placesOn])
   useEffect(() => {
     const m = map.current
     if (!m || !onContext) return
@@ -493,6 +525,14 @@ export function LocationMap({
               <label className="flex cursor-pointer items-center gap-2 py-1 font-medium" title="Pinta onde os leques de duas ou mais ERBs se cruzam — área provável do alvo">
                 <input type="checkbox" checked={interOn} onChange={(e) => setInterOn(e.target.checked)} aria-label="Área provável" /> Área provável (interseção)
               </label>
+              {(places?.home || places?.work) && (
+                <label
+                  className="flex cursor-pointer items-center gap-2 py-1 font-medium"
+                  title="Estima casa (eventos à noite/madrugada) e trabalho (horário comercial) pelos horários dos pontos"
+                >
+                  <input type="checkbox" checked={placesOn} onChange={(e) => setPlacesOn(e.target.checked)} aria-label="Provável casa/trabalho" /> Provável casa/trabalho
+                </label>
+              )}
             </div>
           )}
         </div>

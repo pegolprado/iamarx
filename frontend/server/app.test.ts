@@ -80,16 +80,31 @@ beforeEach(() => {
 })
 
 describe('servidor de login', () => {
-  it('guarda somente usuários e não tem rotas de dados', async () => {
+  it('guarda só usuários e os mapas ERB de link curto (nenhuma rota de dados investigativos)', async () => {
     const c = await setupAdmin()
     const tables = db.raw
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all()
       .map((r: any) => r.name)
-    expect(new Set(tables)).toEqual(new Set(['users', 'reset_tokens', 'login_failures']))
+    // erb_maps guarda apenas o conteúdo (já comprimido) de um link do Mapas ERB público, criado
+    // sob demanda no botão "Gerar link curto". Nenhuma tabela de casos/arquivos/eventos.
+    expect(new Set(tables)).toEqual(new Set(['users', 'reset_tokens', 'login_failures', 'erb_maps']))
     await c.login('admin@marx.local', 'SenhaForte123')
     for (const p of ['/api/cases', '/api/files', '/api/events', '/api/reports', '/api/upload']) expect((await c.req('POST', p, {})).status).toBe(404)
     expect(db.raw.prepare('SELECT pw FROM users').get()).not.toHaveProperty('pw', expect.stringMatching(/SenhaForte/))
+  })
+
+  it('Mapas ERB: link curto guarda e recupera o conteúdo (público, sem login)', async () => {
+    await setupAdmin()
+    const c = new Client(env)
+    const created = await c.req('POST', '/api/erb', { data: 'z1.exemplo-de-conteudo' }, { 'x-csrf-token': 'erb' })
+    expect(created.status).toBe(200)
+    const id = created.body.id as string
+    expect(id).toMatch(/^[A-Za-z0-9]{6,16}$/)
+    const got = await c.req('GET', `/api/erb/${id}`)
+    expect(got.status).toBe(200)
+    expect(got.body.data).toBe('z1.exemplo-de-conteudo')
+    expect((await c.req('GET', '/api/erb/naoexiste123')).status).toBe(404)
   })
 
   it('funciona sem o cookie anti-CSRF (celular que não o guardou)', async () => {

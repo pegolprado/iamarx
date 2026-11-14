@@ -26,7 +26,8 @@ import { exportSheet } from '../lib/erbSheet'
 import { exportMapPdf, renderMapImage } from '../lib/mapImage'
 import { toast } from 'sonner'
 import { fmtDateTime, fmtInt } from '../lib/format'
-import { decryptMap, decryptMapOpen, isErbHost, isOpenLink, type SharedMap, WrongPassword } from '../lib/shareMap'
+import { estimateHomeWork } from '../lib/homework'
+import { decryptMap, decryptMapOpen, isErbHost, isOpenLink, type SharedMap, shareUrl, WrongPassword } from '../lib/shareMap'
 import { EMPTY, ErbDocModals, MarkGlyph, newDraft, TimesByDay, useErbDoc } from './MapasErb'
 
 const PAGE = 8
@@ -84,6 +85,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     hasTimes,
     current,
     link,
+    frag,
     onMapClick,
     onContext,
     onMark,
@@ -97,16 +99,42 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
   } = d
   const ungrouped = useMemo(() => base.points.filter((p) => p.g === undefined), [base.points])
   const hasContent = base.points.length > 0 || marks.some((m) => !m.hidden)
+  const places = useMemo(() => estimateHomeWork(base.points), [base.points])
+  useEffect(() => setShortUrl(null), [frag])
   const [working, setWorking] = useState<string | null>(null)
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null)
   const [qr, setQr] = useState<string | null>(null)
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  const [shortBusy, setShortBusy] = useState(false)
   const photoName = `${(title && !['Mapas ERB', 'MARX Mapas ERB'].includes(title) ? title : 'Mapa_ERB').replace(/[^\w.-]+/g, '_').slice(0, 60)}.png`
+  const makeShort = async () => {
+    if (!frag) return toast.error('Adicione ao menos uma ERB ou ponto.')
+    if (shortUrl) {
+      await navigator.clipboard.writeText(shortUrl).catch(() => {})
+      return toast.success('Link curto copiado')
+    }
+    setShortBusy(true)
+    try {
+      const r = await fetch('/api/erb', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': 'erb' }, body: JSON.stringify({ data: frag }) })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Falha ao gerar o link curto.')
+      const { id } = await r.json()
+      const url = shareUrl(`s${id}`)
+      setShortUrl(url)
+      await navigator.clipboard.writeText(url).catch(() => {})
+      toast.success('Link curto gerado e copiado — abre com um clique no WhatsApp.')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao gerar o link curto.')
+    } finally {
+      setShortBusy(false)
+    }
+  }
   const showQr = async () => {
-    if (!link) return
+    const target = shortUrl || link
+    if (!target) return
     try {
       const qrcode = (await import('qrcode-generator')).default
       const q = qrcode(0, 'M')
-      q.addData(link)
+      q.addData(target)
       q.make()
       setQr(q.createDataURL(6, 8))
     } catch {
@@ -208,6 +236,7 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
         onContext={onContext}
         onMark={onMark}
         focus={focus}
+        places={places}
         onCloseDetail={() => setSel(null)}
         onBackgroundClick={() => (setOpen(false), setAddMenu(false))}
         detail={
@@ -368,6 +397,17 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
               >
                 <QrCode className="h-4 w-4" />
               </button>
+            </div>
+            <div className="mt-2">
+              <button
+                className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 text-[12.5px] font-medium text-[#fff] hover:bg-indigo-700 disabled:opacity-50"
+                onClick={makeShort}
+                disabled={!hasContent || shortBusy}
+                title="Gera um link curto (abre com um clique no WhatsApp, sem cortar). O conteúdo fica guardado no servidor."
+              >
+                {shortBusy ? 'Gerando…' : shortUrl ? '✓ Link curto (copiar de novo)' : 'Gerar link curto (WhatsApp)'}
+              </button>
+              {shortUrl && <div className="mt-1 truncate font-mono text-[11px] text-indigo-600">{shortUrl}</div>}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
@@ -586,9 +626,11 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
  * que está no próprio endereço (#…) — direto (z0/z1/m2/m3) ou com senha (m1, links antigos).
  */
 export default function ErbPage() {
-  const frag = location.hash.slice(1)
+  const raw = location.hash.slice(1)
+  const isShort = /^s[A-Za-z0-9]{6,16}$/.test(raw)
+  const [frag, setFrag] = useState(isShort ? '' : raw)
   const open_ = !frag || isOpenLink(frag)
-  const [map, setMap] = useState<SharedMap | null | undefined>(frag ? undefined : null)
+  const [map, setMap] = useState<SharedMap | null | undefined>(raw ? undefined : null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [password, setPassword] = useState('')
@@ -599,13 +641,22 @@ export default function ErbPage() {
     }
     setMap(m)
   }
+  // link curto (#s<id>): busca o conteúdo no servidor e segue como um link normal
   useEffect(() => {
-    if (!frag || !open_) return
+    if (!isShort) return
+    fetch(`/api/erb/${raw.slice(1)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Mapa não encontrado ou expirado.'))))
+      .then((d) => setFrag(d.data))
+      .catch((x) => setErr(x?.message ?? 'Não foi possível abrir o mapa.'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (!frag || !isOpenLink(frag)) return
     decryptMapOpen(frag)
       .then(accept)
       .catch((x) => setErr(x?.message ?? 'Não foi possível abrir o mapa.'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [frag])
   const openPw = async (e: FormEvent) => {
     e.preventDefault()
     setErr('')

@@ -6,7 +6,7 @@
  */
 import { KEY_RE, newTotpSecret, passwordHash, randomToken, safeEqual, saltFor, type SessionPayload, signSession, totpVerify, verifySession, hmacHex } from './crypto'
 
-export const APP_VERSION = '3.9.0'
+export const APP_VERSION = '3.10.0'
 
 // ---------------------------------------------------------------- tipos mínimos do D1
 
@@ -68,6 +68,8 @@ const SCHEMA = [
   // Falhas de login por IP (IP guardado só como HMAC, apagado após 15 minutos) — proteção contra força bruta.
   `CREATE TABLE IF NOT EXISTS login_failures (ip_hash TEXT NOT NULL, ts INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS login_failures_ip ON login_failures (ip_hash, ts)`,
+  // Mapas ERB compartilhados por link curto (payload já comprimido/cifrado do próprio link).
+  `CREATE TABLE IF NOT EXISTS erb_maps (id TEXT PRIMARY KEY, data TEXT NOT NULL, created INTEGER NOT NULL)`,
 ]
 
 const schemaReady = new WeakMap<DB, Promise<void>>()
@@ -554,6 +556,35 @@ route('GET', '/api/settings', async (ctx) => {
     smtp_configured: false,
     idle_minutes: ctx.c.idle,
   }
+})
+
+// ---------------------------------------------------------------- Mapas ERB: link curto (público)
+// Guarda o conteúdo do link (coordenadas/rótulos já comprimidos) e devolve um id curto, para o
+// link caber no WhatsApp e abrir com um clique. Não exige login (o site Mapas ERB é público).
+const ERB_ID = () => {
+  const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const r = crypto.getRandomValues(new Uint8Array(8))
+  return [...r].map((x) => a[x % a.length]).join('')
+}
+route('POST', '/api/erb', async (ctx) => {
+  const b = await readJson(ctx.req)
+  const data = typeof b.data === 'string' ? b.data : ''
+  if (!data || data.length > 300_000) throw new HttpError(400, 'Conteúdo do mapa ausente ou grande demais.')
+  for (let i = 0; i < 4; i++) {
+    const id = ERB_ID()
+    try {
+      await ctx.env.DB.prepare('INSERT INTO erb_maps (id, data, created) VALUES (?, ?, ?)').bind(id, data, now()).run()
+      return { id }
+    } catch {
+      /* colisão de id (raríssimo): tenta outro */
+    }
+  }
+  throw new HttpError(500, 'Não foi possível gerar o link curto.')
+})
+route('GET', '/api/erb/([A-Za-z0-9]{6,16})', async (ctx, [id]) => {
+  const r = await ctx.env.DB.prepare('SELECT data FROM erb_maps WHERE id = ?').bind(id).first<{ data: string }>()
+  if (!r) throw new HttpError(404, 'Mapa não encontrado ou expirado.')
+  return { data: r.data }
 })
 
 // ---------------------------------------------------------------- entrada

@@ -770,3 +770,34 @@ select {
 .erb-tower-in[style] svg {
   color: var(--tw);
 }
+
+/* MarxMapas: selos de provável residência/trabalho */
+.hw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, 0);
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+}
+.hw-badge .hw-emoji {
+  font-size: 13px;
+}
+.hw-badge b {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.hw-badge.hw-home {
+  background: #16a34a;
+}
+.hw-badge.hw-work {
+  background: #2563eb;
+}
