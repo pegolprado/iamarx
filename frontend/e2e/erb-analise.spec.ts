@@ -1,0 +1,25 @@
+import { expect, test } from '@playwright/test'
+test('Mapas ERB: área provável (interseção) e QR code do link', async ({ page }) => {
+  test.setTimeout(90000)
+  await page.goto('/erb')
+  await page.click('button[aria-label="Abrir painel"]')
+  const addErb = async (name: string, lat: string, lon: string, az: string) => {
+    await page.click('button:has-text("Adicionar")')
+    await page.click('text=Antena / ERB (digitar)')
+    await page.getByLabel('Nome *').fill(name)
+    await page.getByLabel('Latitude *').fill(lat)
+    await page.getByLabel('Longitude *').fill(lon)
+    await page.getByLabel('Azimute (°)').fill(az)
+    await page.click('button:has-text("Salvar")')
+    if (await page.locator('button[aria-label="Abrir painel"]').isVisible()) await page.click('button[aria-label="Abrir painel"]')
+  }
+  await addErb('ERB A', '-23.5000', '-46.6000', '90')
+  await addErb('ERB B', '-23.5000', '-46.5950', '270')
+  await page.click('button[aria-label="Camadas do mapa"]')
+  await page.getByLabel('Área provável').check()
+  await page.waitForTimeout(500)
+  await expect(page.locator('path[stroke="#f59e0b"]').first()).toBeVisible()
+  if (await page.locator('button[aria-label="Abrir painel"]').isVisible()) await page.click('button[aria-label="Abrir painel"]')
+  await page.click('button[aria-label="QR code do link"]')
+  await expect(page.getByRole('dialog', { name: 'QR code do link' }).getByAltText('QR code do link desta análise')).toBeVisible()
+})

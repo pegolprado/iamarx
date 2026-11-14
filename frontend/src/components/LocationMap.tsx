@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import L from 'leaflet'
 import { Layers, Maximize2, Minimize2, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { sectorIntersections } from '../lib/geo'
 import type { LocEvent, Tower } from '../engine/location'
 import { baseLayer, OSM, SATELLITE, STREETS } from './ErbMap'
 import { drawErbs, ERB_OPS, erbSitesIn } from './erbLayer'
@@ -168,6 +169,8 @@ export function LocationMap({
   const erbs = useRef<L.LayerGroup | null>(null)
   const erbRenderer = useRef<L.Canvas | null>(null)
   const [erbOn, setErbOn] = useState(false)
+  const [interOn, setInterOn] = useState(false)
+  const interLayer = useRef<L.LayerGroup | null>(null)
   const [ops, setOps] = useState<Set<number>>(() => new Set([0, 1, 2, 3]))
   const [erbMsg, setErbMsg] = useState('')
   const [layersOpen, setLayersOpen] = useState(false)
@@ -299,6 +302,24 @@ export function LocationMap({
       mk.addTo(g)
     })
   }, [marks, onMark, radius, beam])
+  // área provável do alvo: interseção dos setores das ERBs marcadas (com azimute)
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    interLayer.current ??= L.layerGroup()
+    const g = interLayer.current
+    g.clearLayers()
+    if (!interOn) {
+      m.removeLayer(g)
+      return
+    }
+    g.addTo(m)
+    const erbList = (marks ?? [])
+      .filter((k) => !k.hidden && k.kind === 'erb' && k.az !== null && k.az !== undefined)
+      .map((k) => ({ lat: k.lat, lon: k.lon, az: k.az as number, dist: k.dist || radius, beam: k.beam || beam }))
+    for (const o of sectorIntersections(erbList))
+      L.polygon(o.poly, { color: '#f59e0b', weight: 1, opacity: 0.9, fillColor: '#f59e0b', fillOpacity: 0.28, dashArray: '4 3', interactive: false }).addTo(g)
+  }, [marks, interOn, radius, beam])
   useEffect(() => {
     const m = map.current
     if (!m || !onContext) return
@@ -468,6 +489,10 @@ export function LocationMap({
                   {erbOn && <div className="pl-1 text-[12.5px]">{opsList}</div>}
                 </>
               )}
+              <div className="mt-2 mb-1 border-t border-gray-200 pt-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">Análise</div>
+              <label className="flex cursor-pointer items-center gap-2 py-1 font-medium" title="Pinta onde os leques de duas ou mais ERBs se cruzam — área provável do alvo">
+                <input type="checkbox" checked={interOn} onChange={(e) => setInterOn(e.target.checked)} aria-label="Área provável" /> Área provável (interseção)
+              </label>
             </div>
           )}
         </div>

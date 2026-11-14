@@ -14,6 +14,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  QrCode,
   RadioTower,
   Share2,
   Trash2,
@@ -98,7 +99,20 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
   const hasContent = base.points.length > 0 || marks.some((m) => !m.hidden)
   const [working, setWorking] = useState<string | null>(null)
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null)
+  const [qr, setQr] = useState<string | null>(null)
   const photoName = `${(title && !['Mapas ERB', 'MARX Mapas ERB'].includes(title) ? title : 'Mapa_ERB').replace(/[^\w.-]+/g, '_').slice(0, 60)}.png`
+  const showQr = async () => {
+    if (!link) return
+    try {
+      const qrcode = (await import('qrcode-generator')).default
+      const q = qrcode(0, 'M')
+      q.addData(link)
+      q.make()
+      setQr(q.createDataURL(6, 8))
+    } catch {
+      toast.error('Não foi possível gerar o QR code.')
+    }
+  }
   const makePhoto = async () => {
     setWorking('Gerando a foto…')
     try {
@@ -345,6 +359,15 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
               >
                 <Share2 className="h-4 w-4" /> Copiar
               </button>
+              <button
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-gray-300 px-2.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                onClick={showQr}
+                disabled={!link}
+                aria-label="QR code do link"
+                title="Mostra um QR code para abrir no celular"
+              >
+                <QrCode className="h-4 w-4" />
+              </button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
@@ -510,6 +533,21 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
           </p>
         </div>
       </aside>
+
+      {qr && (
+        <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/50 p-3" onMouseDown={() => setQr(null)}>
+          <div className="w-full max-w-xs rounded-xl bg-[#fff] p-4 text-gray-900 shadow-2xl" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="QR code do link">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[15px] font-semibold">QR code</div>
+              <button className="rounded p-1 text-gray-500 hover:bg-gray-100" onClick={() => setQr(null)} aria-label="Fechar">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <img src={qr} alt="QR code do link desta análise" className="mx-auto w-full max-w-[260px] rounded-lg border border-gray-200" />
+            <p className="mt-2 text-center text-[12px] text-gray-500">Aponte a câmera do celular para abrir este mapa.</p>
+          </div>
+        </div>
+      )}
 
       {photo && (
         <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/50 p-3" onMouseDown={() => (URL.revokeObjectURL(photo.url), setPhoto(null))}>
