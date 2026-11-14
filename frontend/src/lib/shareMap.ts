@@ -241,13 +241,15 @@ function packV3(m: SharedMap) {
         k.label,
         MARK_KINDS.indexOf(k.kind),
         k.color ? MARK_COLORS.indexOf(k.color) : -1,
-        k.az ?? -1,
+        k.az ?? -1, // -1 = sem azimute (0° é um azimute válido e precisa ser preservado)
         // 1000 m e 120° são o padrão e não vão no link
         k.dist && k.dist !== 1000 ? k.dist : 0,
         k.beam && k.beam !== 120 ? k.beam : 0,
         k.hidden ? 1 : 0,
       ]
-      while (a.length > 4 && (a[a.length - 1] === 0 || a[a.length - 1] === -1)) a.pop() // campos vazios no fim não vão no link
+      // remove os campos vazios do fim, cada um com o seu próprio "vazio" (azimute 0 não é vazio)
+      const EMPTY = [null, null, null, null, -1, -1, 0, 0, 0]
+      while (a.length > 4 && a[a.length - 1] === EMPTY[a.length - 1]) a.pop()
       return a
     })
   return o

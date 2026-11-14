@@ -95,6 +95,9 @@ describe('mapa compartilhado', () => {
     expect(a).toBe(await encryptShare(m))
     expect(a.length).toBeLessThan(110)
     expect((await decryptMapOpen(a)).marks?.[0]).toMatchObject({ label: 'GABRIEL - 5799 - 08h59', az: 240 })
+    // azimute 0° (norte) precisa sobreviver ao link curto (não pode virar "sem azimute")
+    const z: SharedMap = { ...m, marks: [{ lat: -23.5, lon: -46.6, label: '8513 - 10h41', kind: 'erb', az: 0 }] }
+    expect((await decryptMapOpen(await encryptShare(z))).marks?.[0]).toMatchObject({ kind: 'erb', az: 0 })
     const at = 6
     const bad = a.slice(0, at) + (a[at] === 'A' ? 'B' : 'A') + a.slice(at + 1)
     await expect(decryptMapOpen(bad)).rejects.toThrow(/corrompido/)
