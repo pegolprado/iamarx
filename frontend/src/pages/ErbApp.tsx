@@ -26,6 +26,7 @@ import { exportSheet } from '../lib/erbSheet'
 import { exportMapPdf, renderMapImage } from '../lib/mapImage'
 import { toast } from 'sonner'
 import { fmtDateTime, fmtInt } from '../lib/format'
+import { dayLabel, filterStats, toHHMM, toMin } from '../lib/erbFilter'
 import { estimateHomeWork } from '../lib/homework'
 import { decryptMap, decryptMapOpen, isErbHost, isOpenLink, type SharedMap, shareUrl, WrongPassword } from '../lib/shareMap'
 import { EMPTY, ErbDocModals, MarkGlyph, newDraft, TimesByDay, useErbDoc } from './MapasErb'
@@ -76,6 +77,11 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     setDraft,
     filter,
     setFilter,
+    erbFilter,
+    setErbFilter,
+    fActive,
+    allDays,
+    view,
     radius,
     beam,
     towers,
@@ -98,8 +104,21 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
     removeUngrouped,
   } = d
   const ungrouped = useMemo(() => base.points.filter((p) => p.g === undefined), [base.points])
-  const hasContent = base.points.length > 0 || marks.some((m) => !m.hidden)
-  const places = useMemo(() => estimateHomeWork(base.points), [base.points])
+  const hasContent = view.length > 0 || marks.some((m) => !m.hidden)
+  const places = useMemo(() => estimateHomeWork(view), [view])
+  const stats = useMemo(() => filterStats(base.points, erbFilter), [base.points, erbFilter])
+  const toggleDay = (day: string) => setErbFilter({ ...erbFilter, days: erbFilter.days.includes(day) ? erbFilter.days.filter((x) => x !== day) : [...erbFilter.days, day] })
+  const setHour = (from: number, to: number) => setErbFilter({ ...erbFilter, from, to })
+  const [range, setRange] = useState<['' | string, '' | string]>(['', ''])
+  const applyRange = (a: string, b: string) => {
+    setRange([a, b])
+    if (a && b) {
+      const [lo, hi] = a <= b ? [a, b] : [b, a]
+      setErbFilter({ ...erbFilter, days: allDays.filter((d) => d >= lo && d <= hi) })
+    }
+  }
+  const chip = (on: boolean) =>
+    clsx('rounded-full border px-2 py-0.5 text-[11.5px] font-medium transition-colors', on ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-[#fff] text-gray-700 hover:bg-gray-100')
   useEffect(() => setShortUrl(null), [frag])
   const [working, setWorking] = useState<string | null>(null)
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null)
@@ -442,6 +461,109 @@ export function ErbApp({ initial }: { initial: SharedMap | null }) {
               <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">Link muito longo: desmarque os dias e horários ou envie a planilha.</p>
             )}
           </Section>
+
+          {allDays.length > 0 && (
+            <Section
+              title="Filtrar por dia e hora"
+              right={
+                fActive ? (
+                  <button className="text-[12px] font-medium text-blue-600 hover:underline" onClick={() => (setErbFilter({ days: [], from: 0, to: 0 }), setRange(['', '']))}>
+                    limpar
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-gray-400">
+                    {fmtInt(allDays.length)} dia{allDays.length > 1 ? 's' : ''}
+                  </span>
+                )
+              }
+            >
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="text-[11.5px] font-medium text-gray-500">Dias</span>
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                      <input
+                        type="date"
+                        className="h-7 !border-gray-300 !bg-[#fff] !px-1.5 !py-0 text-[11px] !text-gray-800"
+                        min={allDays[0]}
+                        max={allDays[allDays.length - 1]}
+                        value={range[0]}
+                        onChange={(e) => applyRange(e.target.value, range[1])}
+                        aria-label="Data inicial do intervalo"
+                      />
+                      <span>→</span>
+                      <input
+                        type="date"
+                        className="h-7 !border-gray-300 !bg-[#fff] !px-1.5 !py-0 text-[11px] !text-gray-800"
+                        min={allDays[0]}
+                        max={allDays[allDays.length - 1]}
+                        value={range[1]}
+                        onChange={(e) => applyRange(range[0], e.target.value)}
+                        aria-label="Data final do intervalo"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-1.5">
+                    <button className={chip(!erbFilter.days.length)} onClick={() => (setErbFilter({ ...erbFilter, days: [] }), setRange(['', '']))}>
+                      Todos
+                    </button>
+                    {allDays.map((d) => {
+                      const { short, wd } = dayLabel(d)
+                      return (
+                        <button key={d} className={chip(erbFilter.days.includes(d))} onClick={() => toggleDay(d)} title={`${short} · ${wd}`}>
+                          {short}
+                          <span className="ml-0.5 text-[9px] opacity-70">{wd}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-[11.5px] font-medium text-gray-500">Horário</div>
+                  <div className="flex items-center gap-2 text-[12.5px] text-gray-700">
+                    <input
+                      type="time"
+                      className="h-8 !border-gray-300 !bg-[#fff] !py-0 text-[12.5px] !text-gray-800"
+                      value={toHHMM(erbFilter.from)}
+                      onChange={(e) => setHour(toMin(e.target.value), erbFilter.to)}
+                      aria-label="Hora inicial"
+                    />
+                    <span className="text-gray-400">até</span>
+                    <input
+                      type="time"
+                      className="h-8 !border-gray-300 !bg-[#fff] !py-0 text-[12.5px] !text-gray-800"
+                      value={toHHMM(erbFilter.to)}
+                      onChange={(e) => setHour(erbFilter.from, toMin(e.target.value))}
+                      aria-label="Hora final"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {(
+                      [
+                        ['Dia 06–18', 360, 1080],
+                        ['Comercial 08–18', 480, 1080],
+                        ['Noite 18–06', 1080, 360],
+                        ['Madrugada 00–06', 0, 360],
+                        ['Dia inteiro', 0, 0],
+                      ] as const
+                    ).map(([l, a, b]) => (
+                      <button key={l} className={chip(erbFilter.from === a && erbFilter.to === b)} onClick={() => setHour(a, b)}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {fActive ? (
+                  <div className="rounded-md bg-blue-50 px-2.5 py-2 text-[12px] leading-snug text-blue-800">
+                    Mostrando <b>{fmtInt(stats.shownEvents)}</b> de {fmtInt(stats.totalEvents)} eventos · <b>{fmtInt(stats.shownErbs)}</b> de {fmtInt(stats.totalErbs)} ERBs. O link, o
+                    Excel e a foto seguem este recorte.
+                  </div>
+                ) : (
+                  <p className="text-[11.5px] leading-snug text-gray-500">Escolha um ou mais dias e/ou uma faixa de horário para ver só esses eventos — o link se atualiza com o recorte.</p>
+                )}
+              </div>
+            </Section>
+          )}
 
           <Section
             title={`Pontos (${fmtInt(marks.length + (base.groups?.length ?? 0) + (ungrouped.length ? 1 : 0))})`}

@@ -8,6 +8,7 @@ import { nextPaint, setProgress } from '../app/progress'
 import { Modal, Notice } from '../components/ui'
 import type { Tower } from '../engine/location'
 import { parseCoord, parseInput, type ParsedItem } from '../lib/coords'
+import { distinctDays, EMPTY_FILTER, type ErbTimeFilter, filterActive, filterPoints } from '../lib/erbFilter'
 import { fmtDateTime, fmtInt } from '../lib/format'
 import { decryptMapOpen, encryptShare, MARK_COLORS, MARK_KINDS, type MapMark, type MarkColor, type MarkKind, type SharedMap, shareUrl, siteUrl, toKml } from '../lib/shareMap'
 
@@ -305,10 +306,15 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
   const [help, setHelp] = useState(false)
   const [filter, setFilter] = useState('')
   const [addMenu, setAddMenu] = useState(false)
-  const towers = useMemo(() => (showAnalysis ? toTowers(base) : []), [base, showAnalysis])
+  // recorte por dia e hora dos eventos (planilhas com muitos dias/horários)
+  const [erbFilter, setErbFilter] = useState<ErbTimeFilter>(EMPTY_FILTER)
+  const fActive = filterActive(erbFilter)
+  const allDays = useMemo(() => distinctDays(base.points), [base.points])
+  const view = useMemo(() => filterPoints(base.points, erbFilter), [base.points, erbFilter])
+  const towers = useMemo(() => (showAnalysis ? toTowers({ ...base, points: view }) : []), [base, view, showAnalysis])
   const path = useMemo(
-    () => (showAnalysis ? (base.path ?? []).map((x) => ({ a: [x[0], x[1]] as [number, number], b: [x[2], x[3]] as [number, number], n: x[4] })) : []),
-    [base, showAnalysis],
+    () => (showAnalysis && !fActive ? (base.path ?? []).map((x) => ({ a: [x[0], x[1]] as [number, number], b: [x[2], x[3]] as [number, number], n: x[4] })) : []),
+    [base, showAnalysis, fActive],
   )
   const radius = base.radius ?? DEF_DIST
   const beam = base.beam ?? DEF_BEAM
@@ -317,8 +323,14 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
   const [withTimes, setWithTimes] = useState(true)
   const hasTimes = base.points.some((p) => p.times?.length)
   const current = useMemo<SharedMap>(
-    () => ({ ...base, points: withTimes ? base.points : base.points.map((p) => ({ ...p, times: undefined })), title: title.trim() || 'Mapas ERB', marks }),
-    [base, title, marks, withTimes],
+    () => ({
+      ...base,
+      points: withTimes ? view : view.map((p) => ({ ...p, times: undefined })),
+      path: fActive ? [] : base.path,
+      title: title.trim() || 'Mapas ERB',
+      marks,
+    }),
+    [base, title, marks, withTimes, view, fActive],
   )
   useEffect(() => {
     let alive = true
@@ -480,6 +492,11 @@ export function useErbDoc(initial: SharedMap | null, urlPath: string | null) {
     setFilter,
     addMenu,
     setAddMenu,
+    erbFilter,
+    setErbFilter,
+    fActive,
+    allDays,
+    view,
     towers,
     path,
     radius,
