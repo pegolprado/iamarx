@@ -3,6 +3,8 @@
  * exportação do Mapas ERB e leitura de volta, agrupando os eventos por ERB (com dias e horários).
  */
 import { readXlsx } from '../engine/xlsxRaw'
+import { readCdrWorkbook } from '../engine/preterita'
+import { cdrErbPoints } from '../engine/preteritaStats'
 import { parseCoord } from './coords'
 import { downloadXlsx } from './xlsxBook'
 import type { MapMark, SharedMap, SitePoint } from './shareMap'
@@ -115,12 +117,45 @@ export function toIso(v: string): string | null {
 export type SheetImport = { points: SitePoint[]; marks: MapMark[]; rows: number; skipped: number; radius: number | null; groups: string[] }
 
 /**
+ * Detecta e lê um extrato de chamadas da operadora (ex.: Vivo "Relatório de chamadas" + "Endereço
+ * das ERBs"), devolvendo apenas as ERBs geolocalizadas como pontos do mapa (setor por azimute,
+ * contagem de registros e dias/horários). Retorna null se não for esse formato — aí segue o
+ * caminho genérico, sem alterar o comportamento atual. Só entram células com coordenada confirmada.
+ */
+function tryOperatorCdr(buf: Uint8Array, fileName: string): SheetImport | null {
+  let cdr
+  try {
+    cdr = readCdrWorkbook(buf, fileName)
+  } catch {
+    return null
+  }
+  const hasErbSheet = cdr.sheets.some((s) => s.kind === 'erbs')
+  const hasCallSheet = cdr.sheets.some((s) => s.kind === 'chamadas' || s.kind === 'tugo' || s.kind === 'wifi')
+  const geocoded = [...cdr.erbs.values()].some((e) => e.found)
+  if (!hasErbSheet || !hasCallSheet || !geocoded || !cdr.events.length) return null
+  const points = cdrErbPoints(cdr.events, cdr.erbs).map((p) => ({ ...p, g: 0 }))
+  if (!points.length) return null
+  // registros que não puderam ser plotados (célula sem coordenada ou sem célula): contagem honesta
+  const skipped = cdr.events.filter((e) => !e.cgi || !cdr.erbs.get(e.cgi)?.found).length
+  const target = cdr.target || fileName.replace(/\.[^.]+$/, '')
+  return { points, marks: [], rows: cdr.events.length, skipped, radius: null, groups: [target] }
+}
+
+/**
  * Lê uma planilha (xlsx ou csv) com colunas Latitude/Longitude (e, se houver, Azimute, Célula,
  * Raio, Data do evento, Localização): eventos viram ERBs da análise com dias e horários; linhas
- * "ERB"/"Lugar" exportadas pelo MARX voltam como pontos marcados.
+ * "ERB"/"Lugar" exportadas pelo MARX voltam como pontos marcados. Extratos de chamadas da operadora
+ * (Vivo etc.) são reconhecidos automaticamente e voltam como ERBs no mapa.
  */
 export async function importSheet(file: File): Promise<SheetImport> {
   const buf = new Uint8Array(await file.arrayBuffer())
+  // Extrato de chamadas da operadora (Vivo e afins): abas "Relatório de chamadas" + "Endereço das
+  // ERBs". A geolocalização vem do cruzamento do CGI, não de colunas Latitude/Longitude na aba
+  // principal — por isso o caminho genérico abaixo não o lê. Aqui voltam só as ERBs para o mapa.
+  if (!/\.csv$|\.txt$/i.test(file.name)) {
+    const cdr = tryOperatorCdr(buf, file.name)
+    if (cdr) return cdr
+  }
   let rows: string[][]
   if (/\.csv$|\.txt$/i.test(file.name)) {
     const text = new TextDecoder().decode(buf)

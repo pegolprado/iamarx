@@ -6,7 +6,7 @@
  */
 import { KEY_RE, newTotpSecret, passwordHash, randomToken, safeEqual, saltFor, type SessionPayload, signSession, totpVerify, verifySession, hmacHex } from './crypto'
 
-export const APP_VERSION = '3.12.0'
+export const APP_VERSION = '3.13.0'
 
 // ---------------------------------------------------------------- tipos mínimos do D1
 

@@ -67,3 +67,39 @@ describe('planilha do Mapas ERB', () => {
     expect(a.name).toBe('RUA GASPARINO LUNARDI, 176 - OSASCO/SP')
   })
 })
+
+describe('importSheet: extrato de chamadas da operadora (Vivo) → ERBs no mapa', () => {
+  it('lê o workbook de chamadas + endereços e volta as ERBs geolocalizadas com setor e horários', async () => {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    const w1 = wb.addWorksheet('Relatório de chamadas')
+    ;[
+      ['', 'Linha:11999990000'],
+      [''],
+      ['Data', 'Hora', 'Chamador', 'IMEI Chamador', 'Chamado', 'IMEI Chamado', 'Desc', 'Hora desc', 'Durac', 'Status', 'Tra', 'GMT Origem', 'GMT Destino', 'Local Origem', 'Local Destino', 'Tec Origem', 'Tec Destino'],
+      ['01/06/2026', '10:15:00', '', '', '11999990000', '', '', '10:15:30', '30', 'Completada', 'Voz', '', '-3', '', '724-10-41011-41654', '', 'GSM'],
+      ['01/06/2026', '22:40:00', '11999990000', '', '', '', '', '22:41:00', '60', 'Completada', 'Voz', '-3', '', '724-10-41011-41654', '', 'GSM', ''],
+      ['02/06/2026', '09:05:00', '11999990000', '', '', '', '', '', '0', 'Entregue', 'TORP.', '-3', '', '724-10-99999-00000', '', 'LTE', ''],
+    ].forEach((r) => w1.addRow(r))
+    const w2 = wb.addWorksheet('Endereço das ERBs')
+    ;[
+      ['', 'Linha:11999990000'],
+      [''],
+      ['CGI', 'CCC', 'Sigla', 'ERB', 'Sigla', 'Set', 'Azi', 'Tecnologia', 'Latitude', 'Longitude', 'UF', 'Cidade', 'Bairro', 'Endereço'],
+      ['724-10-41011-41654', '0', 'MWTCTPD', '4165', 'WPRZ1', '4', '305', 'WCDMA', '-23-34-34,43', '-46-38-25,41', 'SP', 'SÃO PAULO', 'VILA MARIANA', 'RUA VERGUEIRO, 1571'],
+      ['724-10-99999-00000', '0', '', '', '', '', '', '', '', '', '', 'CADASTRO NAO ENCONTRADO', '', 'x'],
+    ].forEach((r) => w2.addRow(r))
+    const buf = await wb.xlsx.writeBuffer()
+    const file = new File([buf], 'consulta.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const r = await importSheet(file)
+    expect(r.rows).toBe(3) // registros lidos
+    expect(r.points).toHaveLength(1) // 1 ERB geolocalizada (a outra é "cadastro não encontrado")
+    expect(r.skipped).toBe(1) // 1 célula sem coordenada
+    expect(r.groups).toEqual(['11999990000'])
+    const p = r.points[0]
+    expect(p.lat).toBeCloseTo(-23.57623, 4)
+    expect(p.az).toContain(305)
+    expect(p.events).toBe(2)
+    expect(p.times).toEqual(['2026-06-01 10:15', '2026-06-01 22:40'])
+  })
+})

@@ -288,6 +288,85 @@ export function analyze(events: CdrEvent[], erbDir: Map<string, ErbInfo>): CdrSt
   }
 }
 
+/**
+ * Converte o extrato (eventos + diretório de ERBs) em antenas para o mapa de ERBs, no padrão do
+ * app público: um ponto por estação (lat/lon), com setores por azimute (cl), contagem de registros,
+ * e os dias/horários dos eventos para o filtro por dia e hora. Só entram células com coordenada
+ * confirmada — nenhuma posição é presumida.
+ */
+export function cdrErbPoints(events: CdrEvent[], erbDir: Map<string, ErbInfo>): SitePoint[] {
+  type Acc = {
+    lat: number
+    lon: number
+    events: number
+    voice: number
+    sms: number
+    data: number
+    az: Set<number>
+    cl: Map<string, [number | null, number]>
+    times: string[]
+    name: string
+    first: string | null
+    last: string | null
+  }
+  const sites = new Map<string, Acc>()
+  for (const e of events) {
+    if (!e.cgi) continue
+    const info = erbDir.get(e.cgi)
+    if (!info?.found || info.lat === null || info.lon === null) continue
+    const key = `${info.lat.toFixed(5)},${info.lon.toFixed(5)}`
+    let s = sites.get(key)
+    if (!s) {
+      s = {
+        lat: info.lat,
+        lon: info.lon,
+        events: 0,
+        voice: 0,
+        sms: 0,
+        data: 0,
+        az: new Set<number>(),
+        cl: new Map(),
+        times: [],
+        name: [info.address, info.district, info.city].filter(Boolean).join(' · ') || info.station || info.cgi,
+        first: null,
+        last: null,
+      }
+      sites.set(key, s)
+    }
+    s.events++
+    if (e.kind === 'voz') s.voice++
+    else if (e.kind === 'sms') s.sms++
+    else if (e.kind === 'dados') s.data++
+    if (info.az !== null) s.az.add(info.az)
+    const cur = s.cl.get(e.cgi) ?? [info.az, 0]
+    cur[1]++
+    s.cl.set(e.cgi, cur)
+    if (e.ts) {
+      const t = `${e.ts.slice(0, 10)} ${e.ts.slice(11, 16)}`
+      s.times.push(t)
+      if (!s.first || e.ts < s.first) s.first = e.ts
+      if (!s.last || e.ts > s.last) s.last = e.ts
+    }
+  }
+  return [...sites.values()]
+    .sort((a, b) => b.events - a.events)
+    .map((s) => ({
+      lat: s.lat,
+      lon: s.lon,
+      events: s.events,
+      voice: s.voice,
+      sms: s.sms,
+      data: s.data,
+      az: [...s.az],
+      cells: [...s.cl.keys()],
+      cl: [...s.cl.entries()].map(([cell, [az, n]]) => [cell, az, n] as [string, number | null, number]),
+      first: s.first ? `${s.first.slice(0, 10)} ${s.first.slice(11, 16)}` : null,
+      last: s.last ? `${s.last.slice(0, 10)} ${s.last.slice(11, 16)}` : null,
+      name: s.name,
+      times: s.times.length ? s.times.sort() : undefined,
+    }))
+}
+
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 const hhmmss = (s: number) => {
   const h = Math.floor(s / 3600)
