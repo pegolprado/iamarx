@@ -38,6 +38,7 @@ const InvmarxHub = lazy(() => import('./pages/invmarx/Hub'))
 const InvWaBilling = lazy(() => import('./pages/invmarx/WaBilling'))
 const InvWaLinks = lazy(() => import('./pages/invmarx/WaLinks'))
 const InvExtrato = lazy(() => import('./pages/invmarx/Extrato'))
+const InvPreterita = lazy(() => import('./pages/invmarx/Preterita'))
 const InvMapasErb = lazy(() => import('./pages/invmarx/MapasErbTool'))
 const InvSteg = lazy(() => import('./pages/invmarx/Steg'))
 const InvFaceCompare = lazy(() => import('./pages/invmarx/FaceCompare'))
@@ -82,6 +83,7 @@ export default function App() {
             <Route path="invmarx/whatsapp" element={<InvWaBilling />} />
             <Route path="invmarx/whatsapp-vinculos" element={<InvWaLinks />} />
             <Route path="invmarx/extrato" element={<InvExtrato />} />
+            <Route path="invmarx/preterita" element={<InvPreterita />} />
             <Route path="invmarx/mapas-erb" element={<InvMapasErb />} />
             <Route path="marxtool" element={<MarxToolHub />} />
             <Route path="marxtool/secret" element={<InvSteg />} />

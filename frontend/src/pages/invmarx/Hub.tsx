@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, FileText, Map as MapIcon, Network } from 'lucide-react'
+import { ChevronRight, Clock, FileText, History, Map as MapIcon, Network } from 'lucide-react'
 import { MarxLogo } from '../../components/brand'
 import { Link } from 'react-router-dom'
 import { Notice } from '../../components/ui'
@@ -24,6 +24,13 @@ export const INVMARX_TOOLS = [
     icon: <Clock />,
     tone: 'text-accent border-line bg-panel-2',
     text: 'Planilha da operadora (Vigia / relatório de localização — Vivo, TIM, Claro): ERBs no mapa com azimute, deslocamentos, playback, provável residência e trabalho.',
+  },
+  {
+    to: '/invmarx/preterita',
+    title: 'Pretérita — Operadoras',
+    icon: <History />,
+    tone: 'text-amber border-line bg-panel-2',
+    text: 'Extrato histórico de chamadas da operadora (Vivo e outras): lê a planilha inteira, gera painel, linha do tempo, ranking de números, ERBs no mapa com azimute, análise automática e exporta Excel.',
   },
   {
     to: '/invmarx/mapas-erb',
